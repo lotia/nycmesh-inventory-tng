@@ -26,11 +26,11 @@ stays.{% endtrans %}</p>
     <td>{{ shown.item }}, {{ shown.package }} · {{ shown.place }}</td>
     <td>{% trans left=shown.left | amount, unit=shown.unit %}Shows {{ left }} {{ unit }}.{% endtrans %}
       {% if row.length_reported is not none %}
-      {% if each.reported_by %}{% trans who=each.reported_by, said=row.length_reported | amount, unit=shown.unit, when=row.length_reported_at | when(zone) %}{{ who }} said {{ said }} {{ unit }} is on it, {{ when }}.{% endtrans %}
-      {%- else %}{% trans said=row.length_reported | amount, unit=shown.unit, when=row.length_reported_at | when(zone) %}Someone said {{ said }} {{ unit }} is on it, {{ when }}.{% endtrans %}{% endif %}
+      {% if each.reported_by %}{% trans who=each.reported_by, said=row.length_reported | amount, unit=row.length_reported_unit, when=row.length_reported_at | when(zone) %}{{ who }} said {{ said }} {{ unit }} is on it, {{ when }}.{% endtrans %}
+      {%- else %}{% trans said=row.length_reported | amount, unit=row.length_reported_unit, when=row.length_reported_at | when(zone) %}Someone said {{ said }} {{ unit }} is on it, {{ when }}.{% endtrans %}{% endif %}
       {% endif %}
       {% if row.below_zero_at %}{% trans when=row.below_zero_at | when(zone) %}Went below zero {{ when }}.{% endtrans %}{% endif %}</td>
-    <td>{% for cut in each.cuts %}{{ cut.quantity | amount }} {{ shown.unit }}, {{ cut.by }}, {{ cut.at | when(zone) }}{% if not loop.last %}<br>{% endif %}{% else %}{% trans %}None{% endtrans %}{% endfor %}</td>
+    <td>{% for cut in each.cuts %}{{ cut.quantity | amount }} {{ cut.unit }}, {{ cut.by }}, {{ cut.at | when(zone) }}{% if not loop.last %}<br>{% endif %}{% else %}{% trans %}None{% endtrans %}{% endfor %}</td>
     <td>
       <form method="post" action="{{ here }}/{{ row.id }}/set{{ view.query_string }}" class="actions">
         <input type="hidden" name="seen" value="{{ each.seen }}">

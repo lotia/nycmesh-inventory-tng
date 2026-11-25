@@ -286,7 +286,7 @@ class RecordedLine(BaseModel):
     package_size: Decimal | None
     open_package_key: uuid.UUID | None
     whole: bool | None
-    # Its item's unit, fixed once it moved.
+    # The unit it was recorded in.
     unit: str
 
 

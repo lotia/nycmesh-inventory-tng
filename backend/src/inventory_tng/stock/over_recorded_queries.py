@@ -131,9 +131,10 @@ class Shown(NamedTuple):
     row: OverRecorded
     item_id: int
     item: str
+    # The unit its line was recorded in.
     unit: str
     # How much more was recorded: whole packages, as times() words them, or
-    # so much in the item's unit.
+    # so much in `unit`.
     amount: str
     transaction_id: int
     kind: str
@@ -253,7 +254,8 @@ def _checks(*columns: SQLColumnExpression[Any]) -> Select:
             OverRecorded,
             Item.id,
             Item.name_shown,
-            Item.unit,
+            # Its amounts are said in the unit its line was recorded in.
+            Movement.unit,
             ItemPackage.name_shown,
             ItemPackage.size,
             Movement.from_open_package_id,

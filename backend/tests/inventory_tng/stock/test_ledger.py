@@ -28,6 +28,7 @@ from inventory_tng.scan.batch_schemas import BodyRefusedReply
 from inventory_tng.stock.balance import balance, countable, retired_places_holding_stock
 from inventory_tng.stock.counts import record_adjustment, record_count
 from inventory_tng.stock.ledger import (
+    Entry,
     insert_transaction,
     line_breaks,
     lines_break,
@@ -395,7 +396,10 @@ def test_an_item_once_in_a_transaction_is_the_databases_too(
     with violates(session, "uq_movement_line"):
         session.execute(
             insert(Movement).values(
-                transaction_id=transaction.id, item_id=place.item.id, quantity=1
+                transaction_id=transaction.id,
+                item_id=place.item.id,
+                quantity=1,
+                unit=place.item.unit,
             )
         )
 
@@ -403,9 +407,75 @@ def test_an_item_once_in_a_transaction_is_the_databases_too(
 def test_a_line_of_no_item_is_the_foreign_keys_to_refuse(
     session: Session, place: Place
 ) -> None:
+    """Given a unit, as it has none of its own to be written in."""
     header = {"kind": "receipt", "to_location_id": place.store.id}
+    line = Entry(999999, Decimal(1), unit="each")
     with violates(session, "fk_movement_item_id_item"):
-        insert_transaction(session, uuid.uuid4(), header, [(999999, Decimal(1))])
+        insert_transaction(session, uuid.uuid4(), header, [line])
+
+
+# Each line records the unit it was entered in (inventory-tng-2rlr)
+
+
+def _units(session: Session, transaction_id: int) -> list[str]:
+    return list(
+        session.scalars(
+            select(Movement.unit).where(Movement.transaction_id == transaction_id)
+        )
+    )
+
+
+def test_lines_record_the_unit_they_were_shown_or_counted_in(
+    client: TestClient, session: Session, place: Place
+) -> None:
+    """A batch's line in the unit the scan page showed; a count's, read
+    from the records, and an adjustment's, as its form showed it, in the
+    cable's."""
+    lines = [{"item_id": place.cable.id, "quantity": "50", "unit": "m"}]
+    sent = client.post(
+        URL,
+        json=place.batch(kind="receipt", lines=lines)
+        | {
+            "from_location_id": None,
+            "to_location_id": place.store.id,
+        },
+    )
+    assert sent.status_code == 201
+    assert _units(session, sent.json()["transaction_id"]) == ["m"]
+    admin = add(session, Admin(username=f"ada-{tag()}"))
+    (counted,) = record_count(
+        session,
+        uuid.uuid4(),
+        admin.id,
+        place.store.id,
+        [(place.cable.id, Decimal(40))],
+        Moment(sent.json()["transaction_id"], 1),
+    ).written
+    found = named(session, AdjustmentReason, "Found")
+    (adjusted,) = record_adjustment(
+        session,
+        uuid.uuid4(),
+        admin.id,
+        place.store.id,
+        place.cable.id,
+        Decimal("2.5"),
+        found=True,
+        reason_id=found.id,
+        shown_unit="m",
+    )
+    assert [_units(session, each.id) for each in (counted, adjusted)] == [["m"]] * 2
+
+
+def test_a_line_in_another_unit_than_its_items_is_refused(
+    session: Session, place: Place
+) -> None:
+    """Never written in a unit its item is not counted in: the page that
+    showed it checks first (units_shown), and the ledger holds it too."""
+    header = {"kind": "receipt", "to_location_id": place.store.id}
+    line = Entry(place.cable.id, Decimal(50), unit="ft")
+    with breaks(session, "movement_unit"):
+        insert_transaction(session, uuid.uuid4(), header, [line])
+    assert not session.scalars(select(Movement)).all()
 
 
 def test_the_server_clock_decides_when(

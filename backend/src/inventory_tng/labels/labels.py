@@ -137,8 +137,9 @@ class Named:
 def _package_words(item: Item, package: ItemPackage) -> str:
     """A package's label's words, its size in the one style every printed
     label uses, whatever the locale of whoever prints it: a point and no
-    grouping, "305 m", "1500.5 m" (Ali, 2026-11-23, inventory-tng-qnwz)."""
-    size = f"{plain_amount(package.size)}{unit_after(item.unit)}"
+    grouping, "305 m", "1500.5 m" (Ali, 2026-11-23, inventory-tng-qnwz), in
+    the package's own unit."""
+    size = f"{plain_amount(package.size)}{unit_after(package.unit)}"
     return package_label(item.name_shown, package.name_shown, size)
 
 

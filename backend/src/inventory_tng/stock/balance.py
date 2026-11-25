@@ -24,27 +24,31 @@ from inventory_tng.core.db_sessions import by_name, exists_where
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
+from inventory_tng.stock.line_amounts import in_items_unit
 
 
 def _sides() -> Subquery:
     """Each side of every line, as stock into a place (+) or out of it (-),
-    in the form it is in there. Each side is a select of its own, joined by
-    UNION ALL, so a filter on a place or an item reaches the indexes on each
-    side, instead of summing the whole ledger first."""
-    moved = select(Movement.item_id).join(
-        LedgerTransaction, LedgerTransaction.id == Movement.transaction_id
+    in the form it is in there, in the item's unit (line_amounts). Each
+    side is a select of its own, joined by UNION ALL, so a filter on a
+    place or an item reaches the indexes on each side, instead of summing
+    the whole ledger first."""
+    moved = (
+        select(Movement.item_id)
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .join(Item, Item.id == Movement.item_id)
     )
     into = moved.add_columns(
         LedgerTransaction.to_location_id.label("location_id"),
         Movement.to_package_id.label("package_id"),
         Movement.to_open_package_id.label("open_package_id"),
-        Movement.quantity.label("quantity"),
+        in_items_unit().label("quantity"),
     ).where(LedgerTransaction.to_location_id.is_not(None))
     out = moved.add_columns(
         LedgerTransaction.from_location_id,
         Movement.from_package_id,
         Movement.from_open_package_id,
-        -Movement.quantity,
+        -in_items_unit(),
     ).where(LedgerTransaction.from_location_id.is_not(None))
     return union_all(into, out).subquery("side")
 

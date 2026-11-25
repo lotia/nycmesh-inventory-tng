@@ -9,7 +9,8 @@ by 0020 (sealed and open packages), 2026-11-15 (counting some items),
 count's moment stays a ledger number), 2026-11-19 and 2026-11-20 (a
 retired package with none left is never taken), 2026-11-21 (a store
 counted with its areas), 2026-11-23 (work saved as it was shown),
-2026-11-24 (a retired item counted to zero)
+2026-11-24 (a retired item counted to zero), 2026-11-24 (every stored
+amount records its unit)
 
 ## Context
 
@@ -342,3 +343,31 @@ balance is not zero at any current place, in any form, as sealed and
 loose that net to nothing are still to be counted. A retired item at
 zero everywhere is not offered. Takes of a retired item stay allowed.
 Rejected: refusing a take of a retired item that would go below zero.
+
+## Amendment: every stored amount records its unit (2026-11-24)
+
+Decided by Ali on 2026-11-24 (inventory-tng-2rlr, from the investigation
+inventory-tng-hsq1). An amount stored apart from its item records its
+unit beside it, rather than being read in whatever unit the item has now:
+
+- A ledger line, in the unit it was entered in: the one its page showed
+  (a batch line's, an adjustment form's, an open package's count
+  confirmed in its line's unit), or, for an amount read from the records
+  as a count's difference is, its item's.
+- A package's size and too-short length, a vendor offer's units per
+  order, what a volunteer said is on an open package, and how much more
+  a line was recorded with than moved.
+- An item's own reorder point and amount on order are in its unit, on
+  the same row.
+
+The ledger writes a line only in its item's unit, as it holds the item.
+Every sum of the ledger adds only lines in their item's unit: the
+database refuses one in another as it reads it, so no sum mixes units
+unawares, and converting is a change of its own. Pages show each past
+line in its own unit. While an item's unit may still change, its
+packages and vendor offers change with it, their numbers as typed.
+
+The units were added by a new migration rather than by rewriting the
+initial one, each filled from its item's, so a database already migrated
+keeps its data (coordinator, 2026-11-25). The fill is exact, as an
+item's unit is fixed once stock has moved in it.

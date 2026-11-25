@@ -144,24 +144,22 @@ class Recorded(NamedTuple):
 
 
 def entry_of(line: batch_schemas.Line, kind: str, opened: int | None = None) -> Entry:
-    """A batch's line as the ledger writes it: sealed on each side `kind`
-    has, loose outside. An opening's leaves sealed and arrives as the open
-    package `opened`, or loose."""
+    """A batch's line as the ledger writes it, in the unit the page showed
+    it in: sealed on each side `kind` has, loose outside. An opening's
+    leaves sealed and arrives as the open package `opened`, or loose."""
     sealed = Form(package_id=line.package_id)
     if kind == "open":
         arrives = Form(open_package_id=opened) if opened is not None else LOOSE
-        return Entry(line.item_id, line.quantity, sealed, arrives)
-    if opened is not None:
+        leaves = sealed
+    elif opened is not None:
         # Taken from an open package: cut loose, or moved whole.
-        taken = Form(open_package_id=opened)
-        return Entry(line.item_id, line.quantity, taken, taken if line.whole else LOOSE)
-    has_from, has_to = batch_schemas.SIDES[kind]
-    return Entry(
-        line.item_id,
-        line.quantity,
-        sealed if has_from else LOOSE,
-        sealed if has_to else LOOSE,
-    )
+        leaves = Form(open_package_id=opened)
+        arrives = leaves if line.whole else LOOSE
+    else:
+        has_from, has_to = batch_schemas.SIDES[kind]
+        leaves = sealed if has_from else LOOSE
+        arrives = sealed if has_to else LOOSE
+    return Entry(line.item_id, line.quantity, leaves, arrives, line.unit)
 
 
 def record(
@@ -230,8 +228,9 @@ def record(
             problems.append((("used_up", number), "moved_whole"))
     twice = repeated(length_keys)
     # What is said to be on one of an item counted each is whole, as the
-    # scan page asks (Ali, 2026-11-23, inventory-tng-uwi3). Read without a
-    # lock: an open package exists only once stock moved in its item, which
+    # scan page asks (Ali, 2026-11-23, inventory-tng-uwi3), and is kept in
+    # its item's unit (open_packages.report_length). Read without a lock:
+    # an open package exists only once stock moved in its item, which
     # fixes its unit for good (catalogue/items.unit_fixed).
     units = values_by(
         session,
@@ -289,12 +288,9 @@ def record(
         if not batch.lines[number].whole:
             cuts[open_id] += batch.lines[number].quantity
     for each in lengths:
+        row = rows[measured[each.open_package_key]]
         open_packages.report_length(
-            session,
-            rows[measured[each.open_package_key]],
-            each.left,
-            batch.volunteer_id,
-            transaction,
+            session, row, each.left, units[row.item_id], batch.volunteer_id, transaction
         )
     for open_id, cut in cuts.items():
         open_packages.went_below_zero(
@@ -628,14 +624,19 @@ def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction |
             Movement.from_open_package_id,
             Movement.to_package_id,
             Movement.to_open_package_id,
+            Movement.unit,
         ).where(Movement.transaction_id == transaction.id)
     ).all()
-    # Each line as written, by its movement.
+    # Each line as written, by its movement, in the unit it was written in.
     movements = {
         movement_id: Entry(
-            item_id, quantity, Form(from_package, from_open), Form(to_package, to_open)
+            item_id,
+            quantity,
+            Form(from_package, from_open),
+            Form(to_package, to_open),
+            unit,
         )
-        for movement_id, item_id, quantity, from_package, from_open, to_package, to_open in rows
+        for movement_id, item_id, quantity, from_package, from_open, to_package, to_open, unit in rows
     }
     # As many of each line, whatever their order: an item may be on several
     # lines, in different forms.
@@ -743,10 +744,10 @@ def _as_batch(
         ItemPackage.size,
         {f.package_id for f in forms if f.package_id},
     )
-    # A moved item's unit is fixed (catalogue/items.py): the one it moved in.
-    units = values_by(session, Item.id, Item.unit, {line.item_id for line in lines})
 
     def line_of(line: Entry) -> batch_schemas.RecordedLine:
+        # Read from its movement, so in the unit it was written in.
+        assert line.unit is not None
         if transaction.kind == "open":
             # Sealed, opened into a followed open package or loose.
             package_id = line.leaves.package_id
@@ -767,7 +768,7 @@ def _as_batch(
             package_size=sizes.get(package_id) if package_id is not None else None,
             open_package_key=keys.get(open_id) if open_id is not None else None,
             whole=whole,
-            unit=units[line.item_id],
+            unit=line.unit,
         )
 
     return batch_schemas.RecordedBatch(

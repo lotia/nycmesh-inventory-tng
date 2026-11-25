@@ -462,29 +462,22 @@ def test_answers_go_back_to_the_page_they_came_from(
 
 
 def test_a_length_of_an_item_counted_each_is_whole(
-    admin_client: TestClient,
-    registered_client: TestClient,
-    session: Session,
-    spools: Spools,
+    admin_client: TestClient, registered_client: TestClient, session: Session
 ) -> None:
+    spools = Spools(session, unit="each")
     made = spools.opened()
     registered_client.post(URL, json=report(spools, length(made, "250")))
-    spools.cable.unit = "each"
-    session.flush()
     form = set_form(session, made, "2.5")
     done = admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
     assert done.headers["location"] == f"{LENGTHS}?notice=length_bad"
 
 
 def test_what_is_in_an_open_box_of_pieces_is_whole(
-    admin_client: TestClient,
-    registered_client: TestClient,
-    session: Session,
-    spools: Spools,
+    admin_client: TestClient, registered_client: TestClient, session: Session
 ) -> None:
     # Ali, 2026-11-23, inventory-tng-uwi3: the server refuses it, as the
     # scan page does. The spools' item made pieces, counted each.
-    spools.cable.unit = "each"
+    spools = Spools(session, unit="each")
     made = spools.opened()
     response = registered_client.post(URL, json=report(spools, length(made, "2.5")))
     assert response.status_code == 422
@@ -510,7 +503,7 @@ def test_a_report_of_one_closed_is_not_kept(session: Session, spools: Spools) ->
     transaction = session.scalars(select(LedgerTransaction)).first()
     assert transaction is not None
     open_packages.report_length(
-        session, made, Decimal(1), spools.place.volunteer.id, transaction
+        session, made, Decimal(1), "m", spools.place.volunteer.id, transaction
     )
     session.refresh(made)
     assert made.length_reported is None
@@ -547,10 +540,16 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     picker = page.one("select", name="found_package_id")
     assert "data-hinted" in picker.one("option", value=str(spools.spool.id)).attrs
     assert picker.one("option", value=str(box.id)).attrs.keys() == {"value"}
-    # Counted each, as the plugs are: none.
-    spools.cable.unit = "each"
-    session.flush()
-    page = text(admin_client.get(f"/admin/counts/{store}"))
+
+
+def test_the_count_page_hints_at_no_printed_length_of_items_counted_each(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Counted each, as plugs are: none, of the open packages nor under one
+    nobody recorded."""
+    pieces = Spools(session, unit="each")
+    pieces.opened()
+    page = text(admin_client.get(f"/admin/counts/{pieces.store.id}"))
     assert str(formatting.PRINTED_LENGTH) not in page
     assert "hint-found_left" not in page
 

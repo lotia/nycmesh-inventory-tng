@@ -6,6 +6,7 @@ import uuid
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -64,17 +65,22 @@ def test_its_count_box_shows_the_keypad_its_items_unit_takes(
     admin_client: TestClient, registered_client: TestClient, session: Session
 ) -> None:
     """Metres take a decimal point; an item counted each, whose count is
-    whole (forms.confirmed_count), the number keypad (inventory-tng-qt6z).
-    The cable is made each once it waits, to show the same row both ways."""
-    spools = Spools(session)
-    moved_whole(registered_client, spools)
-    keyboards = []
+    whole (forms.confirmed_count), the number keypad (inventory-tng-qt6z):
+    one of each waiting, its row's keypad by the unit its line was
+    recorded in."""
+    keyboards = {}
     for unit in ("m", "each"):
-        spools.cable.unit = unit
-        session.flush()
-        page = admin_client.get(PAGE).text
-        keyboards.append(read(page).one("input", name="count").attrs["inputmode"])
-    assert keyboards == ["decimal", "numeric"]
+        spools = Spools(session, unit=unit)
+        moved_whole(registered_client, spools)
+        keyboards[spools.cable.name_shown] = unit
+    page = read(admin_client.get(PAGE).text)
+    shown = {
+        row.all("td")[0].text: row.one("input", name="count").attrs["inputmode"]
+        for row in page.all("tr")
+        if row.all("input", name="count")
+    }
+    keypads = {"m": "decimal", "each": "numeric"}
+    assert shown == {name: keypads[unit] for name, unit in keyboards.items()}
 
 
 def test_its_count_confirmed_as_it_was_writes_nothing(
@@ -114,6 +120,21 @@ def test_its_count_corrected_adjusts_it_where_it_arrived(
     _, again = counted(admin_client, session, "180", seen="305")
     assert "over_recorded_unchanged" in again.headers["location"]
     assert len(adjustments(session)) == 1
+
+
+def test_its_count_corrected_adjusts_it_in_the_unit_its_line_was_recorded_in(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """The count is typed in the unit the move was recorded in, and the
+    adjustment written in it (inventory-tng-2rlr)."""
+    spools = Spools(session)
+    moved_whole(registered_client, spools)
+    counted(admin_client, session, "180")
+    written = select(Movement.unit).join(
+        LedgerTransaction, LedgerTransaction.id == Movement.transaction_id
+    )
+    units = session.scalars(written.where(LedgerTransaction.kind == "adjustment"))
+    assert list(units) == ["m"]
 
 
 def test_its_count_corrected_under_a_key_written_already_says_so(

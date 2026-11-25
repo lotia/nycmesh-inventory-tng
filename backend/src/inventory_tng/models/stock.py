@@ -21,6 +21,7 @@ from inventory_tng.models.base import (
     reference,
     unique_current_name,
 )
+from inventory_tng.models.catalogue import Unit, unit_check
 from inventory_tng.models.names import CanonicalName
 
 # What a transaction is. A count or an adjustment fixes the records, with
@@ -67,10 +68,12 @@ class OpenPackage(Base):
         ),
         CheckConstraint(
             "num_nulls(length_reported_at, length_reported_by_volunteer_id,"
-            " length_reported, length_reported_in_id) IN (0, 4)",
+            " length_reported, length_reported_unit, length_reported_in_id)"
+            " IN (0, 5)",
             name="length_reported_by",
         ),
         CheckConstraint("length_reported >= 0", name="length_reported"),
+        unit_check("length_reported_unit"),
         protection(owner="stock/open_packages.py", lock="row", history=True),
     )
 
@@ -94,6 +97,8 @@ class OpenPackage(Base):
     length_reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     length_reported_by_volunteer_id: Mapped[int | None] = reference("volunteer.id")
     length_reported: Mapped[Decimal | None] = mapped_column(QUANTITY)
+    # Its unit: its item's, as the batch that reported it was written.
+    length_reported_unit: Mapped[Unit | None]
     # The transaction that reported it: setting it to that counts as of
     # then, so a cut since is not lost.
     length_reported_in_id: Mapped[int | None] = reference("ledger_transaction.id")
@@ -182,14 +187,15 @@ class LedgerTransaction(Base):
 
 
 class Movement(Base):
-    """One line of a transaction: an item and how much of it, in the item's
-    unit, and the form it leaves in and arrives in (docs/decisions/0020): a
-    sealed package (package_id), an open package (open_package_id), or
-    neither, loose. ledger.Form is one side's."""
+    """One line of a transaction: an item and how much of it, in the unit
+    it was recorded in, and the form it leaves in and arrives in
+    (docs/decisions/0020): a sealed package (package_id), an open package
+    (open_package_id), or neither, loose. ledger.Form is one side's."""
 
     __tablename__ = "movement"
     __table_args__ = (
         CheckConstraint("quantity > 0", name="quantity"),
+        unit_check(),
         CheckConstraint(
             "num_nonnulls(from_package_id, from_open_package_id) <= 1",
             name="one_form_leaving",
@@ -217,6 +223,10 @@ class Movement(Base):
     transaction_id: Mapped[int] = reference("ledger_transaction.id", index=False)
     item_id: Mapped[int] = reference("item.id")
     quantity: Mapped[Decimal] = mapped_column(QUANTITY)
+    # The unit quantity is in: the one the save was shown, its item's as it
+    # was written (ledger.insert_transaction). Every sum of the ledger adds
+    # only lines in their item's unit (stock/line_amounts.py).
+    unit: Mapped[Unit]
     from_package_id: Mapped[int | None] = reference("item_package.id")
     from_open_package_id: Mapped[int | None] = reference("open_package.id")
     to_package_id: Mapped[int | None] = reference("item_package.id")
@@ -247,6 +257,7 @@ class OverRecorded(Base):
     __tablename__ = "over_recorded"
     __table_args__ = (
         CheckConstraint("quantity > 0", name="quantity"),
+        unit_check(),
         CheckConstraint(one_of("settled_how", OVER_RECORDED_SETTLED), name="how"),
         CheckConstraint(
             "num_nulls(settled_at, settled_by_admin_id, settled_how) IN (0, 3)",
@@ -290,9 +301,10 @@ class OverRecorded(Base):
     movement_id: Mapped[int] = mapped_column(
         ForeignKey("movement.id", ondelete="RESTRICT"), unique=True
     )
-    # How much more was recorded than the batch refused said, in the item's
-    # unit, in the movement's forms.
+    # How much more was recorded than the batch refused said, in `unit`,
+    # its movement's, in the movement's forms.
     quantity: Mapped[Decimal] = mapped_column(QUANTITY)
+    unit: Mapped[Unit]
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     settled_by_admin_id: Mapped[int | None] = reference("admin.id")
     settled_how: Mapped[str | None] = mapped_column(Text)

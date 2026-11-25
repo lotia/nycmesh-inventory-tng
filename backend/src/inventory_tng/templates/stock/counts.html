@@ -102,7 +102,7 @@
       <td>{{ t.created_at | when(t.time_zone) }}</td>
       <td>
         {% if t.kind == "count" %}{{ count_kind }}{% else %}{{ entry.reason }}{% endif %}:
-        {% for item, amount in entry.lines %}{{ "+" if entry.found else "-" }}{{ amount | amount }} {{ item.unit }} {{ item.name_shown }}{{ ", " if not loop.last }}{% else %}{% trans %}as the records said{% endtrans %}{% endfor %}
+        {% for item, amount, unit in entry.lines %}{{ "+" if entry.found else "-" }}{{ amount | amount }} {{ unit }} {{ item.name_shown }}{{ ", " if not loop.last }}{% else %}{% trans %}as the records said{% endtrans %}{% endfor %}
       </td>
       <td>{{ entry.place }}</td>
       <td>{{ entry.admin }}</td>

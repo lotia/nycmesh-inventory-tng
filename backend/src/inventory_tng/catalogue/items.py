@@ -71,6 +71,7 @@ from inventory_tng.models.catalogue import (
     Item,
     ItemAlias,
     ItemPackage,
+    VendorOffer,
     current_aliases,
     reading_rules_held,
 )
@@ -106,8 +107,9 @@ def unit_fixed(session: Session, item_id: int) -> UnitFixed | None:
     """Why the item's unit can no longer change, if it can't: stock has
     moved in it, for good, or a label not revoked has been printed for it
     or one of its packages (a package's label names its item too). Its
-    ledger and its labels say that unit, so a change would silently change
-    what they mean; nothing is converted (Ali, 2026-11-23,
+    labels say that unit, so a change would silently change what they
+    mean, and its ledger's lines record it, which no sum adds in another
+    (stock/line_amounts.py); nothing is converted (Ali, 2026-11-23,
     inventory-tng-rpud). A revoked label scans as no label, so it fixes
     nothing, and revoking an item's labels lets a mistaken unit be
     corrected (Ali, 2026-11-23, inventory-tng-37dj)."""
@@ -465,6 +467,7 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
             )
             for package in session.scalars(locked(holding_one)):
                 _short_cleared(session, package, "switch")
+        _amounts_follow(session, item.id, fields.unit)
     if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
     keys = Keys.of(session, fields.name)
@@ -498,6 +501,18 @@ def save(session: Session, item: Item, fields: Fields, *, seen: Seen) -> Renamed
             by=how,
         )
     return Renamed(kept, swapped)
+
+
+def _amounts_follow(session: Session, item_id: int, unit: str) -> None:
+    """An item's packages and vendor offers, retired ones too, recorded in
+    its new unit, their amounts as they were: its unit may change, so no
+    stock has moved in it and no label says it (unit_fixed), and what was
+    typed was meant in the unit chosen (Ali, 2026-11-23,
+    inventory-tng-rpud)."""
+    for model in (ItemPackage, VendorOffer):
+        query = select(model).where(model.item_id == item_id).order_by(model.id)
+        for row in session.scalars(locked(query)):
+            row.unit = unit
 
 
 def _own_alias(session: Session, item_id: int, keys: Keys) -> ItemAlias | None:

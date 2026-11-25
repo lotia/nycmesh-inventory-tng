@@ -26,6 +26,7 @@ from inventory_tng.models.stock import (
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock import package_forms
 from inventory_tng.stock.balance import balance, by_form, countable, countable_item
+from inventory_tng.stock.line_amounts import in_items_unit
 
 
 def balances(
@@ -145,13 +146,13 @@ def counts_and_adjustments(
 
 def count_lines(
     session: Session, transaction_ids: Collection[int]
-) -> list[tuple[int, Item, Decimal]]:
+) -> list[tuple[int, Item, Decimal, str]]:
     """The lines of the counts and adjustments of `transaction_ids`: each
-    one's id, item and amount."""
+    one's id, item, amount and the unit it was recorded in."""
     return [
-        (transaction_id, item, amount)
-        for transaction_id, item, amount in session.execute(
-            select(Movement.transaction_id, Item, Movement.quantity)
+        (transaction_id, item, amount, unit)
+        for transaction_id, item, amount, unit in session.execute(
+            select(Movement.transaction_id, Item, Movement.quantity, Movement.unit)
             .join(Item, Item.id == Movement.item_id)
             .where(Movement.transaction_id.in_(transaction_ids))
         )
@@ -307,13 +308,15 @@ def recent_cuts(
     """What was last taken from each of `open_ids`' open packages, by
     package then newest first, `recent` of each, never a move of it whole
     nor what was left made loose:
-    each with the package's id, the transaction's id, when, how much, its
-    kind and its volunteer's name, if a volunteer made it."""
+    each with the package's id, the transaction's id, when, how much, the
+    unit it was recorded in, its kind and its volunteer's name, if a
+    volunteer made it."""
     newest = (
         select(
             LedgerTransaction.id,
             LedgerTransaction.created_at,
             Movement.quantity,
+            Movement.unit,
             LedgerTransaction.kind,
             Volunteer.name,
         )
@@ -371,16 +374,17 @@ def openings_at(
     """The sealed packages of `item_ids` opened at the places in the ledger
     transactions after `after` up to `up_to`, the newest first: each
     line's place, item, package, the open package it made (None, opened
-    loose) and amount."""
+    loose) and amount, in its item's unit (line_amounts)."""
     return session.execute(
         select(
             LedgerTransaction.to_location_id,
             Movement.item_id,
             Movement.from_package_id,
             Movement.to_open_package_id,
-            Movement.quantity,
+            in_items_unit(),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .join(Item, Item.id == Movement.item_id)
         .where(
             *_of_kind_at("open", place_ids, item_ids, after, up_to),
             Movement.from_package_id.is_not(None),
@@ -399,15 +403,17 @@ def loosened_at(
     """What was left on open packages of `item_ids` made loose units at
     the places (open_packages.close_unfollowed) in the ledger transactions
     after `after` up to `up_to`: each line's place, item, open package
-    and amount. Never one left below zero, which took from loose units."""
+    and amount, in its item's unit (line_amounts). Never one left below
+    zero, which took from loose units."""
     return session.execute(
         select(
             LedgerTransaction.to_location_id,
             Movement.item_id,
             Movement.from_open_package_id,
-            Movement.quantity,
+            in_items_unit(),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .join(Item, Item.id == Movement.item_id)
         .where(
             *_of_kind_at("loosen", place_ids, item_ids, after, up_to),
             Movement.from_open_package_id.is_not(None),
@@ -474,11 +480,9 @@ def open_with_ids(
 
 
 def item_moved(session: Session, movement_id: int) -> tuple[int, str]:
-    """The item a ledger line moved, and its unit."""
+    """The item a ledger line moved, and the unit it was recorded in."""
     item_id, unit = session.execute(
-        select(Item.id, Item.unit)
-        .join(Movement, Movement.item_id == Item.id)
-        .where(Movement.id == movement_id)
+        select(Movement.item_id, Movement.unit).where(Movement.id == movement_id)
     ).one()
     return item_id, unit
 

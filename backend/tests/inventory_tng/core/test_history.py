@@ -210,8 +210,12 @@ VERSIONED = (
                     "folded_with",
                     "unit_key",
                     "name_shown",
+                    # Which moves with its item's unit, as a vendor offer's
+                    # does (models.catalogue.Unit; inventory-tng-2rlr).
+                    "unit",
                 },
                 "item_alias": {"unit_key", "name_shown"},
+                "vendor_offer": {"unit"},
             },
         ),
         ("row_lock_only", {"item": {"on_order"}}),

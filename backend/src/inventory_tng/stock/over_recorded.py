@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session, aliased
 
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_locking import get_locked, locked
+from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.phrases import lazy_gettext
 from inventory_tng.models.stock import (
@@ -82,13 +83,14 @@ WAITING = OverRecorded.settled_at.is_(None)
 
 
 def raise_checks(session: Session, over: Mapping[int, Decimal]) -> None:
-    """Keep, for each movement, how much more of it was recorded than moved:
-    a new check, or one waiting told the newest amount; one settled stays
-    settled. The caller commits."""
+    """Keep, for each movement, how much more of it was recorded than moved,
+    in the unit it was recorded in: a new check, or one waiting told the
+    newest amount; one settled stays settled. The caller commits."""
     if not over:
         return
+    units = values_by(session, Movement.id, Movement.unit, over)
     rows = [
-        {"movement_id": movement_id, "quantity": quantity}
+        {"movement_id": movement_id, "quantity": quantity, "unit": units[movement_id]}
         for movement_id, quantity in sorted(over.items())
     ]
     statement = insert(OverRecorded).values(rows)
@@ -472,6 +474,9 @@ def correct(
             found=found,
             reason_id=reason.id,
             form=form,
+            # Undone in the unit it was recorded in, refused if its item is
+            # counted in another now.
+            shown_unit=row.unit,
         )
     _measure_settled(session, "corrected")
     once_committed(
@@ -531,6 +536,10 @@ def confirm_count(
         found=count > movement.quantity,
         reason_id=adjustment_reasons.seeded(session, REASON).id,
         form=ledger.Form(movement.to_package_id, open_id),
+        # The count was typed in the unit the line was recorded in
+        # (forms.confirmed_count): refused if its item is counted in
+        # another now.
+        shown_unit=movement.unit,
     )
     _measure_settled(session, "corrected")
     once_committed(

@@ -55,7 +55,10 @@ def give(session: Session, location: Location) -> None:
             to_location_id=location.id,
         ),
     )
-    add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=1))
+    add(
+        session,
+        Movement(transaction_id=batch.id, item_id=item.id, quantity=1, unit=item.unit),
+    )
 
 
 def test_adding_a_volunteer(admin_client: TestClient, session: Session) -> None:

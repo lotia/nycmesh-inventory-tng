@@ -24,10 +24,10 @@ from inventory_tng.scan.batch import _more_written
 from inventory_tng.stock import counts, over_recorded
 from inventory_tng.stock.ledger import Entry, Form
 
-from helpers.over_recorded import bagged, checks, recorded_then_changed
+from helpers.over_recorded import answered, bagged, checks, recorded_then_changed
 from helpers.rows import add, tag
 from helpers.sign_in import new_admin_id
-from helpers.stock import URL, Place, Spools, cut
+from helpers.stock import URL, Place, Spools, cut, sealed_line
 
 
 def test_a_reused_key_is_told_what_was_recorded(
@@ -349,3 +349,25 @@ def test_the_reply_to_another_client_leaves_out_nothing_it_holds(
         409,
         {"reason": "key_reused", "recorded": None},
     )
+
+
+def test_a_check_and_its_correction_keep_the_unit_its_line_was_recorded_in(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Two spools of cable recorded, then one: the reply says the line in
+    the unit it was recorded in, the check keeps it, and Correct writes
+    the spool off in it (inventory-tng-2rlr)."""
+    spools = Spools(session)
+    first = spools.place.batch(lines=[sealed_line(spools, "610")])
+    reply = recorded_then_changed(
+        registered_client, first, lines=[sealed_line(spools, "305")]
+    )
+    assert [line["unit"] for line in reply["recorded"]["lines"]] == ["m"]
+    (check,) = checks(session)
+    assert check.unit == "m"
+    assert answered(admin_client, session, "correct").status_code == 303
+    written = select(Movement.unit).join(
+        LedgerTransaction, LedgerTransaction.id == Movement.transaction_id
+    )
+    units = session.scalars(written.where(LedgerTransaction.kind == "adjustment"))
+    assert list(units) == ["m", "m"]

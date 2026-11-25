@@ -202,7 +202,9 @@ def count_corrections(
 ) -> tuple[list[Entry], list[Entry]]:
     """What a count by form finds and loses: for each form counted, the
     difference from what the records said (`then`), into the place in that
-    form, or out of it."""
+    form, or out of it. Each in its item's unit (Entry): the records' sums
+    are in it, and a count form's amounts were shown in it, as
+    store_counts checks holding the item."""
     found: list[Entry] = []
     lost: list[Entry] = []
     for item_id, form, amount in counted:
@@ -404,7 +406,8 @@ def record_adjustment(
     `form` there (docs/decisions/0020). What it wrote: nothing if its key
     was written already. NotCountable (location_countable), as record_count;
     with `shown_unit`, the unit an administrator's form showed the amount
-    in, ShownOtherwise unless it is the item's (units_shown)."""
+    in, ShownOtherwise unless it is the item's (units_shown), and the unit
+    it is written in; without, in its item's."""
     if _hold_place(session, location_id, key) is not None:
         return []
     if shown_unit is not None:
@@ -414,7 +417,6 @@ def record_adjustment(
         units_shown.require_as_shown(session, "adjustment", shown, [item_id])
     side = "to_location_id" if found else "from_location_id"
     header = {"reason_id": reason_id, side: location_id}
-    line = (
-        Entry(item_id, amount, LOOSE, form) if found else Entry(item_id, amount, form)
-    )
+    leaves, arrives = (LOOSE, form) if found else (form, LOOSE)
+    line = Entry(item_id, amount, leaves, arrives, shown_unit)
     return _correct(session, key, "adjustment", admin_id, header, [line])

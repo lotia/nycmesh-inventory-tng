@@ -23,9 +23,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
+from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import AT_ONE_PLACE, LedgerTransaction, Movement
 from inventory_tng.stock.balance import balance
 from inventory_tng.stock.ledger import Form
+from inventory_tng.stock.line_amounts import in_items_unit
 
 
 class Moment(NamedTuple):
@@ -82,15 +84,17 @@ def corrected_since(session: Session, open_id: int, after: int) -> Decimal:
 
 def _into_open(session: Session, open_id: int, *where: ColumnElement[bool]) -> Decimal:
     """All that went into an open package less all that left it, in the
-    ledger transactions `where` picks."""
+    ledger transactions `where` picks, in its item's unit (line_amounts)."""
     # A whole move names it on both sides: in and out, nothing changed.
-    signed = case(
-        (Movement.to_open_package_id == open_id, Movement.quantity), else_=0
-    ) - case((Movement.from_open_package_id == open_id, Movement.quantity), else_=0)
+    amount = in_items_unit()
+    signed = case((Movement.to_open_package_id == open_id, amount), else_=0) - case(
+        (Movement.from_open_package_id == open_id, amount), else_=0
+    )
     total = session.scalar(
         select(func.coalesce(func.sum(signed), 0))
         .select_from(Movement)
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .join(Item, Item.id == Movement.item_id)
         .where(
             or_(
                 Movement.to_open_package_id == open_id,
@@ -125,7 +129,8 @@ def flows(
 ) -> list[dict[int, tuple[Decimal, Decimal]]]:
     """For each window (which ledger transactions it takes), what came into
     a place and what went out of it, by item: each item that moved there in
-    that window, of `items` only, if given. One query, however many."""
+    that window, of `items` only, if given, in its unit (line_amounts). One
+    query, however many."""
     into = LedgerTransaction.to_location_id == location_id
     out = LedgerTransaction.from_location_id == location_id
     windows = (window, *more)
@@ -142,12 +147,13 @@ def flows(
         select(
             Movement.item_id,
             *(
-                func.sum(Movement.quantity).filter(each, side)
+                func.sum(in_items_unit()).filter(each, side)
                 for each in windows
                 for side in (into, out)
             ),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .join(Item, Item.id == Movement.item_id)
         .where(*where)
         .group_by(Movement.item_id)
     )
@@ -203,9 +209,10 @@ def form_flows(
                 Movement.item_id,
                 package,
                 opened,
-                *(func.sum(Movement.quantity).filter(each) for each in windows),
+                *(func.sum(in_items_unit()).filter(each) for each in windows),
             )
             .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+            .join(Item, Item.id == Movement.item_id)
             .where(place == location_id, or_(*windows), Movement.item_id.in_(items))
             .group_by(Movement.item_id, package, opened)
         )
@@ -224,7 +231,8 @@ def _signed_at(
 ) -> tuple[ColumnElement[Any], ...]:
     """Each movement up to the moment `as_of` at the places, once at each
     end there: the place, the item, its `columns` on that side (to_ or
-    from_), and its quantity, more for in, less for out. A subquery's
+    from_), and its quantity in its item's unit (line_amounts), more for
+    in, less for out. A subquery's
     columns, by name: place, item_id, the columns unprefixed, and quantity.
     An opening, both ends at one place, nets to nothing but by form."""
     ids = list(location_ids)
@@ -239,9 +247,10 @@ def _signed_at(
                     getattr(Movement, f"{side}_{column}").label(column)
                     for column in columns
                 ),
-                (Movement.quantity * literal(sign)).label("quantity"),
+                (in_items_unit() * literal(sign)).label("quantity"),
             )
             .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+            .join(Item, Item.id == Movement.item_id)
             .where(place.in_(ids), LedgerTransaction.id <= as_of)
         )
     return tuple(union_all(*sides).subquery().c)

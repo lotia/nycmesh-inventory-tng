@@ -45,8 +45,8 @@ class Arrived:
     open; then what happens at Shelf B (`then`) before the form is
     refused and shown again with the moves. `tracked`, whether an opened
     spool is followed as an open package, else it is opened loose, as a
-    box of connectors is. `opened`, the open packages made at Shelf B,
-    oldest first."""
+    box of connectors is; `unit`, the cable's, from the start. `opened`,
+    the open packages made at Shelf B, oldest first."""
 
     def __init__(
         self,
@@ -56,12 +56,13 @@ class Arrived:
         spools: int = 1,
         metres: int = 0,
         tracked: bool = True,
+        unit: str = "m",
         own: Callable[[Arrived], object] = lambda _: None,
         then: Callable[[Arrived], object] = lambda _: None,
     ) -> None:
         self.client = client
         self.opened: list[OpenPackage] = []
-        self.made = made = Spools(session, tracked=tracked)
+        self.made = made = Spools(session, tracked=tracked, unit=unit)
         made.receive(uuid.uuid4(), spools=2)
         self.cable = made.cable.id
         self.store = made.store
@@ -457,11 +458,8 @@ def test_a_box_opened_loose_where_it_went_says_what_is_left_in_each(
     connectors is, opened loose at Shelf B and 5 used: what is left of
     the box, in each."""
 
-    def in_each(moved: Arrived) -> None:
-        moved.made.cable.unit = "each"
-
     moved = Arrived(
-        session, admin_client, tracked=False, own=in_each, then=open_and_cut(5)
+        session, admin_client, tracked=False, unit="each", then=open_and_cut(5)
     )
     assert opened_since(moved) == [opened_here_since(Decimal(300), "each")]
 
@@ -474,15 +472,12 @@ def test_a_box_opened_loose_among_loose_of_its_own_says_no_more_than_came(
     line counts the place's own towards what is left, but never more than
     the box held: 305, not 310."""
 
-    def in_each_and_own(moved: Arrived) -> None:
-        moved.made.cable.unit = "each"
-        moved.bring(metres=10)
-
     moved = Arrived(
         session,
         admin_client,
         tracked=False,
-        own=in_each_and_own,
+        unit="each",
+        own=lambda moved: moved.bring(metres=10),
         then=open_and_cut(5),
     )
     assert opened_since(moved) == [opened_here_since(Decimal(305), "each")]
@@ -553,11 +548,8 @@ def test_a_box_opened_loose_where_it_went_and_all_used_says_used_up(
     """A box not followed once opened, opened loose at Shelf B and all of
     it used: used up, as its loose units are."""
 
-    def in_each(moved: Arrived) -> None:
-        moved.made.cable.unit = "each"
-
     moved = Arrived(
-        session, admin_client, tracked=False, own=in_each, then=open_and_cut(305)
+        session, admin_client, tracked=False, unit="each", then=open_and_cut(305)
     )
     assert opened_since(moved) == [str(OPENED_THEN_USED_UP)]
 

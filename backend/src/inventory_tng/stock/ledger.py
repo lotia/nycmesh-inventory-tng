@@ -62,14 +62,18 @@ LOOSE = Form()
 
 
 class Entry(NamedTuple):
-    """A line of a transaction: so much of an item, in its unit, leaving in
+    """A line of a transaction: so much of an item, in `unit`, leaving in
     one form and arriving in another. A line given as just an item and an
-    amount is loose on both sides."""
+    amount is loose on both sides. Its unit is the one a page showed it in,
+    if one did; else, as for an amount read from the ledger's sums, its
+    item's (None). The ledger writes either only in its item's unit
+    (insert_transaction)."""
 
     item_id: int
     quantity: Decimal
     leaves: Form = LOOSE
     arrives: Form = LOOSE
+    unit: str | None = None
 
 
 def line_breaks(kind: str, item: Item, amount: Decimal) -> list[str]:
@@ -589,6 +593,14 @@ def insert_transaction(
     for line in lines:
         for rule in form_breaks(kind, line, places, packages, opens):
             enforce(rule)
+        # Shown in another unit than its item's, as the item is held: the
+        # page that showed it checked it (units_shown), so this only
+        # backs that up.
+        item = items.get(line.item_id)
+        enforce(
+            "movement_unit",
+            when=item is not None and line.unit not in (None, item.unit),
+        )
     zone = zone_at(session, _where(header, held.custody))
     transaction = session.scalar(
         pg_insert(LedgerTransaction)
@@ -611,6 +623,7 @@ def insert_transaction(
                     "transaction_id": transaction.id,
                     "item_id": line.item_id,
                     "quantity": line.quantity,
+                    "unit": _unit(line, items),
                     "from_package_id": line.leaves.package_id,
                     "from_open_package_id": line.leaves.open_package_id,
                     "to_package_id": line.arrives.package_id,
@@ -635,6 +648,14 @@ def insert_transaction(
         if transaction.kind == "receipt":
             _receive(session, lines)
     return transaction
+
+
+def _unit(line: Entry, items: Mapping[int, Item]) -> str | None:
+    """The unit a line is written in: the one it was shown in, else its
+    item's. None for an item that does not exist: the database refuses
+    the line."""
+    item = items.get(line.item_id)
+    return line.unit or (item.unit if item is not None else None)
 
 
 def _place(header: Mapping[str, object], side: str) -> int | None:

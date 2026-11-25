@@ -58,14 +58,17 @@ def unit_of(row: ItemPackage | OpenPackage) -> str:
 
 
 class Place:
-    """The rows a batch needs, made in one session."""
+    """The rows a batch needs, made in one session: its cable in
+    `cable_unit`, from the start, as its ledger lines are then recorded in
+    it."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, cable_unit: str = "m") -> None:
         mark = tag()
         category = add(session, Category(name=f"Radios {mark}"))
         self.item = add(session, Item(name=f"LiteBeam {mark}", category_id=category.id))
         self.cable = add(
-            session, Item(name=f"Cable {mark}", category_id=category.id, unit="m")
+            session,
+            Item(name=f"Cable {mark}", category_id=category.id, unit=cable_unit),
         )
         self.store = add(session, Location(name=f"Store {mark}", kind="store"))
         self.van = add(session, Location(name=f"Van {mark}", kind="vehicle"))
@@ -231,11 +234,14 @@ def at_retired_van(session: Session) -> Place:
 
 class Spools:
     """A Place whose cable comes in spools of 305 m, tracked when opened
-    (docs/decisions/0020), and two sealed ones received into its store."""
+    (docs/decisions/0020), and two sealed ones received into its store. Or
+    of 305 in `unit`, from the start."""
 
-    def __init__(self, session: Session, *, tracked: bool = True) -> None:
+    def __init__(
+        self, session: Session, *, tracked: bool = True, unit: str = "m"
+    ) -> None:
         self.session = session
-        self.place = Place(session)
+        self.place = Place(session, cable_unit=unit)
         self.cable = self.place.cable
         self.cable.track_opened = tracked
         self.spool = add(

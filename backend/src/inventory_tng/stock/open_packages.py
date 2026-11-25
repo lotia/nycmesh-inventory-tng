@@ -172,11 +172,13 @@ def report_length(
     session: Session,
     row: OpenPackage,
     left: Decimal,
+    unit: str,
     volunteer_id: int,
     transaction: LedgerTransaction,
 ) -> None:
-    """What a volunteer says is really on an open package, for an
-    administrator to check: a report, never an adjustment (0003). A later
+    """What a volunteer says is really on an open package, `left` in
+    `unit`, for an administrator to check: a report, never an adjustment
+    (0003). A later
     report replaces one not yet checked; one of a package closed is left,
     as nobody would check it. Call it holding the row, as a save holds its
     open packages (stock/ledger.py's lock order)."""
@@ -185,6 +187,7 @@ def report_length(
     row.length_reported_at = transaction.created_at
     row.length_reported_by_volunteer_id = volunteer_id
     row.length_reported = left
+    row.length_reported_unit = unit
     row.length_reported_in_id = transaction.id
     _check_raised(session, "volunteer")
     once_committed(
@@ -237,6 +240,7 @@ def _clear_check(row: OpenPackage) -> bool:
     row.length_reported_at = None
     row.length_reported_by_volunteer_id = None
     row.length_reported = None
+    row.length_reported_unit = None
     row.length_reported_in_id = None
     row.below_zero_at = None
     return checked

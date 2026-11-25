@@ -133,7 +133,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% elif sizes_fixed[package.id] == "labelled" %}
-          <span class="hint block">{#- Translators: a package's size, its "Holds", fixed only by its labels; the link goes to the item's labels, each of which can be revoked there. #}{% trans size=package.size | amount, unit=item.unit, link=its_labels %}Holds {{ size }} {{ unit }}: fixed, as a label has been printed for it. <a href="{{ link }}">Revoke its labels</a> to change it.{% endtrans %}</span>
+          <span class="hint block">{#- Translators: a package's size, its "Holds", fixed only by its labels; the link goes to the item's labels, each of which can be revoked there. #}{% trans size=package.size | amount, unit=package.unit, link=its_labels %}Holds {{ size }} {{ unit }}: fixed, as a label has been printed for it. <a href="{{ link }}">Revoke its labels</a> to change it.{% endtrans %}</span>
           {% endif %}
           <button>{% if package.id in sizes_fixed %}{% trans package=package.name_shown %}Save<span class="sr-only"> the name of {{ package }}</span>{% endtrans %}
             {%- else %}{% trans package=package.name_shown %}Save<span class="sr-only"> the name and size of {{ package }}</span>{% endtrans %}{% endif %}</button>
@@ -141,7 +141,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       {% else %}{{ package.name_shown }}{% endif %}
         <span class="hint block">{{ _("Opened ones followed") if followed else _("Opened ones loose") }}
         ({{ _("set on this package") if own and followed != item.track_opened else _("as the item") }})</span></td>
-      <td>{{ package.size | amount }} {{ item.unit }}</td>
+      <td>{{ package.size | amount }} {{ package.unit }}</td>
       <td>{% if not package.retired_at and not retired %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}/tracking" class="actions">
           <label><span class="sr-only">{% trans package=package.name_shown %}When one of {{ package }} is opened{% endtrans %}</span>

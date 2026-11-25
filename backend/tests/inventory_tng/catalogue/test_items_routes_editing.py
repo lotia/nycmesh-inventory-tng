@@ -27,6 +27,7 @@ from inventory_tng.models.catalogue import (
     Category,
     Item,
     ItemPackage,
+    VendorOffer,
     reading_rules_held,
 )
 from inventory_tng.models.places import Location
@@ -321,6 +322,28 @@ def _moved(session: Session, item: Item) -> None:
     )
 
 
+def test_a_package_takes_its_items_unit_and_follows_a_change_to_it(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A package records its size's unit, its item's as it is added; a
+    switch while the unit may change records the item's packages, and its
+    vendor offers, in the new one, their amounts as typed
+    (inventory-tng-2rlr)."""
+    item = new_item(session, radios, unit="m")
+    reel = add(session, ItemPackage(item_id=item.id, name="Reel", size=Decimal(305)))
+    offer = add(session, VendorOffer(item_id=item.id, url="https://example.org"))
+    assert (reel.unit, offer.unit) == ("m", "m")
+    saved = admin_client.post(
+        f"{ITEMS}/{item.id}", data=shown_item_form(item, unit="ft")
+    )
+    assert saved.status_code == 303
+    for row in (reel, offer):
+        session.refresh(row)
+    assert (reel.unit, reel.size, offer.unit) == ("ft", Decimal(305), "ft")
+    page = admin_client.get(f"{ITEMS}/{item.id}").text
+    assert "305 ft" in words_on(page)
+
+
 def test_the_unit_is_fixed_once_stock_has_moved(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
@@ -470,7 +493,10 @@ def test_a_retired_item_says_what_is_left(
             to_location_id=store.id,
         ),
     )
-    add(session, Movement(transaction_id=batch.id, item_id=item.id, quantity=3))
+    add(
+        session,
+        Movement(transaction_id=batch.id, item_id=item.id, quantity=3, unit=item.unit),
+    )
     admin_client.post(f"{ITEMS}/{item.id}/retire")
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
     assert "can't be received" in page

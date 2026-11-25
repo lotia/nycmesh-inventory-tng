@@ -182,6 +182,8 @@ CUT_KINDS = {
 class Cut(NamedTuple):
     at: datetime
     quantity: Decimal
+    # The unit it was recorded in.
+    unit: str
     kind: str
     volunteer: str | None
 

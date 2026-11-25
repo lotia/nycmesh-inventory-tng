@@ -3,6 +3,7 @@ reading rules, and vendors."""
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Annotated
 
 from sqlalchemy import (
     CheckConstraint,
@@ -50,6 +51,15 @@ from inventory_tng.models.names import (
 from inventory_tng.models.search_text import Searchable, fold, held
 
 UNITS = ("each", "m", "ft")
+# A unit of UNITS: an item's, and the one each amount stored apart from its
+# item is in, beside it, so a stored amount says its own unit and is never
+# read in its item's unit unawares (Ali, 2026-11-24, inventory-tng-2rlr).
+Unit = Annotated[str, mapped_column(Text)]
+
+
+def unit_check(column: str = "unit") -> CheckConstraint:
+    """A unit column held to UNITS, the check named for it."""
+    return CheckConstraint(one_of(column, UNITS), name=column)
 
 
 class Category(CanonicalName, Versioned, Base):
@@ -98,7 +108,7 @@ class Item(KeyedName, Searchable, Versioned, Base):
             postgresql_using="gin",
             postgresql_ops={"search_text": "gin_trgm_ops"},
         ),
-        CheckConstraint(one_of("unit", UNITS), name="unit"),
+        unit_check(),
         CheckConstraint("minimum >= 0", name="minimum"),
         # The app's rule (amount_rules.whole_enough), held here too, as it
         # costs nothing on one row (Ali, 2026-11-23; inventory-tng-gfes).
@@ -119,7 +129,8 @@ class Item(KeyedName, Searchable, Versioned, Base):
     part_number: Mapped[str | None] = mapped_column(Text)
     # The sheet's NYCM- code.
     old_code: Mapped[str | None] = mapped_column(Text)
-    unit: Mapped[str] = mapped_column(Text, server_default="each")
+    # The unit of its stock, and of minimum and on_order, beside them.
+    unit: Mapped[Unit] = mapped_column(server_default="each")
     # The reorder point, compared with total stock across stores. NULL means
     # never reorder.
     minimum: Mapped[Decimal | None] = mapped_column(QUANTITY)
@@ -187,6 +198,7 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
         Index("uq_item_package_name", "item_id", "name_key", unique=True),
         Index("uq_item_package_unit_key", "item_id", "unit_key", unique=True),
         name_key_check(),
+        unit_check(),
         CheckConstraint("size > 0", name="size"),
         CheckConstraint("short_below > 0", name="short_below"),
         # A whole one is never a short end.
@@ -199,12 +211,17 @@ class ItemPackage(KeyedName, Searchable, Versioned, Base):
     created_at: Mapped[CreatedAt]
     item_id: Mapped[int] = reference("item.id")
     name: Mapped[str] = mapped_column(Text)
-    # In the item's unit.
+    # In `unit`.
     size: Mapped[Decimal] = mapped_column(QUANTITY)
+    # The unit of size and short_below: its item's when added
+    # (_items_unit), and changed with its item's while that may change
+    # (items.save), which its item's history records, so no change of its
+    # own (db_protection).
+    unit: Mapped[Unit] = mapped_column(info={"not_a_change": True})
     # NULL: as the item's track_opened says; else this package's own
     # (ledger.tracks_opened).
     track_opened: Mapped[bool | None]
-    # Too short to use, in the item's unit: an open package with less left
+    # Too short to use, in `unit`: an open package with less left
     # is a short end (docs/decisions/0020). NULL: none is.
     short_below: Mapped[Decimal | None] = mapped_column(QUANTITY)
     # How many sealed in the stores to keep: fewer shows on reorder. NULL:
@@ -389,6 +406,15 @@ def _refold(session: Session, _context: object, _instances: object) -> None:
         row.name_shown = units.shown_name(row.name or "", rules)
 
 
+@event.listens_for(Session, "before_flush")
+def _items_unit(session: Session, _context: object, _instances: object) -> None:
+    """A package or vendor offer added is in its item's unit, unless given
+    another."""
+    for row in session.new:
+        if isinstance(row, ItemPackage | VendorOffer) and row.unit is None:
+            row.unit = session.get_one(Item, row.item_id).unit
+
+
 class Vendor(Base):
     __tablename__ = "vendor"
     __table_args__ = (
@@ -409,6 +435,7 @@ class VendorOffer(Base):
     __tablename__ = "vendor_offer"
     __table_args__ = (
         CheckConstraint("units_per_order > 0", name="units_per_order"),
+        unit_check(),
         protection(owner=None, lock="row", history=True),
     )
 
@@ -419,6 +446,8 @@ class VendorOffer(Base):
     url: Mapped[str] = mapped_column(Text)
     vendor_sku: Mapped[str | None] = mapped_column(Text)
     units_per_order: Mapped[Decimal | None] = mapped_column(QUANTITY)
+    # The unit of units_per_order, kept as an item package's is.
+    unit: Mapped[Unit] = mapped_column(info={"not_a_change": True})
     retired_at: Mapped[RetiredAt]
 
 

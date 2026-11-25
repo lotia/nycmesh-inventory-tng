@@ -119,11 +119,12 @@ def _recent(session: Session, view: View) -> tuple[list[dict[str, Any]], View]:
         offset=view.offset,
     )
     log.debug("counts listed", found=view.found, sort=view.by, page=view.page)
-    lines: dict[int, list[tuple[Item, Decimal]]] = {}
-    for transaction_id, item, amount in queries.count_lines(
+    # Each line in the unit it was recorded in.
+    lines: dict[int, list[tuple[Item, Decimal, str]]] = {}
+    for transaction_id, item, amount, unit in queries.count_lines(
         session, [row[0].id for row in rows]
     ):
-        lines.setdefault(transaction_id, []).append((item, amount))
+        lines.setdefault(transaction_id, []).append((item, amount, unit))
     return [
         {
             "transaction": transaction,

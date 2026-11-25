@@ -8,8 +8,10 @@ from typing import NamedTuple
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import AT_ONE_PLACE, LedgerTransaction, Movement
 from inventory_tng.stock.ledger import LOOSE, Form
+from inventory_tng.stock.line_amounts import in_items_unit
 
 
 class MovedOut(NamedTuple):
@@ -34,7 +36,8 @@ def moved_out(
     split: int | None = None,
 ) -> list[MovedOut]:
     """What left each of the places in the ledger transactions after
-    `after`, by where it went, item and the form it arrived in, in all:
+    `after`, by where it went, item and the form it arrived in, in all,
+    in its unit (line_amounts):
     an opening or a loosening, which changes only the form of stock at a
     place, is no move. Split at the moment `split`, if given, into what left up to it
     and what left after it (MovedOut.later). In order of place, then
@@ -47,8 +50,9 @@ def moved_out(
     if split is not None:
         by.append(LedgerTransaction.id > split)
     query = (
-        select(*by, func.sum(Movement.quantity))
+        select(*by, func.sum(in_items_unit()))
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .join(Item, Item.id == Movement.item_id)
         .where(
             went.in_(list(location_ids)),
             LedgerTransaction.id > after,

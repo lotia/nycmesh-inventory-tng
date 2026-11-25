@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_locking import UNGUARDED_INFO
 from inventory_tng.core.phrases import PATH_BETWEEN
-from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import count_routes, queries
 from inventory_tng.stock.count_forms import TYPE_IT_HERE
@@ -33,7 +33,7 @@ from helpers.markup import (
     text,
 )
 from helpers.query_counts import counting
-from helpers.rows import add, setting_up
+from helpers.rows import add, setting_up, tag
 from helpers.stock import count_form, held_by_form, retire, write
 from helpers.store_areas import Store, area, counts_at, field
 
@@ -260,43 +260,58 @@ def test_bring_it_back_restores_the_area_and_shows_the_form_again(
     assert expected(session, made.empty.id) == {}
 
 
-def test_bring_it_back_after_a_switch_to_ft_asks_again_in_ft(
+def in_ft(form: dict[str, str], cable_id: int) -> dict[str, str]:
+    """A count form's units as a page drawn before its cable was switched
+    from ft to m would send them: the cable in ft. Its ledger lines are in
+    m, as it is now, as a moved item's unit is fixed (inventory-tng-2rlr)."""
+    return {"units": form["units"].replace(f"{cable_id}:m", f"{cable_id}:ft")}
+
+
+def test_bring_it_back_after_a_switch_to_m_asks_again_in_m(
     admin_client: TestClient, session: Session
 ) -> None:
-    """50 typed for the cable in Bin 1, shown in m; switched to ft (made
-    straight in the database, as a moved item's unit is fixed), then Bring
-    it back: the area comes back and the form says beside the box that the
-    cable is now counted in ft, so 50 is never saved in ft unawares (Ali,
-    2026-11-23, inventory-tng-57u8). Brought back, it answers 200: the
-    words refuse nothing, as nothing was saved (Ali, 2026-11-23,
-    inventory-tng-itfm)."""
+    """50 typed for the cable in Bin 1 on a form showing it in ft, from
+    before a switch to m (in_ft), then Bring it back: the area comes back
+    and the form says beside the box that the cable is now counted in m, so
+    50 is never saved in m unawares (Ali, 2026-11-23, inventory-tng-57u8).
+    Brought back, it answers 200: the words refuse nothing, as nothing was
+    saved (Ali, 2026-11-23, inventory-tng-itfm)."""
     setup = Emptied(session, admin_client)
     made, gone, cable = setup.made, setup.gone, setup.made.place.cable
     made.move(session, gone, made.empty, "2")
     refused = admin_client.post(made.path, data=setup.shown)
     box = field(made.bin, made.store, f"counted_{cable.id}")
     typed = {box: "50", setup.arrived(made.empty): "2"}
-    cable.unit = "ft"
-    session.flush()
+    typed |= in_ft(count_form(refused), cable.id)
     back = bring_back(admin_client, made, refused, typed, gone.id)
     assert back.status_code == 200
     session.refresh(gone)
     assert gone.retired_at is None
-    assert problem(back.text, box) == now_counted_in("ft")
+    assert problem(back.text, box) == now_counted_in("m")
     assert box_values(back.text, box) == ["50"]
-    assert f"{cable.id}:ft" in dict(hidden_fields(back.text))["units"]
+    assert f"{cable.id}:m" in dict(hidden_fields(back.text))["units"]
 
 
 def test_a_count_refused_as_an_area_is_gone_says_a_switch_since(
     admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Refused as Shelf C is gone, and the cable switched to ft just after
-    (made straight in the database, as a moved item's unit is fixed): the
-    form shown again in ft says so beside the 50 typed in m."""
+    """Refused as Shelf C is gone, and the wire found there switched to ft
+    just after: the form shown again in ft says so beside the 50 typed in
+    m. Wire nothing has moved in, as only such an item's unit can switch
+    (inventory-tng-2rlr)."""
     setup = Emptied(session, admin_client)
-    made, cable = setup.made, setup.made.place.cable
+    made = setup.made
     made.move(session, setup.gone, made.empty, "2")
-    box = field(made.bin, made.store, f"counted_{cable.id}")
+    wire = add(
+        session,
+        Item(name=f"Wire {tag()}", category_id=made.place.cable.category_id, unit="m"),
+    )
+    shown = setup.shown | {"units": f"{setup.shown['units']} {wire.id}:m"}
+    found = {
+        "extra_location_id": str(made.store.id),
+        "extra_item_id": str(wire.id),
+        "extra_quantity": "50",
+    }
     refusal = count_routes.refusal
 
     def switched_after(
@@ -305,18 +320,18 @@ def test_a_count_refused_as_an_area_is_gone_says_a_switch_since(
         refused = refusal(held, change, *expected)
         # Another administrator's edit, as the test's own rows are written.
         setting_up(session)
-        cable.unit = "ft"
+        wire.unit = "ft"
         session.flush()
         del session.info[UNGUARDED_INFO]
         return refused
 
     monkeypatch.setattr(count_routes, "refusal", switched_after)
-    again = admin_client.post(made.path, data=setup.shown | {box: "50"})
+    again = admin_client.post(made.path, data=shown | found)
     # Refused as the area is gone, as without the switch.
     assert again.status_code == 409
     assert emptied_words(setup.gone.name) in text(again)
-    assert problem(again.text, box) == now_counted_in("ft")
-    assert box_values(again.text, box) == ["50"]
+    assert problem(again.text, "extra_quantity") == now_counted_in("ft")
+    assert box_values(again.text, "extra_quantity") == ["50"]
 
 
 def test_bring_it_back_of_an_area_back_already_shows_the_form(
@@ -363,9 +378,9 @@ def test_bring_it_back_refused_by_a_rule_says_so(
 def test_bring_it_back_refused_by_a_rule_after_a_switch_answers_409(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Not brought back, and the cable switched to ft since 50 was typed:
-    409 as without the switch, the words beside the box too (Ali,
-    2026-11-23, inventory-tng-itfm)."""
+    """Not brought back, and the cable switched to m since 50 was typed in
+    ft (in_ft): 409 as without the switch, the words beside the box too
+    (Ali, 2026-11-23, inventory-tng-itfm)."""
     setup = Emptied(session, admin_client)
     made, cable = setup.made, setup.made.place.cable
     shelf = add(session, area("Shelf D", made.store))
@@ -376,11 +391,10 @@ def test_bring_it_back_refused_by_a_rule_after_a_switch_answers_409(
     made.move(session, inner, made.empty, "1")
     refused = admin_client.post(made.path, data=shown)
     box = field(made.bin, made.store, f"counted_{cable.id}")
-    cable.unit = "ft"
-    session.flush()
-    back = bring_back(admin_client, made, refused, {box: "50"}, inner.id)
+    typed = {box: "50"} | in_ft(count_form(refused), cable.id)
+    back = bring_back(admin_client, made, refused, typed, inner.id)
     assert back.status_code == 409
-    assert problem(back.text, box) == now_counted_in("ft")
+    assert problem(back.text, box) == now_counted_in("m")
 
 
 def test_an_area_gone_and_moved_out_of_the_store_since_is_named_by_its_own_name(
