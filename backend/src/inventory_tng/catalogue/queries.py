@@ -1,7 +1,8 @@
 """What the catalogue's pages read (categories_routes.py,
-items_routes.py, reading_rules_routes.py, and admins/home_routes.py's
-counts of its tables): plain functions taking a Session, each named for what it
-returns (docs/decisions/0023)."""
+items_routes.py, reading_rules_routes.py, the guided recount's
+unit_recounts.py, and admins/home_routes.py's counts of its tables):
+plain functions taking a Session, each named for what it returns
+(docs/decisions/0023)."""
 
 from collections.abc import Sequence
 from decimal import Decimal
@@ -128,27 +129,47 @@ def unit_change_example(
             return UnitChangeExample(
                 "place", quantity, converted_kept(quantity, item.unit, new), place.name
             )
-    offered = session.execute(
-        select(VendorOffer.units_per_order, func.coalesce(Vendor.name, VendorOffer.url))
-        .outerjoin(Vendor, Vendor.id == VendorOffer.vendor_id)
-        .where(
-            VendorOffer.item_id == item.id,
-            VendorOffer.retired_at.is_(None),
-            VendorOffer.unit == item.unit,
-            VendorOffer.units_per_order > 0,
-        )
-        .order_by(VendorOffer.id)
-        .limit(1)
-    ).first()
-    per_order, vendor = offered or (None, None)
-    stored: list[tuple[ExampleOf, Decimal | None, str | None]] = [
-        ("minimum", item.minimum, None),
-        ("on_order", item.on_order, None),
-        ("offer", per_order, vendor),
+    stored: list[tuple[ExampleOf, Decimal | None]] = [
+        ("minimum", item.minimum),
+        ("on_order", item.on_order),
     ]
-    for of, amount, name in stored:
+    for of, amount in stored:
         if amount:
+            return UnitChangeExample(of, amount, converted_kept(amount, item.unit, new))
+    for each in current_offers(session, item.id):
+        per_order = each.offer.units_per_order
+        if each.offer.unit == item.unit and per_order:
             return UnitChangeExample(
-                of, amount, converted_kept(amount, item.unit, new), name
+                "offer",
+                per_order,
+                converted_kept(per_order, item.unit, new),
+                each.named,
             )
     return None
+
+
+class Offer(NamedTuple):
+    """A current vendor offer of the item, and its vendor's name, if it
+    names one."""
+
+    offer: VendorOffer
+    vendor: str | None
+
+    @property
+    def named(self) -> str:
+        """Its vendor's name, or the offer's address if it names none."""
+        return self.vendor or self.offer.url
+
+
+def current_offers(session: Session, item_id: int) -> list[Offer]:
+    """The item's current vendor offers, in order, each with its vendor's
+    name."""
+    return [
+        Offer(offer, vendor)
+        for offer, vendor in session.execute(
+            select(VendorOffer, Vendor.name)
+            .outerjoin(Vendor, Vendor.id == VendorOffer.vendor_id)
+            .where(VendorOffer.item_id == item_id, VendorOffer.retired_at.is_(None))
+            .order_by(VendorOffer.id)
+        )
+    ]

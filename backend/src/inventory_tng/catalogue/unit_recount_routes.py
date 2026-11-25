@@ -17,7 +17,7 @@ from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue import forms, unit_changes, unit_recounts
+from inventory_tng.catalogue import forms, queries, unit_changes, unit_recounts
 from inventory_tng.catalogue.paths import ITEMS, UNIT_RECOUNT, UNIT_RECOUNTED
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession
@@ -118,7 +118,7 @@ def recount(
         return redirect(f"{ITEMS}/{item_id}")
     # The offers and packages as now: one added or retired since is
     # refused as changed.
-    offers = [each.offer.id for each in unit_recounts.offers_of(session, item_id)]
+    offers = [each.offer.id for each in queries.current_offers(session, item_id)]
     packages = unit_recounts.resized_of(session, found)
     amounts, problems = forms.recount_amounts(
         form, offers, packages, separator=decimal_separator(request)

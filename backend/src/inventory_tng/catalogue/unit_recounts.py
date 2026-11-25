@@ -61,6 +61,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import unit_changes, units
 from inventory_tng.catalogue.name_keys import name_key
+from inventory_tng.catalogue.queries import Offer, current_offers
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import lock_catalogue, locked, relock
 from inventory_tng.core.db_once_committed import once_committed
@@ -68,7 +69,6 @@ from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import (
     Item,
     ItemPackage,
-    Vendor,
     VendorOffer,
     reading_rules_held,
 )
@@ -113,14 +113,6 @@ class Held(NamedTuple):
     @property
     def total(self) -> Decimal:
         return sum(self.forms.values(), Decimal(0))
-
-
-class Offer(NamedTuple):
-    """A current vendor offer of the item, and its vendor's name, if it
-    names one."""
-
-    offer: VendorOffer
-    vendor: str | None
 
 
 class Renamed(NamedTuple):
@@ -225,7 +217,7 @@ def planned(session: Session, item: Item) -> Planned:
     retired = [each.id for each in resized if each.retired_at is not None]
     revoking_current = _labels_of(session, current)
     revoking_retired = _labels_of(session, retired)
-    offers = offers_of(session, item.id)
+    offers = current_offers(session, item.id)
     waiting = unit_changes.checks_waiting(session, item.id)
     last = _last_transaction(session, item.id)
     seen = "/".join(
@@ -285,20 +277,6 @@ def _labels_of(session: Session, package_ids: Sequence[int]) -> list[int]:
             .order_by(Label.id)
         )
     )
-
-
-def offers_of(session: Session, item_id: int) -> list[Offer]:
-    """The item's current vendor offers, in order, each with its vendor's
-    name."""
-    return [
-        Offer(offer, vendor)
-        for offer, vendor in session.execute(
-            select(VendorOffer, Vendor.name)
-            .outerjoin(Vendor, Vendor.id == VendorOffer.vendor_id)
-            .where(VendorOffer.item_id == item_id, VendorOffer.retired_at.is_(None))
-            .order_by(VendorOffer.id)
-        )
-    ]
 
 
 def _ids(ids: Iterable[int]) -> str:

@@ -45,7 +45,9 @@ def _labelled(session: Session, item: Item, count: int) -> None:
         assert labels.make_for_item(session, item.id, package.id) is not None
 
 
-def _offer(item: Item, units_per_order: Decimal, vendor: str | None = "Acme") -> None:
+def _offer(
+    item: Item, units_per_order: Decimal | None, vendor: str | None = "Acme"
+) -> None:
     """A vendor offer of `units_per_order` in the item's unit, from
     `vendor`, by name, or naming none."""
     session = object_session(item)
@@ -75,9 +77,11 @@ def _stored(item: Item, stored: str, amount: str) -> None:
     session.flush()
 
 
+# Each stored amount's field, its name bold in the note.
+FIELD = {"minimum": "Reorder at", "on_order": "On order", "offer": "Units per order"}
+
 # Each stored amount the note gives as its example, from m to ft and from
-# ft to m: the units, what is stored, its amount, the example's words and
-# its bold field name.
+# ft to m: the units, what is stored, its amount and the example's words.
 STORED_EXAMPLES = [
     (
         "m",
@@ -85,23 +89,14 @@ STORED_EXAMPLES = [
         "minimum",
         "100",
         "Its Reorder at would change from 100 m to 328.084 ft",
-        "Reorder at",
     ),
-    (
-        "m",
-        "ft",
-        "on_order",
-        "50",
-        "Its On order would change from 50 m to 164.042 ft",
-        "On order",
-    ),
+    ("m", "ft", "on_order", "50", "Its On order would change from 50 m to 164.042 ft"),
     (
         "m",
         "ft",
         "offer",
         "305",
         "The Units per order from Acme would change from 305 m to 1000.656 ft",
-        "Units per order",
     ),
     (
         "ft",
@@ -109,23 +104,14 @@ STORED_EXAMPLES = [
         "minimum",
         "1000",
         "Its Reorder at would change from 1000 ft to 304.8 m",
-        "Reorder at",
     ),
-    (
-        "ft",
-        "m",
-        "on_order",
-        "50",
-        "Its On order would change from 50 ft to 15.24 m",
-        "On order",
-    ),
+    ("ft", "m", "on_order", "50", "Its On order would change from 50 ft to 15.24 m"),
     (
         "ft",
         "m",
         "offer",
         "1000.656",
         "The Units per order from Acme would change from 1000.656 ft to 305 m",
-        "Units per order",
     ),
 ]
 
@@ -198,7 +184,7 @@ def _installed(session: Session, unit: str = "m") -> Item:
 
 
 @pytest.mark.parametrize(
-    ("unit", "into", "stored", "amount", "example", "field"), STORED_EXAMPLES
+    ("unit", "into", "stored", "amount", "example"), STORED_EXAMPLES
 )
 def test_stock_moved_none_left_gives_a_stored_amount(
     admin_client: TestClient,
@@ -208,7 +194,6 @@ def test_stock_moved_none_left_gives_a_stored_amount(
     stored: str,
     amount: str,
     example: str,
-    field: str,
 ) -> None:
     """No place holds any to give: a stored amount instead, as the
     labels-only note gives (Ali, 2026-11-25, inventory-tng-aknv). The
@@ -223,7 +208,7 @@ def test_stock_moved_none_left_gives_a_stored_amount(
         f"unit becomes {into}, and you count each place in {into}."
     )
     note = read(page).one("span", id="unit-problem")
-    note.one("strong", field)
+    assert [each.text for each in note.all("strong")] == [FIELD[stored]]
     note.one("a", f"recount it in {into}", href=unit_recount(cable.id, into))
 
 
@@ -291,7 +276,7 @@ def test_labels_revoked_since_the_unit_was_read_asks_afresh(
 
 
 @pytest.mark.parametrize(
-    ("unit", "into", "stored", "amount", "example", "field"), STORED_EXAMPLES
+    ("unit", "into", "stored", "amount", "example"), STORED_EXAMPLES
 )
 def test_labels_only_give_a_stored_amount_and_link_to_revoke_the_label(
     admin_client: TestClient,
@@ -301,7 +286,6 @@ def test_labels_only_give_a_stored_amount_and_link_to_revoke_the_label(
     stored: str,
     amount: str,
     example: str,
-    field: str,
 ) -> None:
     """The field's name bold, as its label (Ali, 2026-11-25,
     inventory-tng-aknv)."""
@@ -316,17 +300,18 @@ def test_labels_only_give_a_stored_amount_and_link_to_revoke_the_label(
         f"to {into}; the amounts stay as they are."
     )
     note = read(page).one("span", id="unit-problem")
-    assert [each.text for each in note.all("strong")] == [field]
+    assert [each.text for each in note.all("strong")] == [FIELD[stored]]
     note.one("a", "revoke its label", href=item_labels(cable.id))
 
 
 def test_the_example_is_the_first_amount_stored(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Nothing on order is skipped, and the first vendor offer given, not
-    a later one."""
+    """Nothing on order is skipped, as is an offer saying no units per
+    order: the first offer saying some is given, not a later one."""
     cable = Place(session).cable
     cable.on_order = Decimal(0)
+    _offer(cable, None, vendor="Unsaid")
     _offer(cable, Decimal(305))
     _offer(cable, Decimal(100), vendor="Later")
     _labelled(session, cable, 1)
