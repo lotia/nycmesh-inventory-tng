@@ -541,8 +541,10 @@ SETTLED_ORDER: dict[str, tuple[Any, ...]] = {
                 in_query(SETTLED_HOW["confirmed"]),
             ),
             (
-                # Made loose, Correct corrected it (settled()), unless its
-                # count was corrected before.
+                # Made loose, Correct corrected it (settled()). One whose
+                # count was corrected before it was made loose sorts here
+                # too, though settled() words it "Count corrected": only
+                # Correct's key, not in SQL, tells the two apart.
                 and_(
                     OverRecorded.settled_how == "corrected",
                     Movement.from_open_package_id == Movement.to_open_package_id,

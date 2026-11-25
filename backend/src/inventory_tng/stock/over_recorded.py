@@ -492,11 +492,13 @@ def confirm_count(
     place it arrived, in it, for the difference, with the reason REASON,
     under a key of the check's. How it was settled.
     Call it holding its places (places_of), locked first. RuleBroken as
-    _settle, if it is not such a move (over_recorded_not_whole), or as
-    counts.record_adjustment."""
+    _settle, if it is not such a move (over_recorded_not_whole), if its
+    open package was made loose meanwhile, as from a page drawn before, so
+    has no count to confirm (over_recorded_unchanged; Ali, 2026-11-24,
+    inventory-tng-04z7), or as counts.record_adjustment."""
     row = _settle(session, check_id, seen_as, admin_id, "checked")
-    movement = session.get_one(Movement, row.movement_id)
-    transaction = session.get_one(LedgerTransaction, movement.transaction_id)
+    read = _read(session, row)
+    movement, transaction = read.movement, read.transaction
     open_id = movement.to_open_package_id
     if (
         open_id is None
@@ -504,6 +506,8 @@ def confirm_count(
         or transaction.to_location_id is None
     ):
         raise RuleBroken("over_recorded_not_whole")
+    if read.loose_at is not None:
+        raise RuleBroken("over_recorded_unchanged")
     if count == movement.quantity:
         _measure_settled(session, "checked")
         once_committed(

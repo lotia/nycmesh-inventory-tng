@@ -25,6 +25,7 @@ from helpers.markup import links, words_on
 from helpers.over_recorded import (
     PAGE,
     adjustments,
+    answered,
     arrived_field,
     checks,
     correct,
@@ -302,6 +303,26 @@ def test_moved_whole_then_made_loose_is_corrected_off_the_loose_units(
     ]
     settled = words_on(admin_client.get(f"{PAGE}/settled").text)
     assert f"Corrected Adjusted at {spools.van.name}" in settled
+
+
+@pytest.mark.parametrize("count", ["305", "180"])
+def test_confirm_count_drawn_before_it_was_made_loose_is_refused(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    count: str,
+) -> None:
+    """Confirm count sent from a page drawn before its open package was
+    made loose: nothing is left to count, so it is refused as changed, and
+    the check still waits, writing nothing."""
+    spools = Spools(session)
+    moved_whole(registered_client, spools)
+    made_loose(session, spools, open_ones=1)
+    sent = answered(admin_client, session, "count", count=count, unit=spools.cable.unit)
+    assert "over_recorded_unchanged" in sent.headers["location"]
+    (row,) = checks(session)
+    assert row.settled_at is None
+    assert adjustments(session) == []
 
 
 def test_moved_whole_and_written_off_still_asks_for_its_count(

@@ -627,7 +627,9 @@ that difference (`stock/over_recorded.py`), and the administrators' home
 page lists it under "Needs your action" as "Recorded more than moved"
 until one corrects it, with adjustments that undo it on each side, or
 marks it checked; an open package moved whole, now where it arrived, has its
-count there confirmed, or corrected by an adjustment, instead. From a
+count there confirmed, or corrected by an adjustment, instead, until it
+is made loose: then it is corrected, or counted, where it was made
+loose. From a
 server that says nothing of what it recorded, that heading goes over the
 save's lines. Such a save never goes in a
 cart whole again, here or in the older list, which offers only Discard:
