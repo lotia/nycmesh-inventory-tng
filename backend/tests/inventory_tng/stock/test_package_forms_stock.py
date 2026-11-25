@@ -234,7 +234,7 @@ def test_a_packages_settings_are_set_on_its_items_page(
         ({"short_below": "305"}, SHORTER_THAN_WHOLE),
         ({"minimum_sealed": "lots"}, WHOLE_PACKAGES),
     ):
-        refused = admin_client.post(path, data=bad)
+        refused = admin_client.post(path, data=bad | {"unit_shown": "m"})
         assert refused.status_code == 400
         assert words is None or str(words) in text(refused)
     other = f"/admin/items/{spools.place.item.id}/packages/{spools.spool.id}/settings"

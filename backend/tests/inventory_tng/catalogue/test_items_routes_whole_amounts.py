@@ -358,7 +358,8 @@ def test_a_retired_package_too_short_to_use_below_a_fraction_comes_back_to_set(
     beside = page.one("span", id="short-to-set").text
     assert beside == "Set it to a whole number from 1 to 304."
     refused = admin_client.post(
-        f"{here}/packages/{reel.id}/settings", data={"short_below": "1.5"}
+        f"{here}/packages/{reel.id}/settings",
+        data={"short_below": "1.5", "unit_shown": reel.unit},
     )
     assert refused.status_code == 400
     assert problem(refused.text, "short_below") == str(WHOLE_UNITS)

@@ -26,8 +26,12 @@ from helpers.stock import Spools
 def _drawn(admin_client: TestClient, item: Item, action: str) -> dict[str, str]:
     """The hidden fields of the item page's form sent to `action`, as the
     page draws it now."""
-    page = read(admin_client.get(f"{ITEMS}/{item.id}").text)
-    (form,) = [f for f in page.all("form") if f.attrs.get("action") == action]
+    return _hidden(admin_client.get(f"{ITEMS}/{item.id}").text, action)
+
+
+def _hidden(html: str, action: str) -> dict[str, str]:
+    """The hidden fields of the form sent to `action` on the page `html`."""
+    (form,) = [f for f in read(html).all("form") if f.attrs.get("action") == action]
     return {
         box.attrs["name"]: box.attrs.get("value", "")
         for box in form.all("input", type="hidden")
@@ -74,6 +78,7 @@ def test_a_package_added_in_a_unit_left_since_is_asked_again(
         refused = admin_client.post(action, data=drawn | typed)
     assert refused.status_code == 400
     assert problem(refused.text, "size") == now_counted_in("ft")
+    assert _hidden(refused.text, action)[UNIT_SHOWN] == "ft"
     assert [
         (line["form"], line["table"], line["row_id"])
         for line in logs
@@ -103,6 +108,7 @@ def test_a_too_short_length_in_a_unit_left_since_is_asked_again(
     refused = admin_client.post(action, data=drawn | typed)
     assert refused.status_code == 400
     assert problem(refused.text, "short_below") == now_counted_in("ft")
+    assert _hidden(refused.text, action)[UNIT_SHOWN] == "ft"
     session.refresh(reel)
     assert (reel.unit, reel.short_below, reel.minimum_sealed) == ("ft", None, None)
     again = _drawn(admin_client, cable, action)
@@ -146,3 +152,26 @@ def test_a_cleared_or_unshown_length_needs_no_unit(
     assert admin_client.post(action, data=cleared).status_code == 303
     session.refresh(reel)
     assert (reel.short_below, reel.minimum_sealed) == (None, None)
+
+
+def test_a_package_form_refused_otherwise_says_its_unit_changed_too(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Refused for something else, its name taken or its Keep sealed not
+    whole, the page drawn again in ft keeps the number typed in m: said
+    beside it, so it is not sent again unchecked and kept in ft."""
+    cable, reel = _cable(session, radios)
+    add = f"{ITEMS}/{cable.id}/packages"
+    settings = f"{add}/{reel.id}/settings"
+    drawn_add = _drawn(admin_client, cable, add)
+    drawn_settings = _drawn(admin_client, cable, settings)
+    _to_ft(session, cable)
+    taken = admin_client.post(
+        add, data=drawn_add | {"package_name": "Reel", "size": "300"}
+    )
+    assert taken.status_code == 400
+    assert problem(taken.text, "size") == now_counted_in("ft")
+    not_whole = {"short_below": "5", "minimum_sealed": "1.5"}
+    refused = admin_client.post(settings, data=drawn_settings | not_whole)
+    assert refused.status_code == 400
+    assert problem(refused.text, "short_below") == now_counted_in("ft")

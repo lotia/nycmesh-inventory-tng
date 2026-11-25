@@ -853,6 +853,17 @@ SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
 UNIT_SHOWN = "unit_shown"
 
 
+def _asked_in_unit_now(
+    problems: dict[str, Words], form: Mapping[str, str], box: str, unit: str
+) -> None:
+    """A package form drawn again, for whatever reason, its amount in `box`
+    typed in a unit other than `unit`, the one it is in now: said beside
+    it, so the number is checked, not saved again in the new unit as the
+    form now shows it."""
+    if form.get(UNIT_SHOWN, "") != unit:
+        problems[box] = now_counted_in(unit)
+
+
 @router.post(f"{ITEMS}/{{item_id}}/packages")
 def add_package(
     request: Request,
@@ -906,6 +917,7 @@ def add_package(
                 if broken == items.READ_ALIKE
                 else forms.PACKAGE_TAKEN
             )
+    _asked_in_unit_now(problems, form, "size", found.unit)
     # With the units chosen, if any: not a package's own form's (package_id).
     values = {**form, "package_name": name, "size": size}
     return _item_page(request, session, signed, found, problems=problems, values=values)
@@ -1109,40 +1121,38 @@ def package_settings(
     }
     if short_below is not None:
         values["short_below"] = short_below
-    if problems:
-        return _item_page(
-            request, session, signed, found, problems=problems, values=values
-        )
-    _, broken = refusal(
-        session,
-        lambda: items.package_settings(
+    if not problems:
+        _, broken = refusal(
             session,
-            package,
-            short,
-            minimum,
-            shown_unit=form.get(UNIT_SHOWN, ""),
-            keep_short=short_below is None,
-        ),
-        RETIRED,
-        SHORT_UNDER_SIZE,
-        items.PACKAGE_WHOLE,
-        unit_changes.UNIT_CHANGED,
-    )
-    if broken == RETIRED:
-        return _item_page(request, session, signed, found, alert=RULES[RETIRED])
-    if broken:
+            lambda: items.package_settings(
+                session,
+                package,
+                short,
+                minimum,
+                shown_unit=form.get(UNIT_SHOWN, ""),
+                keep_short=short_below is None,
+            ),
+            RETIRED,
+            SHORT_UNDER_SIZE,
+            items.PACKAGE_WHOLE,
+            unit_changes.UNIT_CHANGED,
+        )
+        if broken == RETIRED:
+            return _item_page(request, session, signed, found, alert=RULES[RETIRED])
+        if not broken:
+            session.commit()
+            return redirect(
+                f"{ITEMS}/{item_id}", notice="package_settings", section="packages"
+            )
         # Resized meanwhile to no more than it, its item made each, or its
         # unit changed: said beside it, as above.
-        words = {
+        problems["short_below"] = {
             items.PACKAGE_WHOLE: WHOLE_UNITS,
             unit_changes.UNIT_CHANGED: now_counted_in(package.unit),
         }.get(broken, forms.SHORTER_THAN_WHOLE)
-        problems = {"short_below": words}
-        return _item_page(
-            request, session, signed, found, problems=problems, values=values
-        )
-    session.commit()
-    return redirect(f"{ITEMS}/{item_id}", notice="package_settings", section="packages")
+    if short_below and short_below.strip():  # A length typed, in a unit.
+        _asked_in_unit_now(problems, form, "short_below", package.unit)
+    return _item_page(request, session, signed, found, problems=problems, values=values)
 
 
 @router.post(f"{ITEMS}/{{item_id}}/aliases")

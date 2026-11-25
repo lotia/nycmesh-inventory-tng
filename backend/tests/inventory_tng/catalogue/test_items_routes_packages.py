@@ -371,7 +371,7 @@ def test_a_too_short_length_refused_as_resized_meanwhile_says_so_beside_it(
     monkeypatch.setattr(items, "package_settings", resized_meanwhile)
     refused = admin_client.post(
         f"{ITEMS}/{item.id}/packages/{box.id}/settings",
-        data={"short_below": "5", "minimum_sealed": ""},
+        data={"short_below": "5", "minimum_sealed": "", "unit_shown": box.unit},
     )
     assert refused.status_code == 400
     assert str(SHORTER_THAN_WHOLE) in text(refused)

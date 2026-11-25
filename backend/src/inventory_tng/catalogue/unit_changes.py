@@ -74,7 +74,7 @@ UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
 
 # Refused: a package's amount typed in the unit its form showed, which its
 # item or package has left since (require_unit_shown).
-UNIT_CHANGED = "unit_changed"
+UNIT_CHANGED = "package_unit_changed"
 # The package forms that say the unit they showed: the counter's attribute.
 PackageForm = Literal["add_package", "package_settings"]
 
