@@ -312,7 +312,7 @@ def quantity(
     """A quantity typed into a form's box whose decimal separator is
     `separator` (read_decimal): a Decimal, or what is wrong with it as a
     str (refused_words), one typed with the other separator counted. Blank
-    is None, or `required` if one must be given. Up to three decimal
+    is None, or `required` if one must be given. Up to QUANTITY_SCALE decimal
     places, as the ledger keeps; more than zero if `positive`, else zero or
     more; whole, for an item in `unit` counted each (whole_enough)."""
     text = text.strip()

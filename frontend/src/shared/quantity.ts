@@ -69,8 +69,8 @@ export function boxSeparator(): Separator {
 /** Why what was typed in a number box is no amount, as the server says
  * (web/forms.Unreadable): not a number; the other decimal separator than
  * the box's; that one followed by three digits after a whole part above
- * 0, as thousands are grouped; or more than three decimal places. Both
- * sides are tested against quantity-cases.json. */
+ * 0, as thousands are grouped; or more than AMOUNT_PLACES decimal places.
+ * Both sides are tested against quantity-cases.json. */
 export type Unreadable = "number" | "separator" | "thousands" | "places";
 
 const DIGIT = /\p{Nd}/u;
@@ -108,9 +108,9 @@ function split(plain: string, separator: string) {
 
 /** A number typed in a box whose decimal separator is `separator`, in
  * thousandths, as web/forms.read_decimal reads one: digits, of any
- * script, with that separator and up to three decimals after it, and a
- * "-" before them if below zero. Neither grouping, an exponent, "+" nor
- * "_"; -0 reads as 0. */
+ * script, with that separator and up to AMOUNT_PLACES decimals after it,
+ * and a "-" before them if below zero. Neither grouping, an exponent,
+ * "+" nor "_"; -0 reads as 0. */
 export function amountTyped(
   text: string,
   separator: Separator = pageSeparator,
@@ -129,10 +129,10 @@ export function amountTyped(
     if (mistaken === null) {
       return "number";
     }
-    // A whole part of 0, or none, is no thousands, so a decimal (Ali,
-    // 2026-11-23, inventory-tng-mat2).
-    return /[1-9]/.test(mistaken.units) &&
-      mistaken.fraction.length === AMOUNT_PLACES
+    // Three digits after it, as thousands are grouped, whatever the
+    // ledger's places. A whole part of 0, or none, is no thousands, so a
+    // decimal (Ali, 2026-11-23, inventory-tng-mat2).
+    return /[1-9]/.test(mistaken.units) && mistaken.fraction.length === 3
       ? "thousands"
       : "separator";
   }
