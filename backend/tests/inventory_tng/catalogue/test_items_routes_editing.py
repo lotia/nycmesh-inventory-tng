@@ -66,6 +66,29 @@ def test_adding_an_item(
     assert "LiteBeam 5AC" in text(admin_client.get(ITEMS))
 
 
+def test_adding_reads_only_the_add_forms_fields(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """The add form has no Reorder at, Old code, Notes or Ordering notes,
+    nor Track opened: sent anyway, they are ignored, so even a fractional
+    Reorder at on an item counted each adds it (Ali, 2026-11-24,
+    inventory-tng-iibw)."""
+    form = item_form(
+        radios,
+        name="RJ45 connector",
+        minimum="2.5",
+        old_code="NYCM-0042",
+        notes="Outdoor",
+        ordering_notes="Buy by the box",
+        track_opened="on",
+    )
+    done = admin_client.post(ITEMS, data=form)
+    item = named(session, Item, "RJ45 connector")
+    assert done.headers["location"] == f"{ITEMS}/{item.id}?notice=added"
+    assert (item.unit, item.minimum, item.old_code) == ("each", None, None)
+    assert (item.notes, item.ordering_notes, item.track_opened) == (None, None, False)
+
+
 def test_an_item_name_needs_more_than_punctuation(
     admin_client: TestClient, radios: Category
 ) -> None:

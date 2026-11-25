@@ -11,7 +11,6 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -21,7 +20,7 @@ from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.web import forms as web_forms
 from inventory_tng.web.forms import WHOLE_UNITS
 
-from helpers.items import NOW, item_form, new_item, shown_item_form
+from helpers.items import NOW, new_item, shown_item_form
 from helpers.markup import problem, read
 from helpers.rows import add, history, item_fields, shown
 
@@ -85,20 +84,6 @@ def test_the_database_refusing_a_fractional_reorder_at_says_so_beside_it(
     # The form's own check let it by: said, by id.
     (line,) = [line for line in logs if line["log_level"] == "warning"]
     assert line["item_id"] == item.id
-
-
-def test_the_database_refusing_a_fractional_reorder_at_on_an_add_is_no_500(
-    admin_client: TestClient,
-    session: Session,
-    radios: Category,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An add, whose form has no Reorder at box, is refused too
-    (inventory-tng-gfes)."""
-    monkeypatch.setattr(web_forms, "whole_enough", lambda _unit, _amount: True)
-    form = item_form(radios, name="RJ45 connector", minimum="2.5")
-    assert admin_client.post(ITEMS, data=form).status_code == 400
-    assert session.scalar(select(Item).where(Item.name == form["name"])) is None
 
 
 def test_reorder_at_is_checked_against_the_unit_sent(
