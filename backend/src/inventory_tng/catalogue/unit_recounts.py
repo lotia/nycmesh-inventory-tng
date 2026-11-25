@@ -137,8 +137,8 @@ class Planned(NamedTuple):
     brings to zero, the open packages it closes, its packages in its unit
     and the name each is given as retired, or, `converted` before with no
     stock moved, those it asks the size of again, current ones first, and
-    their labels it revokes, by id, and how many of those are retired
-    ones', which can't be printed again while they stay retired; the
+    their labels it revokes, by id, retired ones' apart, as those can't
+    be printed again while they stay retired; the
     vendor offers it asks for again; whether a line of it recorded with
     more than was moved waits, which refuses it; and `seen`, all that as
     one string, which a recount sent from a page showing it compares: a
@@ -149,11 +149,16 @@ class Planned(NamedTuple):
     packages: list[Renamed]
     converted: bool
     resized: list[ItemPackage]
-    revoking: list[int]
-    revoking_retired: int
+    revoking_current: list[int]
+    revoking_retired: list[int]
     offers: list[Offer]
     waiting: bool
     seen: str
+
+    @property
+    def revoking(self) -> list[int]:
+        """Every label it revokes, by id, in order."""
+        return sorted(self.revoking_current + self.revoking_retired)
 
 
 def _held(session: Session, item_id: int) -> list[Held]:
@@ -216,10 +221,10 @@ def planned(session: Session, item: Item) -> Planned:
     old = [] if converted else [each for each in every if each.unit == item.unit]
     renamed = _renamed(session, old, every, item.unit)
     resized = _asked_again(every, item.unit) if converted else []
-    retired = [each.id for each in resized if each.retired_at is not None]
-    revoking_retired = _labels_of(session, retired)
     current = [each.id for each in resized if each.retired_at is None]
-    revoking = sorted(_labels_of(session, current) + revoking_retired)
+    retired = [each.id for each in resized if each.retired_at is not None]
+    revoking_current = _labels_of(session, current)
+    revoking_retired = _labels_of(session, retired)
     offers = offers_of(session, item.id)
     waiting = unit_changes.checks_waiting(session, item.id)
     last = _last_transaction(session, item.id)
@@ -233,7 +238,7 @@ def planned(session: Session, item: Item) -> Planned:
             # Each with its version: one renamed since is named otherwise.
             ",".join(f"{package.id}.{package.edit_version}" for package in every),
             _ids(each.offer.id for each in offers),
-            _ids(revoking),
+            _ids(revoking_current + revoking_retired),
         ]
     )
     return Planned(
@@ -242,8 +247,8 @@ def planned(session: Session, item: Item) -> Planned:
         renamed,
         converted,
         resized,
-        revoking,
-        len(revoking_retired),
+        revoking_current,
+        revoking_retired,
         offers,
         waiting,
         seen,
@@ -485,8 +490,7 @@ def _recounted(
         label_ids=plan.revoking,
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
-    current = len(plan.revoking) - plan.revoking_retired
-    return Recounted(places, current, plan.revoking_retired)
+    return Recounted(places, len(plan.revoking_current), len(plan.revoking_retired))
 
 
 def _resize(
