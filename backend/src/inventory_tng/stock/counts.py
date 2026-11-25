@@ -287,9 +287,9 @@ def record_count(
         "changed_since_shown",
         when=moments.seen_up_to(session, places, as_of) != shown.seen,
     )
-    [moved] = moments.flows(session, location_id, after, items=counted_at)
+    moved = moments.flows(session, location_id, after, items=counted_at)
     form_items = {item_id for item_id, _ in forms_counted}
-    [form_moved] = moments.form_flows(session, location_id, (after,), form_items)
+    form_moved = moments.form_flows(session, location_id, after, form_items)
     # What the records said then of what was counted, its forms summed as
     # kept, as the form showed it (moments.expected_at), less what came
     # from areas gone: not the sum of its lines, which may differ by parts

@@ -32,7 +32,7 @@ READERS: dict[str, Callable[[Session, Place], object]] = {
     ),
     "flows": lambda session, place: moments.flows(session, place.store.id, true()),
     "by form": lambda session, place: moments.form_flows(
-        session, place.store.id, [true()], [place.cable.id]
+        session, place.store.id, true(), [place.cable.id]
     ),
     "moved out": lambda session, place: moved_out(session, [place.store.id], 0),
 }
@@ -118,7 +118,7 @@ def test_lines_in_another_length_are_read_converted(
     assert moments.expected(session, place.store.id) == {
         place.cable.id: Decimal("131.234")
     }
-    (_, flow), *_ = moments.flows(session, place.store.id, true())[0].items()
+    (_, flow), *_ = moments.flows(session, place.store.id, true()).items()
     assert flow == (Decimal("164.042"), Decimal("32.808"))
     (out,) = moved_out(session, [place.store.id], 0)
     assert out.quantity == Decimal("32.808")

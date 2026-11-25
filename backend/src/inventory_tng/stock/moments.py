@@ -7,7 +7,7 @@ The ledger's core (stock/ledger.py) writes; these only read it, taking no
 lock. They import the core.
 """
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection
 from decimal import Decimal
 from typing import Any, NamedTuple
 
@@ -125,46 +125,34 @@ def flows(
     session: Session,
     location_id: int,
     window: ColumnElement[bool],
-    *more: ColumnElement[bool],
     items: Collection[int] | None = None,
-) -> list[dict[int, tuple[Decimal, Decimal]]]:
-    """For each window (which ledger transactions it takes), what came into
-    a place and what went out of it, by item: each item that moved there in
-    that window, of `items` only, if given, in its unit (line_amounts). One
-    query, however many."""
+) -> dict[int, tuple[Decimal, Decimal]]:
+    """What came into a place and what went out of it in `window` (which
+    ledger transactions it takes), by item: each item that moved there in
+    it, of `items` only, if given, in its unit (line_amounts)."""
     into = LedgerTransaction.to_location_id == location_id
     out = LedgerTransaction.from_location_id == location_id
-    windows = (window, *more)
     # An opening or a loosening changes the form of stock at a place, not
     # how much is there.
-    where = [
-        at_place(location_id),
-        or_(*windows),
-        LedgerTransaction.kind.not_in(AT_ONE_PLACE),
-    ]
+    where = [at_place(location_id), window, LedgerTransaction.kind.not_in(AT_ONE_PLACE)]
     if items is not None:
         where.append(Movement.item_id.in_(items))
     rows = session.execute(
         select(
             Movement.item_id,
-            *(
-                at_scale_sql(func.sum(in_items_unit()).filter(each, side))
-                for each in windows
-                for side in (into, out)
-            ),
+            at_scale_sql(func.sum(in_items_unit()).filter(into)),
+            at_scale_sql(func.sum(in_items_unit()).filter(out)),
         )
         .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
         .join(Item, Item.id == Movement.item_id)
         .where(*where)
         .group_by(Movement.item_id)
     )
-    by_window: list[dict[int, tuple[Decimal, Decimal]]] = [{} for _ in windows]
-    for item_id, *sums in rows:
-        # A sum over no movements is NULL: the item did not move in that one.
-        for flow, came, went in zip(by_window, sums[::2], sums[1::2], strict=True):
-            if came is not None or went is not None:
-                flow[item_id] = (came or Decimal(0), went or Decimal(0))
-    return by_window
+    # A sum over no movements is NULL: nothing came, or nothing went.
+    return {
+        item_id: (came or Decimal(0), went or Decimal(0))
+        for item_id, came, went in rows
+    }
 
 
 def expected(session: Session, location_id: int) -> dict[int, Decimal]:
@@ -179,17 +167,15 @@ def expected(session: Session, location_id: int) -> dict[int, Decimal]:
 def form_flows(
     session: Session,
     location_id: int,
-    windows: Sequence[ColumnElement[bool]],
+    window: ColumnElement[bool],
     items: Collection[int],
-) -> list[dict[tuple[int, Form], tuple[Decimal, Decimal]]]:
-    """flows(), by form too: for each window, what came into a place and
-    went out of it, by item and the form it was in there. Openings are
-    moves here, as they change forms."""
-    by_window: list[dict[tuple[int, Form], tuple[Decimal, Decimal]]] = [
-        {} for _ in windows
-    ]
+) -> dict[tuple[int, Form], tuple[Decimal, Decimal]]:
+    """flows(), by form too: what came into a place and went out of it in
+    `window`, by item and the form it was in there. Openings are moves
+    here, as they change forms."""
+    flow: dict[tuple[int, Form], tuple[Decimal, Decimal]] = {}
     if not items:
-        return by_window
+        return flow
     sides = (
         (
             True,
@@ -210,35 +196,29 @@ def form_flows(
                 Movement.item_id,
                 package,
                 opened,
-                *(
-                    at_scale_sql(func.sum(in_items_unit()).filter(each))
-                    for each in windows
-                ),
+                at_scale_sql(func.sum(in_items_unit())),
             )
             .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
             .join(Item, Item.id == Movement.item_id)
-            .where(place == location_id, or_(*windows), Movement.item_id.in_(items))
+            .where(place == location_id, window, Movement.item_id.in_(items))
             .group_by(Movement.item_id, package, opened)
         )
-        for item_id, package_id, open_id, *sums in rows:
-            for flow, total in zip(by_window, sums, strict=True):
-                if total is None:
-                    continue
-                form = (item_id, Form(package_id, open_id))
-                came, went = flow.get(form, (Decimal(0), Decimal(0)))
-                flow[form] = (came + total, went) if into else (came, went + total)
-    return by_window
+        for item_id, package_id, open_id, total in rows:
+            form = (item_id, Form(package_id, open_id))
+            came, went = flow.get(form, (Decimal(0), Decimal(0)))
+            flow[form] = (came + total, went) if into else (came, went + total)
+    return flow
 
 
 def _signed_at(
-    location_ids: Collection[int], as_of: int, *columns: str
+    location_ids: Collection[int], as_of: int
 ) -> tuple[ColumnElement[Any], ...]:
     """Each movement up to the moment `as_of` at the places, once at each
-    end there: the place, the item, its `columns` on that side (to_ or
-    from_), and its quantity in its item's unit (line_amounts), more for
-    in, less for out. A subquery's
-    columns, by name: place, item_id, the columns unprefixed, and quantity.
-    An opening, both ends at one place, nets to nothing but by form."""
+    end there: the place, the item, its form on that side (to_ or from_)
+    and its quantity in its item's unit (line_amounts), more for in, less
+    for out. A subquery's columns, by name: place, item_id, package_id,
+    open_package_id and quantity. An opening, both ends at one place, nets
+    to nothing but by form."""
     ids = list(location_ids)
     sides = []
     for side, sign in (("to", 1), ("from", -1)):
@@ -249,7 +229,7 @@ def _signed_at(
                 Movement.item_id,
                 *(
                     getattr(Movement, f"{side}_{column}").label(column)
-                    for column in columns
+                    for column in ("package_id", "open_package_id")
                 ),
                 (in_items_unit() * literal(sign)).label("quantity"),
             )
@@ -302,9 +282,7 @@ def _netted_at(
     open_package_id and amount, where not zero. Not `by_form`, its forms
     summed, as balance.balance sums balance.by_form (inventory-tng-8s2c):
     each row's place, item and amount."""
-    place, item_id, *form, quantity = _signed_at(
-        location_ids, as_of, "package_id", "open_package_id"
-    )
+    place, item_id, *form, quantity = _signed_at(location_ids, as_of)
     by = (place, item_id, *form)
     total = at_scale_sql(func.sum(quantity))
     query = select(*by, total.label("quantity")).group_by(*by)
