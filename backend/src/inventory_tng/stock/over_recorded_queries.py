@@ -35,8 +35,10 @@ from inventory_tng.models.stock import (
 from inventory_tng.stock import balance
 from inventory_tng.stock.over_recorded import (
     CHECKED_REASONS,
+    MADE_LOOSE_ON,
     OPENED_INTO,
     WAITING,
+    WRITTEN_OFF_ON,
     correction_key,
     moved_whole,
 )
@@ -62,7 +64,7 @@ def within(name: str) -> str:
 class OneCounted(NamedTuple):
     """A check one of whose two ends a count put right: the end counted
     and how ("counted", or "closed" for an opening's open package closed
-    since, inventory-tng-nyl) and when, the end still to put right, as a
+    since by a write-off, inventory-tng-nyl) and when, the end still to put right, as a
     sentence starts with each, and as its Correct button names it; and the
     place to count, by id and name, and whether it may be counted
     (balance.countable). A move's ends are its places; an opening's, both
@@ -75,6 +77,21 @@ class OneCounted(NamedTuple):
     on: datetime
     still: str
     correct: str
+    place_id: int
+    place: str
+    countable: bool
+
+
+class MadeLoose(NamedTuple):
+    """An opening whose open package was made loose, as turning following
+    off does, before a count put its open end right: what was on it is
+    loose units at its place, which a count there puts right (Ali,
+    2026-11-24, inventory-tng-n7dj). Its open form as within() shows it
+    ("open spool"), when, and the place to count, by id and name, and
+    whether it may be counted (balance.countable)."""
+
+    open: str
+    on: datetime
     place_id: int
     place: str
     countable: bool
@@ -129,6 +146,9 @@ class Shown(NamedTuple):
     one_counted: OneCounted | None
     # Both ends of two put right; None unless both are.
     both_right: BothRight | None
+    # An opening's open package made loose, its open end not counted; else
+    # None.
+    made_loose: MadeLoose | None
 
 
 def amount_words(
@@ -185,6 +205,7 @@ def _end_names(
     to_open: int | None,
     from_place: str | None,
     to_place: str | None,
+    made_loose: bool,
 ) -> tuple[str, str]:
     """A check's two ends, where it left and where it arrived, as a
     sentence starts with each: a move's, its places; an opening's, both at
@@ -192,8 +213,10 @@ def _end_names(
     if kind != "open":
         return from_place or "", to_place or ""
     # An opening leaves sealed, and arrives open if its item tracks opened,
-    # else loose (ledger._opening_breaks).
-    arrived = opened(package or "") if to_open is not None else loose(item)
+    # else loose (ledger._opening_breaks); open, then made loose, loose.
+    arrived = (
+        opened(package or "") if to_open is not None and not made_loose else loose(item)
+    )
     return sealed(package or ""), arrived
 
 
@@ -255,20 +278,22 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             LedgerTransaction.to_location_id,
             LEFT_COUNT.created_at,
             ARRIVED_COUNT.created_at,
-            OpenPackage.closed_at,
+            WRITTEN_OFF_ON,
+            MADE_LOOSE_ON,
         )
         .where(WAITING, *where)
         .order_by(func.lower(Item.name), Item.id, OverRecorded.id)
     ).all()
     # Only a place that may be counted is offered for counting: the end
     # still to put right of one with one end counted, or an opening's open
-    # package closed.
+    # package closed; or an opening's place, its open package made loose.
     countable = _countable(
         session,
         {
             to_id if left_on else from_id
-            for *_, from_id, to_id, left_on, arrived_on, closed_on in found
+            for *_, from_id, to_id, left_on, arrived_on, closed_on, loose_on in found
             if (left_on is None) != (arrived_on is None and closed_on is None)
+            or (loose_on is not None and arrived_on is None)
         },
     )
     lines = []
@@ -292,18 +317,30 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         left_on,
         arrived_on,
         closed_on,
+        loose_on,
     ) in found:
         words = _amount(row.quantity, unit, package, size, from_open, kind)
         whole = moved_whole(from_open, to_open)
-        # An opening's open package closed since: Correct skips that end
-        # (correct()), so the row says it is closed.
+        # An opening's open package closed since by a write-off: Correct
+        # skips that end (correct()), so the row says it is closed.
         arrived_how: Literal["counted", "closed"] = "counted"
         if arrived_on is None and closed_on is not None:
             arrived_on, arrived_how = closed_on, "closed"
-        one = both = None
+        one = both = made_loose = None
+        if loose_on is not None and arrived_on is None:
+            # An opening's: one place, both ends.
+            made_loose = MadeLoose(
+                within(opened(package or "")),
+                loose_on,
+                to_id or 0,
+                to_place or "",
+                to_id in countable,
+            )
         # Moved whole, it has one end only: where it arrived.
         two = from_id is not None and to_id is not None and not whole
-        left, arrived = _end_names(kind, item, package, to_open, from_place, to_place)
+        left, arrived = _end_names(
+            kind, item, package, to_open, from_place, to_place, loose_on is not None
+        )
         # Within a sentence: a form's name lower-cased ("open spool"), a
         # place's as named.
         name = within if kind == "open" else str
@@ -345,6 +382,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
                 else None,
                 one,
                 both,
+                made_loose,
             )
         )
     return lines
@@ -504,7 +542,8 @@ def settled(
             TO.name,
             LEFT_COUNT.created_at,
             ARRIVED_COUNT.created_at,
-            OpenPackage.closed_at,
+            WRITTEN_OFF_ON,
+            MADE_LOOSE_ON,
             Admin.username,
         )
         .join(Admin, Admin.id == OverRecorded.settled_by_admin_id)
@@ -513,17 +552,18 @@ def settled(
         .limit(limit)
         .offset(offset)
     ).all()
-    # An opening corrected, its open package closed: whether Correct wrote
+    # An opening corrected, its open package closed by a write-off (one made
+    # loose Correct writes off the loose units): whether Correct wrote
     # its open end off, or found it closed and skipped it, by the key it
     # writes under, as no time tells (a close's is the server's clock as it
     # began, perhaps before Correct's, and waited for its place).
     off = {
         correction_key(each.idempotency_key, check, found=False): check.id
         for each in found
-        # closed_at: an opening's only (OPENED_INTO).
+        # written_off_on: an opening's only (OPENED_INTO).
         if (check := each.OverRecorded).settled_how == "corrected"
         and check.arrived_count_id is None
-        and each.closed_at is not None
+        and each.written_off_on is not None
     }
     written_off = (
         {
@@ -566,10 +606,13 @@ def settled(
         left_on,
         arrived_on,
         closed_on,
+        loose_on,
         by,
     ) in found:
         whole = moved_whole(from_open, to_open)
-        left, arrived = _end_names(kind, item, package, to_open, from_place, to_place)
+        left, arrived = _end_names(
+            kind, item, package, to_open, from_place, to_place, loose_on is not None
+        )
         at, how, reason = row.settled_at, row.settled_how, row.checked_reason
         # Settled: the CHECK sets all three or none.
         assert at is not None

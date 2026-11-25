@@ -16,13 +16,13 @@ import uuid
 from collections.abc import Collection, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, NamedTuple
 
 import structlog
 from opentelemetry import metrics
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import Select, and_, case, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_locking import get_locked, locked
@@ -148,6 +148,35 @@ OPENED_INTO = and_(
     LedgerTransaction.kind == "open", OpenPackage.id == Movement.to_open_package_id
 )
 
+# The transaction that made what was left on OpenPackage loose units at its
+# place, as turning following off does (open_packages.close_unfollowed), or
+# NULL. That writes nothing off, so puts no end right: a count of the item
+# there after it does (Ali, 2026-11-24, inventory-tng-n7dj). One made loose
+# with nothing left on it has none, so reads as closed: nothing became loose.
+_LOOSENING, _LOOSENED = aliased(LedgerTransaction), aliased(Movement)
+LOOSENED_IN = (
+    select(_LOOSENING.id)
+    .join(_LOOSENED, _LOOSENED.transaction_id == _LOOSENING.id)
+    .where(
+        _LOOSENING.kind == "loosen",
+        or_(
+            _LOOSENED.from_open_package_id == OpenPackage.id,
+            _LOOSENED.to_open_package_id == OpenPackage.id,
+        ),
+    )
+    .correlate(OpenPackage)
+    .scalar_subquery()
+)
+# When an opening's open package (OPENED_INTO) was closed by a write-off
+# (used up, lost: open_packages.close), and when made loose instead; each
+# NULL otherwise.
+WRITTEN_OFF_ON = case((LOOSENED_IN.is_(None), OpenPackage.closed_at)).label(
+    "written_off_on"
+)
+MADE_LOOSE_ON = case((LOOSENED_IN.is_not(None), OpenPackage.closed_at)).label(
+    "made_loose_on"
+)
+
 
 def moved_whole(from_open: int | None, to_open: int | None) -> bool:
     """Whether a movement moved an open package whole: it left one and
@@ -256,43 +285,54 @@ def correction_key(
     )
 
 
-def _read(
-    session: Session, row: OverRecorded
-) -> tuple[Movement, LedgerTransaction, bool]:
-    """A check's movement and transaction, and whether it is an opening
-    whose open package closed since, its open end not counted: closing it,
-    however (used up, Close, a count), wrote off what it showed, so put
-    that end right (Ali, 2026-11-15, inventory-tng-nyl). Read under the
-    place's lock: a close takes its open package's place first
-    (open_packages.close), and an opening's open package is at its place
-    unless moved since, where writing off in it is refused anyway
+class _Read(NamedTuple):
+    """A check's movement and transaction, and, for an opening whose open
+    end no count put right, whether its open package was closed since by
+    a write-off (`closed`), or made loose (`loose`)."""
+
+    movement: Movement
+    transaction: LedgerTransaction
+    closed: bool
+    loose: bool
+
+
+def _read(session: Session, row: OverRecorded) -> _Read:
+    """A check as _Read says. Closing its open package (used up, Close, a
+    count) wrote off what it showed, so put that end right (Ali,
+    2026-11-15, inventory-tng-nyl); making it loose did not, so that end
+    waits for a count, and Correct writes it off the loose units there
+    (Ali, 2026-11-24, inventory-tng-n7dj). Read under the place's lock: a
+    close and a loosening take their open package's place first
+    (open_packages), and an opening's open package is at its place unless
+    moved since, where writing off in it is refused anyway
     (movement_open_package_place). Closed is never undone."""
     movement = session.get_one(Movement, row.movement_id)
     transaction = session.get_one(LedgerTransaction, movement.transaction_id)
     open_id = movement.to_open_package_id
-    closed = (
+    closed = loose = False
+    if (
         transaction.kind == "open"
         and open_id is not None
         and row.arrived_count_id is None
-        and session.scalar(
-            select(OpenPackage.closed_at).where(OpenPackage.id == open_id)
-        )
-        is not None
-    )
-    return movement, transaction, closed
+    ):
+        closed_on, loosened_in = session.execute(
+            select(OpenPackage.closed_at, LOOSENED_IN).where(OpenPackage.id == open_id)
+        ).one()
+        loose = loosened_in is not None
+        closed = closed_on is not None and not loose
+    return _Read(movement, transaction, closed, loose)
 
 
-def _right(
-    row: OverRecorded, movement: Movement, transaction: LedgerTransaction, closed: bool
-) -> bool:
+def _right(row: OverRecorded, read: _Read) -> bool:
     """Whether every end a check has is put right already (_all_right)."""
+    movement, transaction = read.movement, read.transaction
     return _all_right(
         transaction.from_location_id,
         transaction.to_location_id,
         moved_whole(movement.from_open_package_id, movement.to_open_package_id),
         row.left_count_id,
         row.arrived_count_id,
-        closed,
+        read.closed,
     )
 
 
@@ -318,7 +358,7 @@ def close(session: Session, check_id: int, seen_as: str, admin_id: int) -> None:
     as waiting(), or (over_recorded_unchanged) if an end is still to put
     right."""
     row = waiting(session, check_id, seen_as)
-    if not _right(row, *_read(session, row)):
+    if not _right(row, _read(session, row)):
         raise RuleBroken("over_recorded_unchanged")
     _closed_right(session, row, admin_id)
 
@@ -330,7 +370,8 @@ def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Set
     again where it left, written off where it arrived. An opening's open
     package closed since, however, put its end right (_read), so its end is
     skipped: the sealed end alone is written (Ali, 2026-11-15,
-    inventory-tng-nyl). One with every end put right already has nothing
+    inventory-tng-nyl). One made loose since did not, so its end is written
+    off the loose units there (Ali, 2026-11-24, inventory-tng-n7dj). One with every end put right already has nothing
     to write, so is settled as counted, as close() settles it (Ali,
     2026-11-15, inventory-tng-dro). Call it holding its places
     (places_of), locked first. Each under a key of the check's, so it is
@@ -338,8 +379,9 @@ def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Set
     settled. RuleBroken as waiting(), or as
     counts.record_adjustment."""
     row = waiting(session, check_id, seen_as)
-    movement, transaction, closed = _read(session, row)
-    if _right(row, movement, transaction, closed):
+    read = _read(session, row)
+    movement, transaction, closed = read.movement, read.transaction, read.closed
+    if _right(row, read):
         _closed_right(session, row, admin_id)
         return "counted"
     _settled(row, admin_id, "corrected")
@@ -356,17 +398,18 @@ def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Set
         (
             None if row.left_count_id else transaction.from_location_id,
             True,
-            movement.from_package_id,
-            movement.from_open_package_id,
+            ledger.Form(movement.from_package_id, movement.from_open_package_id),
         ),
         (
             None if row.arrived_count_id or closed else transaction.to_location_id,
             False,
-            movement.to_package_id,
-            movement.to_open_package_id,
+            # Made loose, what it showed is loose units there now.
+            ledger.LOOSE
+            if read.loose
+            else ledger.Form(movement.to_package_id, movement.to_open_package_id),
         ),
     )
-    for place, found, package_id, open_id in sides:
+    for place, found, form in sides:
         if place is None:
             continue
         counts.record_adjustment(
@@ -378,7 +421,7 @@ def correct(session: Session, check_id: int, seen_as: str, admin_id: int) -> Set
             row.quantity,
             found=found,
             reason_id=reason.id,
-            form=ledger.Form(package_id, open_id),
+            form=form,
         )
     _measure_settled(session, "corrected")
     once_committed(
@@ -538,7 +581,9 @@ def counted(
     arrived in it, as a count of it at 0 would, so Correct writes only the
     sealed end (Ali, 2026-11-15, inventory-tng-he9); a move's it does not.
     One closed before, however, put that end right already, though no count
-    did (OPENED_INTO). One with every end it has put right closes as
+    did (OPENED_INTO); one made loose before did not, and a count of the
+    item's total or its loose units puts that end right, made by `as_of`
+    (LOOSENED_IN; Ali, 2026-11-24, inventory-tng-n7dj). One with every end it has put right closes as
     counted, by the count's administrator, then. How many closed.
 
     Call it in the count's transaction, holding the place (ledger.lock_place):
@@ -559,7 +604,8 @@ def counted(
             LedgerTransaction.kind,
             LedgerTransaction.from_location_id,
             LedgerTransaction.to_location_id,
-            OpenPackage.closed_at,
+            WRITTEN_OFF_ON,
+            LOOSENED_IN,
         ),
         [place_id],
         as_of,
@@ -567,10 +613,18 @@ def counted(
     ).outerjoin(OpenPackage, OPENED_INTO)
     found = session.execute(locked(query, of=OverRecorded)).all()
     closed = 0
-    for row, movement, kind, left_at, arrived_at, closed_on in found:
+    for row, movement, kind, left_at, arrived_at, closed_on, loosened_in in found:
         whole = moved_whole(movement.from_open_package_id, movement.to_open_package_id)
         item_id = movement.item_id
         by_total = item_id in totals and not whole and kind != "open"
+        # Its open package made loose by the moment counted: what it showed
+        # is loose units, which the item's total or its loose units counted
+        # put right (Ali, 2026-11-24, inventory-tng-n7dj).
+        loose_counted = (
+            loosened_in is not None
+            and loosened_in <= as_of
+            and (item_id in totals or (item_id, ledger.LOOSE) in forms)
+        )
         left = ledger.Form(movement.from_package_id, movement.from_open_package_id)
         arrived = ledger.Form(movement.to_package_id, movement.to_open_package_id)
         if (
@@ -588,6 +642,7 @@ def counted(
                 by_total
                 or (item_id, arrived) in forms
                 or (kind == "open" and (item_id, arrived) in emptied)
+                or loose_counted
             )
         ):
             row.arrived_count_id = count_id

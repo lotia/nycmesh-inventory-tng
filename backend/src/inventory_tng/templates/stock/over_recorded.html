@@ -87,9 +87,14 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
       other end's next step. Both: nothing left to write, so Close it. #}
       {% set one = each.one_counted %}
       {% set both = each.both_right %}
+      {#- An opening's open package made loose, its open end waiting for a
+      count there (over_recorded_queries.MadeLoose). #}
+      {% set loose = each.made_loose %}
       {#- How an end was put right (over_recorded_queries.OneCounted, BothRight):
-      "counted", or "closed", an opening's open package closed since. #}
-      {% if one %}
+      "counted", or "closed", an opening's open package written off since. #}
+      {% if loose %}
+      <p>{#- Translators: %(open)s is an open package's form, such as "open spool"; %(place)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home. #}{% trans open=loose.open, place=loose.place, day=loose.on | day(zone) %}What was on the {{ open }} became loose units at {{ place }} on {{ day }}. Count {{ place }} to put this right.{% endtrans %}</p>
+      {% elif one %}
       <p>{#- Translators: %(counted)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home, or a form, such as "open spool". #}{% if one.how == "closed" %}{% trans counted=one.counted, day=one.on | day(zone), still=one.still %}{{ counted }} closed {{ day }}. {{ still }} still to put right.{% endtrans %}
       {#- Translators: %(counted)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home, or a form, such as "open spool". #}{%- else %}{% trans counted=one.counted, day=one.on | day(zone), still=one.still %}{{ counted }} counted {{ day }}. {{ still }} still to put right.{% endtrans %}{% endif %}</p>
       {% elif both %}
@@ -103,8 +108,9 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
           <button>{% if both %}{% trans %}Close it{% endtrans %}{% elif one %}
           {#- Translators: %(end)s is a place of any kind, such as a store, a shelf, a bin or a volunteer's home, or a form, such as "open spool". #}{% trans end=one.correct %}Correct {{ end }}{% endtrans %}{% else %}{% trans %}Correct{% endtrans %}{% endif %}<span class="sr-only"> {{ which(each) }}</span></button>
         </form>
-        {% if one and one.countable %}
-        <a href="{{ counts_path }}/{{ one.place_id }}?item={{ each.item_id }}">{% trans place=one.place %}Count {{ place }}{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></a>
+        {% set count_at = loose or one %}
+        {% if count_at and count_at.countable %}
+        <a href="{{ counts_path }}/{{ count_at.place_id }}?item={{ each.item_id }}">{% trans place=count_at.place %}Count {{ place }}{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></a>
         {% endif %}
         <form method="post" action="{{ here }}/{{ row.id }}/checked{{ view.query_string }}">
           <input type="hidden" name="seen" value="{{ seen(row) }}">

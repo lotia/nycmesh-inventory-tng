@@ -483,6 +483,7 @@ def recorded(**differs: object) -> SimpleNamespace:
             "moved_whole": None,
             "one_counted": None,
             "both_right": None,
+            "made_loose": None,
         }
         | differs
     )
@@ -514,6 +515,15 @@ def recorded_more() -> str:
         *(
             recorded(both_right=SimpleNamespace(**both, arrived_how=how))
             for how in ("counted", "closed")
+        ),
+        recorded(
+            made_loose=SimpleNamespace(
+                open=NOT_ENGLISH,
+                on=DAY,
+                place_id=1,
+                place=NOT_ENGLISH,
+                countable=True,
+            )
         ),
         recorded(from_place=None),
         recorded(to_place=None),

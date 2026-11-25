@@ -11,7 +11,7 @@ open packages listed fewest left first, short ends after the usable ones
 on the scan page and flagged; its sealed packages largest first on the
 stock pages, smallest first on the item, scan and count pages; packages
 of one size by id) · amended 2026-11-23 (an item counted each; following
-turned off)
+turned off; an opening recorded more than moved made loose, 2026-11-24)
 
 ## Context
 
@@ -450,7 +450,8 @@ you" counts every report in one line, which hides what is waiting.
   an opening's end in it right already.
 - **An opening's open package closed** since, however it closed (Confirm
   used up, Close on its item's page, a count, even one whose every line
-  was withheld as moved meanwhile, which writes no count), wrote off what
+  was withheld as moved meanwhile, which writes no count; not made loose,
+  below), wrote off what
   it showed, so Correct skips that end and writes only the sealed end,
   not refused (Ali, 2026-11-15, inventory-tng-nyl). The row then says
   "Open spool closed 14 Nov. Sealed spool still to put right." (the day it
@@ -657,6 +658,22 @@ inventory-tng-j89e):
   app. The ledger's kind, loosen, is never shown: the length checks leave
   it out of an open package's last cuts, as one shown just before it was
   made loose could otherwise list it.
+
+- **An opening recorded more than moved, its open package made loose**,
+  still waits for its open end (Ali, 2026-11-24, inventory-tng-n7dj). The
+  row says "What was on the open spool became loose units at Shelf B on
+  24 Nov. Count Shelf B to put this right." (the open form as the row
+  names an end, the place and the day it was made loose) with "Count
+  Shelf B", Correct and Mark checked. A count of the item there after it,
+  by its total or its loose units, puts that end right; one counting the
+  sealed spools too puts both right at once. Then the row reads as after
+  any count, naming that end by what it became ("Loose cat6 cable counted
+  25 Nov."). Correct writes that end off the loose units there. Only a
+  write-off (used up, lost) says "closed" and puts the end right. The app
+  tells the two apart by the loosening transaction; one made loose with
+  nothing left on it has none, so reads as closed, as nothing became
+  loose. Ali rejected "Loose at Shelf B since 24 Nov. Count Shelf B to
+  put this right.", and treating a package made loose as put right.
 
 We rejected leaving both as they were, and only showing "2 open packages
 still followed". For the words, Ali rejected saying nothing before the

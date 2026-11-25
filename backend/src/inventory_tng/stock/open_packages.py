@@ -393,7 +393,9 @@ def close_unfollowed(
     name, so the place holds what it held; the row is marked closed, never
     deleted, in history. How many it closed. Nothing is written off, so,
     unlike close, it puts no end of an opening recorded more than moved
-    right (over_recorded.open_package_closed).
+    right (over_recorded.open_package_closed): that end waits for a count
+    of the item there (over_recorded.LOOSENED_IN; Ali, 2026-11-24,
+    inventory-tng-n7dj).
 
     Call it holding `places` (ledger.lock_places) from before the setting
     was changed, as unfollowing does. One at a place not held, as moved
