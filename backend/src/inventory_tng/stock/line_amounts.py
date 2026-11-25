@@ -14,7 +14,7 @@ its size in its item's unit as kept
 (models.catalogue.ItemPackage.size_in_items_unit), as the ledger takes
 them since, so packages received before a change leave whole after it.
 An amount said of a line, as a correction undoing some of it is written,
-converts alike (said_in_items_unit; inventory-tng-4fjq).
+is read by the same expression (said_in_items_unit; inventory-tng-4fjq).
 """
 
 from decimal import Decimal
@@ -23,6 +23,7 @@ from typing import Any
 from sqlalchemy import (
     ColumnElement,
     Numeric,
+    SQLColumnExpression,
     Text,
     and_,
     case,
@@ -35,36 +36,39 @@ from sqlalchemy.orm import Session, aliased
 
 from inventory_tng.catalogue.unit_conversion import (
     IN_METRES,
-    at_scale,
-    converted,
+    at_scale_sql,
     converted_kept_sql,
     converted_sql,
-    convertible,
 )
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import Movement
 
 
-def _by_packages(sealed: ColumnElement[Any]) -> ColumnElement[Any]:
-    """A sealed line's amount in its item's unit: how many packages it
-    moves, each its size as kept in the line's unit then, times that size
-    as kept in its item's now. Its package is `sealed`, an alias of its
+def _by_packages(
+    sealed: ColumnElement[Any], quantity: SQLColumnExpression[Any]
+) -> ColumnElement[Any]:
+    """A sealed line's amount, `quantity`, in its item's unit: how many
+    packages it moves, each its size as kept in the line's unit then, times
+    that size as kept in its item's now. Its package is `sealed`, an alias of its
     own, so a query that joins a package for another reason does not
     change which."""
     package = aliased(ItemPackage)
     then = converted_kept_sql(package.size, package.unit, Movement.unit)
     now = converted_kept_sql(package.size, package.unit, Item.unit)
     return (
-        select(Movement.quantity / then * now)
+        select(quantity / then * now)
         .where(package.id == sealed)
         .correlate_except(package)
         .scalar_subquery()
     )
 
 
-def in_items_unit() -> ColumnElement[Any]:
-    """Movement.quantity, read in its item's unit, of the Item the query
-    joins to the line, exactly: a sum or a line read alone is rounded with
+def in_items_unit(
+    quantity: SQLColumnExpression[Any] = Movement.quantity,
+) -> ColumnElement[Any]:
+    """`quantity` of a line, its Movement.quantity unless an amount said
+    of it, read in its item's unit, of the Item the query joins to the
+    line, exactly: a sum or a line read alone is rounded with
     unit_conversion.at_scale_sql(). A line in a unit that does not convert is an error as it is
     read, saying the line's id and both units: those words cast to a
     number, a DataError, as the database may hold no function to raise one
@@ -86,31 +90,23 @@ def in_items_unit() -> ColumnElement[Any]:
     lengths = and_(Movement.unit.in_(list(IN_METRES)), Item.unit.in_(list(IN_METRES)))
     sealed = func.coalesce(Movement.from_package_id, Movement.to_package_id)
     return case(
-        (Movement.unit == Item.unit, Movement.quantity),
-        (and_(lengths, sealed.is_not(None)), _by_packages(sealed)),
-        (lengths, converted_sql(Movement.quantity, Movement.unit, Item.unit)),
+        (Movement.unit == Item.unit, quantity),
+        (and_(lengths, sealed.is_not(None)), _by_packages(sealed, quantity)),
+        (lengths, converted_sql(quantity, Movement.unit, Item.unit)),
         else_=cast(refused, Numeric),
     )
 
 
 def said_in_items_unit(
-    session: Session, item_id: int, amount: Decimal, unit: str, package_id: int | None
+    session: Session, movement_id: int, amount: Decimal
 ) -> tuple[Decimal, str]:
-    """`amount` of a line of the item `item_id`, said in the line's `unit`,
-    as in_items_unit() reads the line, kept, and the unit it is in then:
-    by packages of `package_id`, its sealed side's if it has one, else
-    exactly. In `unit`
-    still unless it converts into the item's, so a ledger write shown in it
-    is refused as it would be. Call it holding the item
-    (ledger.hold_across), so its unit cannot change before it is written."""
-    into = session.scalars(select(Item.unit).where(Item.id == item_id)).one()
-    if not convertible(unit, into):
-        return amount, unit
-    if package_id is None:
-        return converted(amount, unit, into), into
-    size, size_unit, size_now = session.execute(
-        select(
-            ItemPackage.size, ItemPackage.unit, ItemPackage.size_in_items_unit
-        ).where(ItemPackage.id == package_id)
+    """`amount` of the line `movement_id`, said in the line's unit, as
+    in_items_unit() reads the line, kept, and its item's unit. Call it
+    holding the item (ledger.hold_across), so its unit cannot change
+    before it is written."""
+    said, unit = session.execute(
+        select(at_scale_sql(in_items_unit(literal(amount, Numeric))), Item.unit)
+        .join(Item, Item.id == Movement.item_id)
+        .where(Movement.id == movement_id)
     ).one()
-    return at_scale(amount / converted(size, size_unit, unit) * size_now), into
+    return said, unit
