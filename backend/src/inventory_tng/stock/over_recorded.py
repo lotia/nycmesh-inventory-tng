@@ -421,8 +421,8 @@ def _in_items_unit(
     waits. A check raised while that change ran, after it looked for
     checks waiting, so converts here too."""
     ledger.hold_across(session, item_ids=[movement.item_id])
-    said, into = line_amounts.said_in_items_unit(session, movement.id, amount)
-    if into != movement.unit:
+    amounts, unit = line_amounts.said_in_items_unit(session, movement.id, amount)
+    if unit != movement.unit:
         once_committed(
             session,
             log.info,
@@ -430,9 +430,9 @@ def _in_items_unit(
             movement_id=movement.id,
             item_id=movement.item_id,
             recorded_in=movement.unit,
-            written_in=into,
+            written_in=unit,
         )
-    return said, into
+    return amounts, unit
 
 
 def correct(

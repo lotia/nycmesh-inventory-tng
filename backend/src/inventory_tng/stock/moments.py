@@ -132,7 +132,8 @@ def flows(
     into = LedgerTransaction.to_location_id == location_id
     out = LedgerTransaction.from_location_id == location_id
     # An opening or a loosening changes the form of stock at a place, not
-    # how much is there.
+    # how much is there: but for the part of a thousandth an opening before
+    # a change between m and ft adds (line_amounts), which is no move.
     where = [at_place(location_id), window, LedgerTransaction.kind.not_in(AT_ONE_PLACE)]
     if items is not None:
         where.append(Movement.item_id.in_(items))

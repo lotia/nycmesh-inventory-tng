@@ -172,8 +172,8 @@ def test_an_open_package_opened_before_reads_converted(
     session: Session, spools: Spools
 ) -> None:
     """A spool opened in m, then cut in ft: what is left on it is read in
-    ft, its opening and its cut exactly, as neither side of either is
-    sealed: 1000.65617 less 0.656, kept as 1000.000."""
+    ft, the end its opening made and its cut exactly, as neither of those
+    sides is sealed: 1000.65617 less 0.656, kept as 1000.000."""
     open_id = spools.opened().id
     spools.cable.unit = "ft"
     session.flush()
@@ -185,6 +185,39 @@ def test_an_open_package_opened_before_reads_converted(
         session, [spools.store.id], [spools.cable.id], 0, latest
     )
     assert opened == Decimal("1000.656")
+
+
+def test_an_opening_is_matched_by_its_packages(session: Session) -> None:
+    """A drum of 1001 ft, kept as 305.105 m, opened in m, then the cable
+    in ft: the open drum holds its true length, 1001.001 ft (1001.00066),
+    but the opening reads as the whole drum it took, 1001 ft, as what
+    arrived sealed is read, so a count matches the two
+    (count_arrivals.as_held)."""
+    spools = Spools(session)
+    drum = add(
+        session,
+        ItemPackage(item_id=spools.cable.id, name="Drum", size=1001, unit="ft"),
+    )
+    store = spools.store.id
+    sealed = Form(package_id=drum.id)
+    size = Decimal("305.105")
+    spools.write(
+        {"kind": "receipt", "to_location_id": store},
+        Entry(spools.cable.id, size, LOOSE, sealed),
+    )
+    made = open_packages.make(session, uuid.uuid4(), drum.id, store)
+    spools.write(
+        {"kind": "open", "from_location_id": store, "to_location_id": store},
+        Entry(spools.cable.id, size, sealed, Form(open_package_id=made.id)),
+    )
+    spools.cable.unit = "ft"
+    session.flush()
+    latest = queries.latest_transaction_id(session)
+    assert moments.left_at(session, made.id, latest) == Decimal("1001.001")
+    ((*_, opened),) = queries.openings_at(
+        session, [store], [spools.cable.id], 0, latest
+    )
+    assert opened == Decimal(1001)
 
 
 def _opened_and_cut(spools: Spools, package: ItemPackage, how_many: int) -> None:
