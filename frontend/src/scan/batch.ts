@@ -6,6 +6,7 @@ import { say, sayParts } from "../shared/i18n";
 import type { Draft, Summary } from "../shared/outbox";
 import type { Said } from "../shared/outbox-notes";
 import {
+  AMOUNT_PLACES,
   count,
   decimal,
   type OtherSeparator,
@@ -41,7 +42,7 @@ const MAX_LINES = 500;
  * with its item's name. */
 export const AN_ITEM = msg`An item`;
 export const OPEN_NOW_WHOLE = msg`{name}: enter what is on the open package, in whole units, or leave it blank.`;
-export const OPEN_NOW_DECIMALS = msg`{name}: enter what is on the open package, up to 3 decimals, or leave it blank.`;
+export const OPEN_NOW_DECIMALS = msg`{name}: enter what is on the open package, up to {places} decimals, or leave it blank.`;
 export const TOO_MUCH = msg`{name}: That is more than the inventory can count.`;
 export const PICK_YOUR_NAME = msg`Pick your name.`;
 export const PICK_FROM = msg`Pick where it comes from.`;
@@ -173,7 +174,10 @@ export function toBatch(
         (item !== undefined && !wholeEnough(item.unit, left))
       ) {
         problems.push(
-          sayParts(each ? OPEN_NOW_WHOLE : OPEN_NOW_DECIMALS, { name: named }),
+          sayParts(each ? OPEN_NOW_WHOLE : OPEN_NOW_DECIMALS, {
+            name: named,
+            places: AMOUNT_PLACES,
+          }),
         );
       } else if (left >= MAX_AMOUNT) {
         problems.push(sayParts(TOO_MUCH, { name: named }));

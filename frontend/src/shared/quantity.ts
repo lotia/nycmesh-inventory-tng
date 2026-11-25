@@ -1,7 +1,7 @@
 /**
- * Quantities as whole thousandths of a unit, the three decimal places the
- * ledger keeps, so adding packages and loose units never meets floating
- * point (0.1 + 0.2). Read from and written to the decimal strings the API
+ * Quantities as whole thousandths of a unit, the AMOUNT_PLACES decimal
+ * places the ledger keeps, so adding packages and loose units never meets
+ * floating point (0.1 + 0.2). Read from and written to the decimal strings the API
  * uses.
  */
 

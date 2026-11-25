@@ -30,6 +30,7 @@ import {
 import { BatchKey, BatchLine } from "../shared/outbox";
 import type { Said } from "../shared/outbox-notes";
 import {
+  AMOUNT_PLACES,
   boxAmount,
   boxSeparator,
   count,
@@ -720,7 +721,10 @@ export function quantityOf(
   | Refusal {
   const loose = readBox(line.loose);
   const looseWords = () =>
-    boxProblem(line.loose, say(LOOSE_DECIMALS, { unit: item.unit }));
+    boxProblem(
+      line.loose,
+      say(LOOSE_DECIMALS, { unit: item.unit, places: AMOUNT_PLACES }),
+    );
   /** Refused for `said`, about `box`, the loose box's words beside. */
   const refuse = (
     said: { problem: Said; refused?: OtherSeparator },
@@ -767,10 +771,13 @@ export function quantityOf(
   )) {
     const part = readBox(typed);
     if (part === null) {
-      return refuse(boxProblem(typed, say(OPEN_DECIMALS)), {
-        kind: "open",
-        key,
-      });
+      return refuse(
+        boxProblem(typed, say(OPEN_DECIMALS, { places: AMOUNT_PLACES })),
+        {
+          kind: "open",
+          key,
+        },
+      );
     }
     if (part > 0) {
       taken.set(key, { amount: part, whole });
@@ -801,8 +808,8 @@ export function quantityOf(
 
 export const PACKAGE_NO_LONGER_USED = msg`A package counted here is no longer used. Remove the line and add it again.`;
 export const COUNT_WHOLE_PACKAGES = msg`Count whole packages: {package}.`;
-export const LOOSE_DECIMALS = msg`Enter the loose amount in {unit}, up to 3 decimals.`;
-export const OPEN_DECIMALS = msg`Enter how much from the open package, up to 3 decimals.`;
+export const LOOSE_DECIMALS = msg`Enter the loose amount in {unit}, up to {places} decimals.`;
+export const OPEN_DECIMALS = msg`Enter how much from the open package, up to {places} decimals.`;
 export const WHOLE_UNITS = msg`Counted in whole units.`;
 /** A box refused for the decimal separator its page does not use: the
  * other read as thousands (shared/quantity.Unreadable), which naming

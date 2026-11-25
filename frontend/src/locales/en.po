@@ -556,10 +556,6 @@ msgstr "Short end"
 msgid "Check the device's settings allow this browser to use the camera. This browser isn't keeping the cart, so record it before you restart the browser, or find items in the list."
 msgstr "Check the device's settings allow this browser to use the camera. This browser isn't keeping the cart, so record it before you restart the browser, or find items in the list."
 
-#: src/scan/cart.ts
-msgid "Enter how much from the open package, up to 3 decimals."
-msgstr "Enter how much from the open package, up to 3 decimals."
-
 #: src/scan/batch.ts
 msgid "{name}, {package}: retired: taking only, so it can't be received."
 msgstr "{name}, {package}: retired: taking only, so it can't be received."
@@ -781,10 +777,6 @@ msgstr "{name}: enter what is on the open package, in whole units, or leave it b
 msgid "No answer from the inventory. Trying again shortly."
 msgstr "No answer from the inventory. Trying again shortly."
 
-#: src/scan/batch.ts
-msgid "{name}: enter what is on the open package, up to 3 decimals, or leave it blank."
-msgstr "{name}: enter what is on the open package, up to 3 decimals, or leave it blank."
-
 #: src/scan/ScanPage.tsx
 msgid "<0>Register it</0>, then come back."
 msgstr "<0>Register it</0>, then come back."
@@ -1004,10 +996,6 @@ msgstr "The inventory answered unexpectedly ({status}). Trying again shortly."
 msgid "{name}: {amount} fewer"
 msgstr "{name}: {amount} fewer"
 
-#: src/scan/cart.ts
-msgid "Enter the loose amount in {unit}, up to 3 decimals."
-msgstr "Enter the loose amount in {unit}, up to 3 decimals."
-
 #. {from} is a place of any kind, such as a store, a shelf, a bin or a volunteer's home.
 #: src/scan/batch.ts
 msgid "Opening: {items} at {from}"
@@ -1033,6 +1021,10 @@ msgstr "These are in your cart, waiting to be recorded."
 #: src/scan/OlderList.tsx
 msgid "A cart: taking it to an install"
 msgstr "A cart: taking it to an install"
+
+#: src/scan/batch.ts
+msgid "{name}: enter what is on the open package, up to {places} decimals, or leave it blank."
+msgstr "{name}: enter what is on the open package, up to {places} decimals, or leave it blank."
 
 #: src/scan/OlderList.tsx
 msgid "This browser can't keep the cart. Clear local data, reload the page and try again."
@@ -1128,6 +1120,10 @@ msgstr "Counted in whole units."
 msgid "Where"
 msgstr "Where"
 
+#: src/scan/cart.ts
+msgid "Enter the loose amount in {unit}, up to {places} decimals."
+msgstr "Enter the loose amount in {unit}, up to {places} decimals."
+
 #: src/shared/outbox-notes.ts
 msgid "That open package moves whole, still open: it is not used up"
 msgstr "That open package moves whole, still open: it is not used up"
@@ -1139,6 +1135,10 @@ msgstr "Register it to send this batch."
 #: src/scan/CartForm.tsx
 msgid "This item wasn't automatically removed. Record the cart and try to remove."
 msgstr "This item wasn't automatically removed. Record the cart and try to remove."
+
+#: src/scan/cart.ts
+msgid "Enter how much from the open package, up to {places} decimals."
+msgstr "Enter how much from the open package, up to {places} decimals."
 
 #: src/scan/OpenPackageCard.tsx
 msgid "Your cut is more than the {name} shows, so “{checkbox}” is ticked. It's recorded as you typed it, and an administrator will check the {name}."
