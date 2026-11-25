@@ -501,14 +501,16 @@ def correct(
     for place, side, form in sides:
         if place is None:
             continue
+        # The end it left is found again; the end it arrived at written off.
+        found = side == "from"
         counts.record_adjustment(
             session,
-            correction_key(transaction.idempotency_key, row, found=side == "from"),
+            correction_key(transaction.idempotency_key, row, found=found),
             admin_id,
             place,
             movement.item_id,
             amounts[side],
-            found=side == "from",
+            found=found,
             reason_id=reason.id,
             form=form,
             shown_unit=unit,

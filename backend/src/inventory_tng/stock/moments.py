@@ -132,8 +132,8 @@ def flows(
     into = LedgerTransaction.to_location_id == location_id
     out = LedgerTransaction.from_location_id == location_id
     # An opening or a loosening changes the form of stock at a place, not
-    # how much is there: but for the part of a thousandth an opening before
-    # a change between m and ft adds (line_amounts), which is no move.
+    # how much is there (but for an opening's part of a thousandth after a
+    # change between m and ft, line_amounts, which is no move either).
     where = [at_place(location_id), window, LedgerTransaction.kind.not_in(AT_ONE_PLACE)]
     if items is not None:
         where.append(Movement.item_id.in_(items))
@@ -191,7 +191,6 @@ def form_flows(
         ),
     )
     for side, place, package, opened in sides:
-        into = side == "to"
         rows = session.execute(
             select(
                 Movement.item_id,
@@ -207,7 +206,7 @@ def form_flows(
         for item_id, package_id, open_id, total in rows:
             form = (item_id, Form(package_id, open_id))
             came, went = flow.get(form, (Decimal(0), Decimal(0)))
-            flow[form] = (came + total, went) if into else (came, went + total)
+            flow[form] = (came + total, went) if side == "to" else (came, went + total)
     return flow
 
 
