@@ -18,6 +18,7 @@ from inventory_tng.catalogue.paths import ITEMS, unit_recount
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.catalogue import ItemPackage, VendorOffer
+from inventory_tng.models.labels import Label
 from inventory_tng.models.stock import Movement
 from inventory_tng.scan.batch import BatchRefused, KeyReused, record
 from inventory_tng.scan.batch_schemas import Batch
@@ -507,3 +508,108 @@ def test_no_for_a_retired_labelled_item_offers_nothing_to_revoke(
     declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
     assert "Nothing was converted" in words_on(declined.text)
     assert read(declined.text).all("a", href=item_labels(place.cable.id)) == []
+
+
+def _labelled_reel(session: Session, place: Place) -> tuple[Label, Label, Label]:
+    """The cable's own label, its reel's, and one of its reel's revoked
+    before (NOW), all made while the cable is in m."""
+    reel = add(session, ItemPackage(item_id=place.cable.id, name="Reel", size=305))
+    old = labels.make_for_item(session, place.cable.id, reel.id)
+    assert old is not None
+    assert labels.revoke(session, old.id, NOW)
+    own = labels.make_for_item(session, place.cable.id)
+    on_reel = labels.make_for_item(session, place.cable.id, reel.id)
+    assert own is not None
+    assert on_reel is not None
+    return own, on_reel, old
+
+
+@pytest.mark.parametrize("moved", [False, True])
+def test_yes_revokes_every_label_not_yet_revoked_and_says_to_print_new_ones(
+    admin_client: TestClient, session: Session, moved: bool
+) -> None:
+    """Its labels show m, so Yes revokes them with the change, whether
+    labels alone fix its unit or stock has moved too; the one revoked
+    before keeps its time, and another item's label is left (Ali,
+    2026-11-25, inventory-tng-8ema)."""
+    place = _shelf_a(session) if moved else Place(session)
+    own, on_reel, old = _labelled_reel(session, place)
+    other = labels.make_for_item(session, place.item.id)
+    assert other is not None
+    asked = admin_client.post(
+        f"{ITEMS}/{place.cable.id}", data=shown_item_form(place.cable, unit="ft")
+    )
+    assert QUESTION in words_on(asked.text)
+    hint = read(asked.text).one("p", id="unit-labels-revoked")
+    assert words_on(hint) == "Its 2 printed labels show m: Yes revokes them."
+    done = admin_client.post(
+        f"{ITEMS}/{place.cable.id}", data=unit_answered(place.cable, unit="ft")
+    )
+    assert done.status_code == 303
+    after = admin_client.get(done.headers["location"])
+    assert (
+        "Saved. Its 2 printed labels showed m and were revoked: print new ones."
+    ) in words_on(after.text)
+    for each in (own, on_reel, old, other):
+        session.refresh(each)
+    assert own.revoked_at is not None
+    assert own.revoked_at == on_reel.revoked_at
+    assert (old.revoked_at, other.revoked_at) == (NOW, None)
+    assert place.cable.unit == "ft"
+
+
+def test_one_label_is_said_once(admin_client: TestClient, session: Session) -> None:
+    place = Place(session)
+    assert labels.make_for_item(session, place.cable.id) is not None
+    asked = admin_client.post(
+        f"{ITEMS}/{place.cable.id}", data=shown_item_form(place.cable, unit="ft")
+    )
+    hint = read(asked.text).one("p", id="unit-labels-revoked")
+    assert words_on(hint) == "Its printed label shows m: Yes revokes it."
+    done = admin_client.post(
+        f"{ITEMS}/{place.cable.id}", data=unit_answered(place.cable, unit="ft")
+    )
+    after = admin_client.get(done.headers["location"])
+    assert (
+        "Saved. Its printed label showed m and was revoked: print a new one."
+    ) in words_on(after.text)
+
+
+def test_no_labels_no_word_of_them(admin_client: TestClient, session: Session) -> None:
+    """Stock moved, nothing printed: neither the question nor the notice
+    speaks of labels."""
+    place = _shelf_a(session)
+    asked = admin_client.post(
+        f"{ITEMS}/{place.cable.id}", data=shown_item_form(place.cable, unit="ft")
+    )
+    assert read(asked.text).all("p", id="unit-labels-revoked") == []
+    done = admin_client.post(
+        f"{ITEMS}/{place.cable.id}", data=unit_answered(place.cable, unit="ft")
+    )
+    assert done.headers["location"] == f"{ITEMS}/{place.cable.id}?notice=saved"
+
+
+def test_no_revokes_nothing(admin_client: TestClient, session: Session) -> None:
+    place = _shelf_a(session)
+    own, on_reel, _ = _labelled_reel(session, place)
+    answered = unit_answered(place.cable, "no", unit="ft")
+    admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
+    for each in (own, on_reel):
+        session.refresh(each)
+    assert (own.revoked_at, on_reel.revoked_at) == (None, None)
+    assert place.cable.unit == "m"
+
+
+def test_a_rename_with_the_change_says_both(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Renamed as well: its aliases' notice, then the labels'."""
+    place = Place(session)
+    assert labels.make_for_item(session, place.cable.id) is not None
+    answered = unit_answered(place.cable, unit="ft", name=f"Heliax {place.cable.id}")
+    done = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
+    after = admin_client.get(done.headers["location"])
+    assert (
+        "remove it below if it shouldn't be. Its printed label showed m and was "
+        "revoked: print a new one."
+    ) in words_on(after.text)

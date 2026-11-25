@@ -3,7 +3,7 @@
 {% from "_listing.html" import sort_heading %}
 {% from "_labels.html" import labels_section with context %}
 {% from "_retired_record.html" import retired_record, retire_section with context %}
-{% from "catalogue/_revoke_labels.html" import until_revoked, revoke_link %}
+{% from "catalogue/_revoke_labels.html" import until_revoked, revoke_link, yes_revokes %}
 {% block main %}
 {#- A retired package not brought back for a fraction in its size, which it
 has no box to change: added again instead (Ali, 2026-11-23). #}
@@ -105,6 +105,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   <div role="alert" id="unit-question">
     <p>{% trans unit=item.unit %}Were the recorded amounts really in {{ unit }}?{% endtrans %}</p>
     <p class="hint">{% trans new=values.get('unit'), old=item.unit %}Yes recalculates its stock, Reorder at, what is on order and its vendor offers in {{ new }}. Past movements stay in {{ old }}.{% endtrans %}</p>
+    {% if labels_printed %}<p class="hint" id="unit-labels-revoked">{{ yes_revokes(labels_printed, item.unit) }}</p>{% endif %}
     <input type="hidden" name="{{ recorded_in }}" value="{{ item.unit }}">
     <div class="actions">
       {#- No first, so Enter in a field converts nothing; shown after Yes. #}

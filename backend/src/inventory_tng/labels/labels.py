@@ -17,7 +17,7 @@ from opentelemetry import metrics
 from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.db_locking import get_locked, locked_row
+from inventory_tng.core.db_locking import get_locked, lock_catalogue, locked_row
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.phrases import PATH_BETWEEN, gettext, lazy_gettext
 from inventory_tng.models.catalogue import Item, ItemPackage
@@ -311,3 +311,16 @@ def revoke(session: Session, label_id: int, at: datetime) -> bool:
     once_committed(session, revoked.add, 1)
     once_committed(session, log.info, "label revoked", label_id=label_id)
     return True
+
+
+def revoke_all(session: Session, names: ColumnElement[bool], at: datetime) -> list[int]:
+    """Revokes every label `names` picks not yet revoked, such as an
+    item's (itself and its packages), each as revoke does: their ids, in
+    order. Under the catalogue lock, so one made meanwhile waits and is
+    either revoked here or made after (Ali, 2026-11-25,
+    inventory-tng-8ema)."""
+    lock_catalogue(session)
+    ids = session.scalars(
+        select(Label.id).where(names, Label.revoked_at.is_(None)).order_by(Label.id)
+    ).all()
+    return [each for each in ids if revoke(session, each, at)]

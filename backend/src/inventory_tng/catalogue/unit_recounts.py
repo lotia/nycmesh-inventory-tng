@@ -373,8 +373,8 @@ def _recounted(
     for package in session.scalars(locked(retiring.order_by(ItemPackage.id))):
         package.name = names[package.id]
         package.retired_at = package.retired_at or at
-    for named in plan.labels:
-        labels.revoke(session, named.label.id, at)
+    # As listed: `seen` holds their ids, under the catalogue lock.
+    revoked = labels.revoke_all(session, Label.item_id == item.id, at)
     offers = select(VendorOffer).where(
         VendorOffer.id.in_([each.offer.id for each in plan.offers])
     )
@@ -396,10 +396,10 @@ def _recounted(
         location_ids=places,
         open_package_ids=[row.id for row in plan.opened],
         item_package_ids=sorted(names),
-        label_ids=[named.label.id for named in plan.labels],
+        label_ids=revoked,
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
-    return Recounted(places, len(plan.labels))
+    return Recounted(places, len(revoked))
 
 
 def _write_off(

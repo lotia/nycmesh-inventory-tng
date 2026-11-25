@@ -41,7 +41,7 @@ def current_aliases(session: Session, item: Item) -> list[str]:
 
 def rename(session: Session, item: Item, name: str) -> items.Renamed | None:
     """`item` renamed `name`, the rest of it as it is."""
-    return items.save(session, item, item_fields(item, name=name), seen=None)
+    return items.save(session, item, item_fields(item, name=name), seen=None).renamed
 
 
 def test_an_alias_is_searched_and_its_removal_frees_it(

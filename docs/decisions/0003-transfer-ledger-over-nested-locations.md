@@ -410,6 +410,12 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   line's unit: each end as the ledger reads that side of the line, by
   how many packages on a sealed side, else exactly (2026-11-25,
   inventory-tng-4fjq, inventory-tng-77eu).
+- Yes also revokes, in the same transaction, every label of the item
+  and its packages not yet revoked, as they show the old unit; the
+  question says how many beforehand, and the notice after says to print
+  new ones. A label made while the question is shown is revoked with
+  them, or, made after, shows the new unit (Ali, 2026-11-25,
+  inventory-tng-8ema). The guided recount revokes them the same way.
 - No converts nothing and says how to put right a unit wrong from the
   start: the guided recount (next amendment); or, only labelled, revoke
   its labels first.

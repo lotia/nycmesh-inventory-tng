@@ -1,7 +1,8 @@
 {#- What fixes an item's unit, or a package's size, while labels printed for
 it are not revoked, and the link to revoke them, each with how many there
 are, `count` (Ali, 2026-11-25, inventory-tng-62qs): the item page's hints
-give the reason first, then the link. -#}
+give the reason first, then the link. And what answering Yes to a unit
+change does to them (Ali, 2026-11-25, inventory-tng-8ema). -#}
 
 {#- Why it is fixed: "until both its printed labels are revoked". -#}
 {% macro until_revoked(count) -%}
@@ -16,4 +17,10 @@ give the reason first, then the link. -#}
 (labels.paths.item_labels), to revoke them there. -#}
 {% macro revoke_link(count, link) -%}
 {#- Translators: a link to the item's labels, each of which can be revoked there; it opens a sentence, as "Revoke its 2 labels to change it." #}{% trans count=count, link=link %}<a href="{{ link }}">Revoke its label</a>{% pluralize %}<a href="{{ link }}">Revoke its {{ count }} labels</a>{% endtrans %}
+{%- endmacro %}
+
+{#- Said while "Were the recorded amounts really in m?" is asked: Yes
+revokes them, as they show `unit`, its unit before the change. -#}
+{% macro yes_revokes(count, unit) -%}
+{#- Translators: under "Were the recorded amounts really in m?", of the item's labels printed and not revoked; %(unit)s is its unit now, which they show. #}{% trans count=count, unit=unit %}Its printed label shows {{ unit }}: Yes revokes it.{% pluralize %}Its {{ count }} printed labels show {{ unit }}: Yes revokes them.{% endtrans %}
 {%- endmacro %}

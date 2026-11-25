@@ -2047,6 +2047,24 @@ msgid ""
 "brought back. Revoking it stops them scanning for good."
 msgstr ""
 
+#: src/inventory_tng/catalogue/items_routes.py
+#, python-format
+msgid "Its printed label showed %(unit)s and was revoked: print a new one."
+msgid_plural ""
+"Its %(num)s printed labels showed %(unit)s and were revoked: print new "
+"ones."
+msgstr[0] ""
+msgstr[1] ""
+
+#. under "Were the recorded amounts really in m?", of the item's labels printed
+#. and not revoked; %(unit)s is its unit now, which they show.
+#: src/inventory_tng/templates/catalogue/_revoke_labels.html
+#, python-format
+msgid "Its printed label shows %(unit)s: Yes revokes it."
+msgid_plural "Its %(count)s printed labels show %(unit)s: Yes revokes them."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/inventory_tng/templates/catalogue/unit_recounted.html
 #, python-format
 msgid ""

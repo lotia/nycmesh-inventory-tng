@@ -63,6 +63,7 @@ from inventory_tng.labels import labels
 from inventory_tng.models.admins import Admin, AdminPassword, AdminSession
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.core import SentForm
+from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.models.stock import (
@@ -1240,6 +1241,48 @@ def test_a_save_while_a_unit_is_converted_is_converted_or_refused(
     # 1.5 m in ft is 4.921 (4.92125...); 1 m alone, 3.281 ft.
     converted = ("ft", Decimal("3.281") if swapped else Decimal("4.921"))
     assert seen == ([converted] if swapped else [("m", Decimal("1.500")), converted])
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("swapped", [False, True])
+def test_a_label_made_while_a_unit_is_converted_is_revoked_or_made_after(
+    committed: Committed, swapped: bool
+) -> None:
+    """A label made for the reel while "Were the recorded amounts really in
+    m?" is shown, and Yes: both take the catalogue lock and hold the cable
+    FOR UPDATE (labels.make_for_item, items.save). Yes second waits, then
+    revokes it with the cable's own; the label second waits, then is made
+    once the cable is in ft. Never left showing m (Ali, 2026-11-25,
+    inventory-tng-8ema). Each reads as its change leaves it, before
+    at_once rolls the second back."""
+    place = committed_place(committed)
+    reel = ItemPackage(item_id=place.cable.id, name="Reel", size=Decimal(305))
+    made(committed, reel)
+    setup = committed.session()
+    assert labels.make_for_item(setup, place.cable.id) is not None
+    setup.commit()
+    seen: list[tuple[str, int]] = []
+
+    def read(session: Session) -> None:
+        printed = labels.current_of(session, Label.item_id == place.cable.id)
+        seen.append((session.get_one(Item, place.cable.id).unit, len(printed)))
+
+    def labelling(session: Session) -> None:
+        assert labels.make_for_item(session, place.cable.id, reel.id) is not None
+        read(session)
+
+    def to_ft(session: Session) -> None:
+        cable = session.get_one(Item, place.cable.id)
+        fields = item_fields(cable, unit="ft")
+        saved = items.save(session, cable, fields, seen=None, recorded_in="m")
+        seen.append(("revoked", saved.labels_revoked))
+        read(session)
+
+    assert either_first(committed, labelling, to_ft, swapped=swapped) is None
+    if swapped:
+        assert seen == [("revoked", 1), ("ft", 0), ("ft", 1)]
+    else:
+        assert seen == [("m", 2), ("revoked", 2), ("ft", 0)]
 
 
 def _recounting(place: Place, seen: str, admin_id: int) -> Write:

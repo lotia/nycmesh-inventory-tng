@@ -1140,10 +1140,12 @@ def test_counts_unit_changes_converted_by_unit(
 ) -> None:
     """A change between lengths, stock moved, is counted once answered Yes,
     by the unit it was in and the one it is in now, and logged by the
-    item's id; asked, or answered No, it is not."""
+    item's id, with the labels it revoked; asked, or answered No, it is
+    not. Each label revoked is counted as revoking counts it."""
     client, _, reader, _ = rolled_back
     name = "inventory.unit_changes.converted"
     before = counted(reader, name)
+    revoked_before = counted(reader, "inventory.labels.revoked")
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     place = Place(session)
@@ -1152,6 +1154,8 @@ def test_counts_unit_changes_converted_by_unit(
         place,
         lines=[{"item_id": place.cable.id, "quantity": "5", "unit": "m"}],
     )
+    label = labels.make_for_item(session, place.cable.id)
+    assert label is not None
     path = f"/admin/items/{place.cable.id}"
     form = shown_item_form(place.cable, unit="ft")
     with capture_logs() as logs:
@@ -1160,6 +1164,9 @@ def test_counts_unit_changes_converted_by_unit(
         assert added(reader, name, before) == {}
         client.post(path, data=unit_answered(place.cable, unit="ft"))
     assert added(reader, name, before) == {(("from", "m"), ("to", "ft")): 1}
+    assert added(reader, "inventory.labels.revoked", revoked_before) == {(): 1}
+    (converted,) = [line for line in logs if line["event"] == "item unit converted"]
+    assert converted["label_ids"] == [label.id]
     assert [
         (line["event"], line["item_id"], line["log_level"])
         for line in logs

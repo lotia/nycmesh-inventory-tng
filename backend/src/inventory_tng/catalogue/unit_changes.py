@@ -4,15 +4,18 @@ does to what is recorded in it. While nothing fixes it, its packages and
 vendor offers follow it, their numbers as typed (follow). Once fixed, it
 changes only between lengths, converting what is recorded once an
 administrator confirms it was in the old unit (convert; Ali, 2026-11-24,
-inventory-tng-y50b); never between each and a length. A package form
+inventory-tng-y50b), revoking its printed labels, which say the old
+unit (Ali, 2026-11-25, inventory-tng-8ema); never between each and a
+length. A package form
 drawn before a change, its amount typed in the unit it showed, is refused
 (require_unit_shown), never kept in the new one.
 
 The arithmetic of converting is unit_conversion's; the ledger's lines keep
 their unit and convert as they are read (stock/line_amounts.py)."""
 
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, NamedTuple
 
 import structlog
 from opentelemetry import metrics
@@ -24,6 +27,7 @@ from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import locked
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.labels import labels
 from inventory_tng.models.base import QUANTITY_MAX, QUANTITY_STEP
 from inventory_tng.models.catalogue import UNITS, Item, ItemPackage, VendorOffer
 from inventory_tng.models.labels import Label
@@ -132,6 +136,14 @@ def follow(session: Session, item_id: int, unit: str) -> None:
             row.unit = unit
 
 
+class Converted(NamedTuple):
+    """What converting did: the item's Reorder at in its new unit, and how
+    many of its printed labels it revoked, to print again."""
+
+    minimum: Decimal | None
+    labels_revoked: int
+
+
 def convert(
     session: Session,
     item: Item,
@@ -140,13 +152,13 @@ def convert(
     *,
     why: UnitFixed,
     recorded_in: str | None,
-) -> Decimal | None:
+) -> Converted:
     """The item, held FOR UPDATE and its unit fixed (`why`), changed to
     `new`: refused unless both are lengths, or while a check of it waits;
     asked (UNIT_UNCONFIRMED) until `recorded_in`, the administrator's
     answer, says what was recorded was in its unit as it is held; then
-    what it records converted (_converted), and `minimum`, its Reorder at
-    as typed in its unit, comes back in `new`."""
+    what it records converted (_converted), `minimum`, its Reorder at as
+    typed in its unit, coming back in `new`."""
     if not convertible(item.unit, new):
         _refused(item.id, why, UNIT_FIXED_RULES[why])
     # Refused before it is asked: a line recorded with more than was
@@ -182,7 +194,7 @@ def _refused(item_id: int, reason: str, rule: str) -> None:
 
 def _converted(
     session: Session, item: Item, new: str, minimum: Decimal | None, why: UnitFixed
-) -> Decimal | None:
+) -> Converted:
     """What the item records in its unit converted into `new` (Ali,
     2026-11-24, inventory-tng-y50b), holding it FOR UPDATE, then each row
     it changes by id, in the ledger's order (stock/ledger.py): `minimum`,
@@ -194,7 +206,10 @@ def _converted(
     read (stock/line_amounts.py), its lines keeping their unit, and its
     packages keep theirs. Refused (UNIT_OUT_OF_RANGE) if an amount
     converted is too large to keep, or a package would not keep its size
-    or too-short length in the new unit."""
+    or too-short length in the new unit. Then every label of it or its
+    packages not yet revoked is revoked, as each says the old unit, one
+    made since its question was asked too (Ali, 2026-11-25,
+    inventory-tng-8ema)."""
     old = item.unit
     offers = select(VendorOffer).where(VendorOffer.item_id == item.id)
     offered = session.scalars(locked(offers.order_by(VendorOffer.id))).all()
@@ -242,6 +257,7 @@ def _converted(
     for row in reported:
         row.length_reported = lengths[row.id]
         row.length_reported_unit = new
+    revoked = labels.revoke_all(session, Label.item_id == item.id, datetime.now(UTC))
     once_committed(session, unit_changes_converted.add, 1, {"from": old, "to": new})
     once_committed(
         session,
@@ -253,8 +269,9 @@ def _converted(
         to_unit=new,
         vendor_offer_ids=[offer.id for offer in offered],
         open_package_ids=sorted(lengths),
+        label_ids=revoked,
     )
-    return minimum
+    return Converted(minimum, len(revoked))
 
 
 def _kept_in(package: ItemPackage, unit: str) -> bool:
