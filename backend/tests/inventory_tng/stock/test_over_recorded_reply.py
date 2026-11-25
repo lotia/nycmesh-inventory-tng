@@ -257,15 +257,15 @@ def test_only_the_lines_less_was_sent_of_are_over() -> None:
         Entry(1, Decimal(50), loose, loose),
         Entry(2, Decimal(4)),
     ]
-    assert _more_written(written, sent, list(written.values())) == {
+    assert _more_written(written, sent, list(written.values()), {}) == {
         1: Decimal(50),
         3: Decimal(2),
     }
     # Only what it took off what it started from: another tab's addition,
     # or the line another tab added, is no check.
     started = [Entry(1, Decimal(100), sealed, sealed), Entry(2, Decimal(1))]
-    assert _more_written(written, sent, started) == {1: Decimal(50)}
-    assert _more_written(written, sent, None) == {}
+    assert _more_written(written, sent, started, {}) == {1: Decimal(50)}
+    assert _more_written(written, sent, None, {}) == {}
 
 
 def test_lines_of_one_item_in_the_same_forms_are_over_once_together() -> None:
@@ -273,11 +273,13 @@ def test_lines_of_one_item_in_the_same_forms_are_over_once_together() -> None:
     taken off together: 5 and 5 recorded, started from 5, sent none, is 5
     over, not 10."""
     written = {1: Entry(1, Decimal(5)), 2: Entry(1, Decimal(5))}
-    assert _more_written(written, [], [Entry(1, Decimal(5))]) == {1: Decimal(5)}
+    assert _more_written(written, [], [Entry(1, Decimal(5))], {}) == {1: Decimal(5)}
     # Started from both, sent 6: 4 over, from the first then the second.
     started = list(written.values())
-    assert _more_written(written, [Entry(1, Decimal(6))], started) == {1: Decimal(4)}
-    assert _more_written(written, [Entry(1, Decimal(2))], started) == {
+    assert _more_written(written, [Entry(1, Decimal(6))], started, {}) == {
+        1: Decimal(4)
+    }
+    assert _more_written(written, [Entry(1, Decimal(2))], started, {}) == {
         1: Decimal(5),
         2: Decimal(3),
     }

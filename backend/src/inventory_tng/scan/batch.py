@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.amount_rules import whole_enough
-from inventory_tng.catalogue.unit_conversion import converted, convertible
+from inventory_tng.catalogue.unit_conversion import at_scale, converted, convertible
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
@@ -29,7 +29,7 @@ from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.scan import batch_schemas
-from inventory_tng.stock import open_packages, units_shown
+from inventory_tng.stock import line_amounts, open_packages, units_shown
 from inventory_tng.stock.ledger import (
     LOOSE,
     Entry,
@@ -696,9 +696,18 @@ def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction |
                 session, batch.model_copy(update={"lines": batch.changed_from})
             )
         )
+        compared = sent_lines if moved_alike else []
+        packages = _packages(
+            session,
+            {
+                package_id
+                for line in [*compared, *(started or [])]
+                if (package_id := line.leaves.package_id or line.arrives.package_id)
+            },
+        )
         raise KeyReused(
             _as_batch(session, transaction, movements),
-            _more_written(movements, sent_lines if moved_alike else [], started),
+            _more_written(movements, compared, started, packages),
         )
     replayed.add(1, {"kind": batch.kind})
     log.info("transaction replayed", transaction_id=transaction.id)
@@ -709,6 +718,7 @@ def _more_written(
     written: Mapping[int, Entry],
     sent: Sequence[Entry],
     started: Sequence[Entry] | None,
+    packages: Mapping[int, ItemPackage],
 ) -> dict[int, Decimal]:
     """By movement, how much more of it was written than `sent` holds of
     the same item in the same forms, but no more than `sent` took off what
@@ -716,7 +726,9 @@ def _more_written(
     recorded. Nothing without `started`, as then what differs may be
     another tab's change, not this batch's. Each is compared in the unit
     its item's lines were written in: a line typed again since in another
-    length, its item changed between lengths, converts into it."""
+    length, its item changed between lengths, converts into it as the
+    ledger reads a line (stock/line_amounts.py): one in sealed `packages`
+    by how many, any other exactly."""
     if started is None:
         return {}
     # One unit for each item: a transaction is written in its items' units.
@@ -727,7 +739,16 @@ def _more_written(
         for line in lines:
             quantity, unit, into = line.quantity, line.unit, units.get(line.item_id)
             if unit is not None and into is not None and convertible(unit, into):
-                quantity = converted(quantity, unit, into)
+                package = packages.get(
+                    line.leaves.package_id or line.arrives.package_id or 0
+                )
+                quantity = (
+                    converted(quantity, unit, into)
+                    if package is None
+                    else at_scale(
+                        line_amounts.by_packages(quantity, package, unit, into)
+                    )
+                )
             by[line.item_id, line.leaves, line.arrives] += quantity
         return by
 

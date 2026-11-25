@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue import items
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Item, ItemPackage
+from inventory_tng.models.stock import OverRecorded
 from inventory_tng.stock import open_packages, over_recorded
 from inventory_tng.stock.ledger import LOOSE, Entry, Form, insert_transaction
 
@@ -93,6 +94,49 @@ def test_sealed_spools_are_corrected_by_how_many(
         assert held_by_form(session, place.id, spools.cable.id) == {
             (spools.cable.id, spools.sealed): spool
         }
+
+
+def _spools_sent_again_in_ft(
+    session: Session,
+    client: TestClient,
+    admin_client: TestClient,
+    spools: int,
+) -> list[OverRecorded]:
+    """20 spools of 305 m moved in m, the cable changed to ft, then the
+    batch, put back in m, sent again under its key from a page drawn in
+    ft, with `spools` spools of 1000.656 ft: the checks it raised. Each
+    spool is 304.99995 m exactly, so from 10 spools on, a sum converted
+    exactly reads a thousandth short."""
+    cable = Spools(session)
+    cable.receive(uuid.uuid4(), spools=18)
+    first = cable.place.batch(lines=[sealed_line(cable, "6100")])
+    assert client.post(URL, json=first).status_code == 201
+    _to_ft(admin_client, cable.cable, track_opened="on")
+    in_ft = sealed_line(cable, str(Decimal("1000.656") * spools)) | {
+        "package_size": "1000.656"
+    }
+    again = first | {"changed_from": first["lines"], "lines": [in_ft]}
+    assert client.post(URL, json=again).status_code == 409
+    return checks(session)
+
+
+def test_sealed_spools_sent_again_in_ft_take_nothing_off(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """The same 20 spools, said in ft, are the 6100 m written, by their
+    packages as the ledger reads a sealed side, not 6099.999 m exactly:
+    no check is raised for a thousandth (inventory-tng-60gl)."""
+    raised = _spools_sent_again_in_ft(session, registered_client, admin_client, 20)
+    assert raised == []
+
+
+def test_a_sealed_spool_left_out_in_ft_is_one_spool_over(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """19 of the 20 spools sent again in ft: one spool, 305 m, was taken
+    off, not 305.001 m (inventory-tng-60gl)."""
+    raised = _spools_sent_again_in_ft(session, registered_client, admin_client, 19)
+    assert [(check.quantity, check.unit) for check in raised] == [(Decimal(305), "m")]
 
 
 def test_loose_units_are_corrected_exactly(
