@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue import items
+from inventory_tng.catalogue import unit_changes
 from inventory_tng.catalogue.items_routes import RECORDED, RECORDED_IN
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.labels import labels
@@ -87,6 +87,10 @@ def test_m_to_ft_asks_then_converts_every_amount(
     assert QUESTION in words_on(page)
     assert button(page, "Yes").attrs["value"] == "yes"
     assert button(page, "No").attrs["value"] == "no"
+    # Enter in a field presses the form's first button: No, converting nothing.
+    (asking,) = [f for f in page.all("form") if f.all("div", id="unit-question")]
+    first = asking.all("button")[0]
+    assert first.attrs["value"] == "no"
     assert cable.unit == "m"
     done = admin_client.post(
         f"{ITEMS}/{cable.id}", data=_yes(cable, unit="ft", minimum="100")
@@ -192,7 +196,9 @@ def test_refused_while_a_line_recorded_with_more_than_moved_waits(
         refused = admin_client.post(f"{ITEMS}/{place.cable.id}", data=form)
         assert refused.status_code == 400
         assert QUESTION not in words_on(refused.text)
-        assert problem(refused.text, "unit") == str(RULES[items.UNIT_CHECKS_WAITING])
+        assert problem(refused.text, "unit") == str(
+            RULES[unit_changes.UNIT_CHECKS_WAITING]
+        )
     assert place.cable.unit == "m"
 
 
@@ -206,7 +212,7 @@ def test_refused_when_an_amount_would_not_keep_in_the_new_unit(
     huge = _yes(cable, unit="ft", minimum="400000000")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=huge)
     assert refused.status_code == 400
-    assert problem(refused.text, "unit") == str(RULES[items.UNIT_OUT_OF_RANGE])
+    assert problem(refused.text, "unit") == str(RULES[unit_changes.UNIT_OUT_OF_RANGE])
     session.refresh(cable)
     assert (cable.unit, cable.minimum) == ("m", 100)
     place = Place(session, cable_unit="ft")
@@ -227,7 +233,7 @@ def test_refused_when_an_amount_would_not_keep_in_the_new_unit(
         tiny = admin_client.post(
             f"{ITEMS}/{place.cable.id}", data=_yes(place.cable, unit="m")
         )
-        assert problem(tiny.text, "unit") == str(RULES[items.UNIT_OUT_OF_RANGE])
+        assert problem(tiny.text, "unit") == str(RULES[unit_changes.UNIT_OUT_OF_RANGE])
         assert place.cable.unit == "ft"
 
 

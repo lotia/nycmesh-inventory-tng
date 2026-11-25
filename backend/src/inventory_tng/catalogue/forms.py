@@ -12,7 +12,7 @@ from decimal import Decimal
 import structlog
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue import items, reading_rules, units
+from inventory_tng.catalogue import items, reading_rules, unit_changes, units
 from inventory_tng.catalogue.amount_rules import becomes_counted_whole, is_whole
 from inventory_tng.catalogue.name_keys import nameless
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
@@ -210,7 +210,7 @@ PICK_A_CATEGORY = lazy_gettext("Pick a category.")
 PICK_A_UNIT = lazy_gettext("Pick a unit.")
 
 
-def unit_declined_problem(old: str, new: str, why: items.UnitFixed) -> str:
+def unit_declined_problem(old: str, new: str, why: unit_changes.UnitFixed) -> str:
     """What the item form says beside its unit when the administrator
     answers No: nothing converts, and how to put right a unit wrong from
     the start, until the guided recount (inventory-tng-qety) does it."""

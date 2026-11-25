@@ -88,15 +88,16 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   {% if followed_now.item and not retired %}<p class="hint" id="followed-now">{{ followed_now.item }}</p>{% endif %}
   </fieldset>
   {% if asking_unit %}
-  {#- Asked once a change between lengths was saved (items.UNIT_UNCONFIRMED):
+  {#- Asked once a change between lengths was saved (unit_changes.UNIT_UNCONFIRMED):
   Yes converts what is recorded, No converts nothing (Ali, 2026-11-24). #}
   <div role="alert" id="unit-question">
     <p>{% trans unit=item.unit %}Were the recorded amounts really in {{ unit }}?{% endtrans %}</p>
     <p class="hint">{% trans new=values.get('unit'), old=item.unit %}Yes converts its stock, Reorder at, what is on order and its vendor offers into {{ new }}. Past movements stay in {{ old }}.{% endtrans %}</p>
     <input type="hidden" name="{{ recorded_in }}" value="{{ item.unit }}">
     <div class="actions">
+      {#- No first, so Enter in a field converts nothing; shown after Yes. #}
+      <button class="order-last" name="{{ recorded }}" value="no">{% trans %}No{% endtrans %}</button>
       <button class="primary" name="{{ recorded }}" value="yes">{% trans %}Yes{% endtrans %}</button>
-      <button name="{{ recorded }}" value="no">{% trans %}No{% endtrans %}</button>
     </div>
   </div>
   {% elif not retired %}<button class="primary">{% trans %}Save{% endtrans %}</button>{% endif %}

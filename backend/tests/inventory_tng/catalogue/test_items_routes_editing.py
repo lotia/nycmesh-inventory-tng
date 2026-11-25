@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue import items
+from inventory_tng.catalogue import items, unit_changes
 from inventory_tng.catalogue.forms import (
     ADD_FIELDS,
     IS_RETIRED,
@@ -478,20 +478,20 @@ def test_a_label_fixes_the_unit_until_revoked_a_movement_for_good(
     reel = add(session, ItemPackage(item_id=item.id, name="Reel", size=10))
     label = labels.make_for_item(session, item.id, reel.id if package else None)
     assert label is not None
-    assert items.unit_fixed(session, item.id) == "labelled"
+    assert unit_changes.unit_fixed(session, item.id) == "labelled"
     with breaks(session, "item_unit_labelled"):
         items.save(session, item, item_fields(item, unit="each"), seen=None)
-    with breaks(session, items.UNIT_UNCONFIRMED):
+    with breaks(session, unit_changes.UNIT_UNCONFIRMED):
         items.save(session, item, item_fields(item, unit="ft"), seen=None)
     assert labels.revoke(session, label.id, NOW)
-    assert items.unit_fixed(session, item.id) is None
+    assert unit_changes.unit_fixed(session, item.id) is None
     items.save(session, item, item_fields(item, unit="ft"), seen=None)
     assert item.unit == "ft"
     _moved(session, item)
-    assert items.unit_fixed(session, item.id) == "moved"
+    assert unit_changes.unit_fixed(session, item.id) == "moved"
     with breaks(session, "item_unit_fixed"):
         items.save(session, item, item_fields(item, unit="each"), seen=None)
-    with breaks(session, items.UNIT_UNCONFIRMED):
+    with breaks(session, unit_changes.UNIT_UNCONFIRMED):
         items.save(session, item, item_fields(item, unit="m"), seen=None)
 
 

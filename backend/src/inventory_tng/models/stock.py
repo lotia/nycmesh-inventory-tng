@@ -98,7 +98,7 @@ class OpenPackage(Base):
     length_reported_by_volunteer_id: Mapped[int | None] = reference("volunteer.id")
     length_reported: Mapped[Decimal | None] = mapped_column(QUANTITY)
     # Its unit: its item's, as the batch that reported it was written, and
-    # converted with it between lengths (catalogue/items._converted).
+    # converted with it between lengths (catalogue/unit_changes.convert).
     length_reported_unit: Mapped[Unit | None]
     # The transaction that reported it: setting it to that counts as of
     # then, so a cut since is not lost.

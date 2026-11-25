@@ -3,9 +3,9 @@ item_package tables, and their rules. A current item is in a current
 category (categories.retire is the other side), and an item's unit is
 fixed once stock has moved in it, or while a label of it or its packages
 is printed and not revoked, as the ledger's quantities and the labels are
-in that unit (unit_fixed), but for a change between lengths, which
-converts what is recorded once an administrator confirms it was in the
-old unit (save, _converted; Ali, 2026-11-24, inventory-tng-y50b), and an
+in that unit, but for a change between lengths, which converts what is
+recorded once an administrator confirms it was in the old unit
+(unit_changes; Ali, 2026-11-24, inventory-tng-y50b), and an
 item counted each has no current package
 holding, or too short to use below, a fraction; a package's size is fixed
 once it has moved or been opened, or while a label of it is not revoked
@@ -54,10 +54,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue import units
+from inventory_tng.catalogue import unit_changes, units
 from inventory_tng.catalogue.amount_rules import counted_whole, is_whole, whole_enough
 from inventory_tng.catalogue.name_keys import SPACES, name_key
-from inventory_tng.catalogue.unit_conversion import converted, convertible
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import (
     Seen,
@@ -68,23 +67,20 @@ from inventory_tng.core.db_locking import (
 )
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
-from inventory_tng.models.base import QUANTITY_MAX, QUANTITY_STEP
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
     SMALLEST_PACKAGE_FIRST,
-    UNITS,
     Category,
     Item,
     ItemAlias,
     ItemPackage,
-    VendorOffer,
     current_aliases,
     reading_rules_held,
 )
 from inventory_tng.models.labels import Label
 from inventory_tng.models.names import unit_key
 from inventory_tng.models.search_text import fold, fuzzy, in_ascii
-from inventory_tng.models.stock import Movement, OpenPackage, OverRecorded
+from inventory_tng.models.stock import Movement, OpenPackage
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -95,53 +91,6 @@ tracking_changed = meter.create_counter(
     description="Items or packages whose opened packages are followed, or "
     "no longer, set by an administrator, by where it was set",
 )
-unit_changes_refused = meter.create_counter(
-    "inventory.unit_changes.refused",
-    unit="{change}",
-    description="Changes to an item's unit refused, by why: what fixes it, "
-    "or, between lengths, what stops what is recorded converting",
-)
-unit_changes_converted = meter.create_counter(
-    "inventory.unit_changes.converted",
-    unit="{change}",
-    description="Changes to an item's unit between lengths that converted "
-    "what is recorded, once stock had moved or a label was printed, by the "
-    "unit it was in and the one it is in now",
-)
-
-# Why an item's unit is fixed, and the rule each refuses a change by.
-UnitFixed = Literal["moved", "labelled"]
-UNIT_FIXED_RULES: dict[UnitFixed, str] = {
-    "moved": "item_unit_fixed",
-    "labelled": "item_unit_labelled",
-}
-
-
-def unit_fixed(session: Session, item_id: int) -> UnitFixed | None:
-    """Why the item's unit can no longer change freely, if it can't: stock
-    has moved in it, for good, or a label not revoked has been printed for
-    it or one of its packages (a package's label names its item too). Its
-    ledger's lines record it, and its labels say what it was then (Ali,
-    2026-11-23, inventory-tng-rpud). It may still change between lengths,
-    converting what is recorded, once an administrator confirms what was
-    recorded was in its unit (save; Ali, 2026-11-24, inventory-tng-y50b);
-    never between each and a length. A revoked label scans as no label, so
-    it fixes nothing, and revoking an item's labels lets a mistaken unit
-    be corrected without converting (Ali, 2026-11-23, inventory-tng-37dj)."""
-    if exists_where(session, Movement.item_id == item_id):
-        return "moved"
-    if exists_where(session, Label.item_id == item_id, Label.revoked_at.is_(None)):
-        return "labelled"
-    return None
-
-
-def units_open(unit: str, why: UnitFixed | None) -> tuple[str, ...]:
-    """The units an item in `unit` may change to, its own first: any, while
-    nothing fixes it (`why`, unit_fixed); else only another length, which
-    converts. Just its own: fixed."""
-    if why is None:
-        return (unit, *(each for each in UNITS if each != unit))
-    return (unit, *(each for each in UNITS if convertible(unit, each)))
 
 
 def _tracking_changed(
@@ -387,18 +336,6 @@ def _not_an_alias(session: Session, keys: Keys, but: ItemAlias | None = None) ->
 # fraction, its item counted each.
 PACKAGES_WHOLE = "item_packages_whole"
 PACKAGE_WHOLE = "package_whole_units"
-# Asked: a change between lengths, the item's unit fixed, that converts
-# what is recorded, not yet confirmed as recorded in its unit (Ali,
-# 2026-11-24, inventory-tng-y50b).
-UNIT_UNCONFIRMED = "item_unit_unconfirmed"
-# Refused: that change while a line of the item recorded with more than
-# was moved waits, its amounts shown in the line's unit
-# (stock/over_recorded.py).
-UNIT_CHECKS_WAITING = "item_unit_checks_waiting"
-# Refused: that change, an amount it converts too large to keep in the new
-# unit, or a package's size or too-short length too small or no longer
-# below its size there (QUANTITY_MAX, QUANTITY_STEP).
-UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
 # The database's check (models.catalogue.Item) on a fractional Reorder at
 # for an item counted each, which the form refuses first (Ali, 2026-11-23,
 # inventory-tng-gfes).
@@ -489,32 +426,20 @@ def save(
     name kept as an alias, in place of the alias it is renamed to if it is
     one of its own (Ali, 2026-11-15): what that did. The old name was the
     item's, so no other item's name nor any current alias, and so is free
-    as an alias. Its unit fixed (unit_fixed), a change between lengths
-    converts what is recorded (_converted), `fields`' Reorder at too, as
-    typed in its unit, once `recorded_in`, the administrator's answer,
-    says what was recorded was in its unit as it is held; else
-    UNIT_UNCONFIRMED, to ask."""
+    as an alias. Its unit fixed (unit_changes.unit_fixed), a change between
+    lengths converts what is recorded, `fields`' Reorder at too, as typed
+    in its unit, once `recorded_in`, the administrator's answer, says what
+    was recorded was in its unit as it is held; else
+    unit_changes.UNIT_UNCONFIRMED, to ask (unit_changes.convert)."""
     # FOR UPDATE waits for any movement of it being written, and for any
     # label of it being made, which locks the item too (labels.make_for_item).
     relock(session, item, seen=seen)
     enforce("retired_read_only", when=item.retired_at is not None)
-    if fields.unit != item.unit and (why := unit_fixed(session, item.id)):
-        if not convertible(item.unit, fields.unit):
-            _unit_refused(item.id, why, UNIT_FIXED_RULES[why])
-        # Refused before it is asked: a line recorded with more than was
-        # moved, waiting, is shown in the line's unit. One raised while this
-        # runs is converted as it is corrected (stock/over_recorded.py).
-        waiting = (
-            OverRecorded.movement_id == Movement.id,
-            Movement.item_id == item.id,
-            OverRecorded.settled_at.is_(None),
+    if fields.unit != item.unit and (why := unit_changes.unit_fixed(session, item.id)):
+        minimum = unit_changes.convert(
+            session, item, fields.unit, fields.minimum, why=why, recorded_in=recorded_in
         )
-        if exists_where(session, *waiting):
-            _unit_refused(item.id, "checks_waiting", UNIT_CHECKS_WAITING)
-        if recorded_in != item.unit:
-            log.info("unit change asked", item_id=item.id, reason=why)
-            enforce(UNIT_UNCONFIRMED)
-        fields = _converted(session, item, fields, why)
+        fields = replace(fields, minimum=minimum)
     elif fields.unit != item.unit:
         if counted_whole(fields.unit):
             # Under the catalogue lock, which every package write takes.
@@ -527,7 +452,7 @@ def save(
             )
             for package in session.scalars(locked(holding_one)):
                 _short_cleared(session, package, "switch")
-        _amounts_follow(session, item.id, fields.unit)
+        unit_changes.follow(session, item.id, fields.unit)
     if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
     keys = Keys.of(session, fields.name)
@@ -561,109 +486,6 @@ def save(
             by=how,
         )
     return Renamed(kept, swapped)
-
-
-def _unit_refused(item_id: int, reason: str, rule: str) -> None:
-    """A change of the item's unit refused by `rule`, logged and counted
-    by `reason`, from a fixed list: UnitFixed's, "checks_waiting" or
-    "out_of_range"."""
-    log.info("unit change refused", item_id=item_id, reason=reason)
-    unit_changes_refused.add(1, {"reason": reason})
-    enforce(rule)
-
-
-def _converted(session: Session, item: Item, fields: Fields, why: UnitFixed) -> Fields:
-    """What the item records in its unit converted into `fields`' (Ali,
-    2026-11-24, inventory-tng-y50b), holding it FOR UPDATE, then each row
-    it changes by id, in the ledger's order (stock/ledger.py): its Reorder
-    at, from `fields`, as typed in its unit, which `fields` comes back
-    with; what is on order; its vendor offers' units per order, retired
-    ones too; and what volunteers said is on its open packages. Every open
-    one not closed is held, so a report being written of one is converted
-    once it is in, never left in the old unit. Its stock converts as the
-    ledger is read (stock/line_amounts.py), its lines keeping their unit,
-    and its packages keep theirs. Refused (UNIT_OUT_OF_RANGE) if an amount
-    converted is too large to keep, or a package would not keep its size
-    or too-short length in the new unit."""
-    old, new = item.unit, fields.unit
-    offers = select(VendorOffer).where(VendorOffer.item_id == item.id)
-    offered = session.scalars(locked(offers.order_by(VendorOffer.id))).all()
-    opened = select(OpenPackage).where(
-        OpenPackage.item_id == item.id,
-        or_(OpenPackage.closed_at.is_(None), OpenPackage.length_reported.is_not(None)),
-    )
-    held = session.scalars(
-        locked(opened.order_by(OpenPackage.id), key_share=True)
-    ).all()
-    minimum = None if fields.minimum is None else converted(fields.minimum, old, new)
-    on_order = None if item.on_order is None else converted(item.on_order, old, new)
-    per_order = {
-        # Never none at all: so few per order in m is still some.
-        offer.id: max(converted(offer.units_per_order, offer.unit, new), QUANTITY_STEP)
-        for offer in offered
-        if offer.units_per_order is not None
-    }
-    reported = [row for row in held if row.length_reported is not None]
-    lengths = {
-        # Set with its unit (its check); narrowed again for the type checker.
-        row.id: converted(row.length_reported, row.length_reported_unit or old, new)
-        for row in reported
-        if row.length_reported is not None
-    }
-    amounts = [minimum, on_order, *per_order.values(), *lengths.values()]
-    # Under the catalogue lock (relock), which every package write takes.
-    packages = session.scalars(
-        select(ItemPackage).where(ItemPackage.item_id == item.id)
-    )
-    if any(each is not None and each > QUANTITY_MAX for each in amounts) or not all(
-        _kept_in(package, new) for package in packages
-    ):
-        _unit_refused(item.id, "out_of_range", UNIT_OUT_OF_RANGE)
-    item.on_order = on_order
-    for offer in offered:
-        offer.units_per_order = per_order.get(offer.id)
-        offer.unit = new
-    for row in reported:
-        row.length_reported = lengths[row.id]
-        row.length_reported_unit = new
-    once_committed(session, unit_changes_converted.add, 1, {"from": old, "to": new})
-    once_committed(
-        session,
-        log.info,
-        "item unit converted",
-        item_id=item.id,
-        reason=why,
-        from_unit=old,
-        to_unit=new,
-        vendor_offer_ids=[offer.id for offer in offered],
-        open_package_ids=sorted(lengths),
-    )
-    return replace(fields, minimum=minimum)
-
-
-def _kept_in(package: ItemPackage, unit: str) -> bool:
-    """Whether `package`'s size and too-short length, in its own unit, are
-    kept in `unit`, its item's once converted: the size from QUANTITY_STEP
-    to QUANTITY_MAX, the length no less than QUANTITY_STEP and below the
-    size, as their checks hold them in their own."""
-    size = converted(package.size, package.unit, unit)
-    if not QUANTITY_STEP <= size <= QUANTITY_MAX:
-        return False
-    if package.short_below is None:
-        return True
-    return QUANTITY_STEP <= converted(package.short_below, package.unit, unit) < size
-
-
-def _amounts_follow(session: Session, item_id: int, unit: str) -> None:
-    """An item's packages and vendor offers, retired ones too, recorded in
-    its new unit, their amounts as they were: its unit may change, so no
-    stock has moved in it and no label says it (unit_fixed), and what was
-    typed was meant in the unit chosen (Ali, 2026-11-23,
-    inventory-tng-rpud)."""
-    for model in (ItemPackage, VendorOffer):
-        query = select(model).where(model.item_id == item_id).order_by(model.id)
-        for row in session.scalars(locked(query)):
-            row.unit = unit
 
 
 def _own_alias(session: Session, item_id: int, keys: Keys) -> ItemAlias | None:

@@ -366,9 +366,10 @@ unit beside it, rather than being read in whatever unit the item has now:
   (inventory-tng-fs50).
 
 The ledger writes a line only in its item's unit, as it holds the item.
-Every sum of the ledger adds only lines in their item's unit: the
-database refuses one in another as it reads it, so no sum mixes units
-unawares, and converting is a change of its own. Pages show each past
+Every sum of the ledger reads each line in its item's unit: a line
+between m and ft converts as it is read (next amendment), and the
+database refuses one between each and a length as it reads it, so no
+sum mixes units unawares. Pages show each past
 line in its own unit. While an item's unit may still change, its
 packages and vendor offers change with it, their numbers as typed, each
 a change of its own, so a package's form drawn before is refused.

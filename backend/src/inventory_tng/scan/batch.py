@@ -233,7 +233,7 @@ def record(
     # the unit the page showed, its item's (open_packages.report_length).
     # Read without a lock on the item: an open package exists only once
     # stock moved in its item, which fixes it as counted each or a length
-    # for good (catalogue/items.unit_fixed); a change between lengths waits
+    # for good (catalogue/unit_changes.unit_fixed); a change between lengths waits
     # for the open packages this holds, then converts what this reports of
     # them. One committed before is read here, so a report shown in the old
     # unit is refused (unit_changed), as a line is (inventory-tng-fs50).
@@ -714,14 +714,21 @@ def _more_written(
     the same item in the same forms, but no more than `sent` took off what
     it `started` from: what the volunteer took off a batch already
     recorded. Nothing without `started`, as then what differs may be
-    another tab's change, not this batch's."""
+    another tab's change, not this batch's. Each is compared in the unit
+    its item's lines were written in: a line typed again since in another
+    length, its item changed between lengths, converts into it."""
     if started is None:
         return {}
+    # One unit for each item: a transaction is written in its items' units.
+    units = {line.item_id: line.unit for line in written.values()}
 
     def tally(lines: Sequence[Entry]) -> defaultdict[tuple[int, Form, Form], Decimal]:
         by: defaultdict[tuple[int, Form, Form], Decimal] = defaultdict(Decimal)
         for line in lines:
-            by[line.item_id, line.leaves, line.arrives] += line.quantity
+            quantity, unit, into = line.quantity, line.unit, units.get(line.item_id)
+            if unit is not None and into is not None and convertible(unit, into):
+                quantity = converted(quantity, unit, into)
+            by[line.item_id, line.leaves, line.arrives] += quantity
         return by
 
     sent_by, started_by = tally(sent), tally(started)

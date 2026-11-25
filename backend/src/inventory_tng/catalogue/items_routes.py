@@ -1,6 +1,6 @@
 """Items and the packages they come in. An item's unit is fixed once stock
 has moved in it, or while a label of it is printed and not revoked
-(items.unit_fixed): the form offers only another length, for one in a
+(unit_changes.unit_fixed): the form offers only another length, for one in a
 length, and asks "Were the recorded amounts really in m?" before it
 converts them (Ali, 2026-11-24, inventory-tng-y50b); fixed only by
 labels, it links to the item's labels, to revoke them and correct a
@@ -18,7 +18,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
-from inventory_tng.catalogue import forms, items, queries, reading_rules, units
+from inventory_tng.catalogue import (
+    forms,
+    items,
+    queries,
+    reading_rules,
+    unit_changes,
+    units,
+)
 from inventory_tng.catalogue.amount_rules import becomes_counted_whole, counted_whole
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
@@ -89,12 +96,12 @@ CLOSE = "close_names"
 REFUSED_FIELDS = {
     "item_category_current": "category_id",
     items.MINIMUM_WHOLE: "minimum",
-    **dict.fromkeys(items.UNIT_FIXED_RULES.values(), "unit"),
-    items.UNIT_CHECKS_WAITING: "unit",
-    items.UNIT_OUT_OF_RANGE: "unit",
+    **dict.fromkeys(unit_changes.UNIT_FIXED_RULES.values(), "unit"),
+    unit_changes.UNIT_CHECKS_WAITING: "unit",
+    unit_changes.UNIT_OUT_OF_RANGE: "unit",
 }
 # The item form's answer to "Were the recorded amounts really in m?"
-# (items.UNIT_UNCONFIRMED): its button, Yes or No, and the unit it asked
+# (unit_changes.UNIT_UNCONFIRMED): its button, Yes or No, and the unit it asked
 # about, so an answer about another is asked again.
 RECORDED = "unit_recorded"
 RECORDED_IN = "unit_asked"
@@ -142,7 +149,7 @@ def _change_or_note[T](
             items.NAME_IS_ALIAS,
             items.READ_ALIKE,
             items.PACKAGES_WHOLE,
-            items.UNIT_UNCONFIRMED,
+            unit_changes.UNIT_UNCONFIRMED,
             *REFUSED_FIELDS,
             *ALERTS,
         )
@@ -464,7 +471,7 @@ def _item_page(
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
     `asking_unit`, the form sent back asks whether what was recorded was
-    in its unit, Yes and No in place of Save (items.UNIT_UNCONFIRMED).
+    in its unit, Yes and No in place of Save (unit_changes.UNIT_UNCONFIRMED).
     With `held_back`, a retired package not brought back for its size's
     fraction: said above the page, with a link to add a new package. With
     `short_to_set`, a package brought back whose Too short to use box is
@@ -477,7 +484,7 @@ def _item_page(
     )
     log.debug("open packages listed", item_id=item.id, found=len(opened), sort=view.by)
     short_fraction = _short_fraction(session, item, problems, values)
-    fixed = items.unit_fixed(session, item.id)
+    fixed = unit_changes.unit_fixed(session, item.id)
     return admin_page(
         request,
         signed,
@@ -498,7 +505,7 @@ def _item_page(
             "categories": [
                 c for c in queries.categories_by_name(session) if c.retired_at is None
             ],
-            "units": items.units_open(item.unit, fixed),
+            "units": unit_changes.units_open(item.unit, fixed),
             "unit_fixed": fixed,
             "asking_unit": asking_unit,
             "recorded": RECORDED,
@@ -764,7 +771,7 @@ def save_item(
         if broken in ALERTS:
             alert = RULES[broken]
             return _item_page(request, session, signed, found, alert=alert)
-        if broken == items.UNIT_UNCONFIRMED and not problems:
+        if broken == unit_changes.UNIT_UNCONFIRMED and not problems:
             return _item_page(
                 request, session, signed, found, values=form, asking_unit=True
             )
@@ -792,7 +799,7 @@ def _unit_declined(
 ) -> Response:
     """No to "Were the recorded amounts really in m?": nothing saved, the
     form shown again in its unit as it is, saying what to do instead."""
-    why = items.unit_fixed(session, item.id)
+    why = unit_changes.unit_fixed(session, item.id)
     if why is None or unit == item.unit:
         # Answered on a page drawn before the item changed: ask afresh.
         return _item_page(request, session, signed, item, values=form)

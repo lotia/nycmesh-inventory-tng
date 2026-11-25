@@ -120,6 +120,26 @@ def test_loose_units_are_corrected_exactly(
     assert adjustment_units(session) == ["ft", "ft"]
 
 
+def test_a_line_typed_again_in_ft_is_taken_off_in_m(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """5 m moved, then typed again as 2 ft once the page shows ft: 4.390 m
+    was taken off, 5 m less 0.610 m (0.6096), not 3."""
+    place = Place(session)
+    cable = place.cable
+    received(session, place, [{"item_id": cable.id, "quantity": "10", "unit": "m"}])
+    line = {"item_id": cable.id, "quantity": "5", "unit": "m"}
+    _sent_again_after_ft(
+        session,
+        registered_client,
+        admin_client,
+        cable,
+        place.batch(lines=[line]),
+        [line | {"quantity": "2", "unit": "ft"}],
+    )
+    assert [check.quantity for check in checks(session)] == [Decimal("4.390")]
+
+
 def test_a_count_corrected_is_typed_in_m_and_written_in_ft(
     admin_client: TestClient, registered_client: TestClient, session: Session
 ) -> None:

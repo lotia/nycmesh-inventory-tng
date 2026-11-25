@@ -268,7 +268,7 @@ def _current_or_new(session: Session, label: Label, names: Names) -> Label:
 
 # Making one locks what it names first, so two made at once make one code,
 # and nothing is retired meanwhile, nor an item's unit changed
-# (items.unit_fixed).
+# (unit_changes.unit_fixed).
 
 
 def make_for_item(
@@ -302,7 +302,7 @@ def revoke(session: Session, label_id: int, at: datetime) -> bool:
     """Revokes a label, current or inactive (Ali, 2026-11-23,
     inventory-tng-x30g): False if there is none by that id, or it is
     revoked already. Under the catalogue lock, as a unit or size
-    change it frees is (items.unit_fixed, items.sizes_fixed)."""
+    change it frees is (unit_changes.unit_fixed, items.sizes_fixed)."""
     label = locked_row(session, Label, label_id)
     if label is None or label.revoked_at is not None:
         return False

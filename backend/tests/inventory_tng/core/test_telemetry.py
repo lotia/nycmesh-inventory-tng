@@ -25,7 +25,7 @@ from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.app import create_app
-from inventory_tng.catalogue import items
+from inventory_tng.catalogue import items, unit_changes
 from inventory_tng.catalogue.paths import CATEGORIES
 from inventory_tng.core import db_sessions, mail
 from inventory_tng.core.db_errors import NoSession, RuleBroken
@@ -1108,8 +1108,8 @@ def test_counts_unit_changes_refused_by_why(
     refusals = (
         (moved, "m", "item_unit_fixed", {}),
         (labelled, "each", "item_unit_labelled", {}),
-        (waiting, "ft", items.UNIT_CHECKS_WAITING, {}),
-        (huge, "ft", items.UNIT_OUT_OF_RANGE, {"minimum": Decimal(400_000_000)}),
+        (waiting, "ft", unit_changes.UNIT_CHECKS_WAITING, {}),
+        (huge, "ft", unit_changes.UNIT_OUT_OF_RANGE, {"minimum": Decimal(400_000_000)}),
     )
     with capture_logs() as logs:
         for item, unit, rule, more in refusals:

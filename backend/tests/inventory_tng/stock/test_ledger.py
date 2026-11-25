@@ -14,7 +14,7 @@ from sqlalchemy import delete, insert, select, text, update
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
-from inventory_tng.catalogue import items
+from inventory_tng.catalogue import items, unit_changes
 from inventory_tng.core.db_sessions import set_actor
 from inventory_tng.core.history import LEDGER
 from inventory_tng.core.local_time import DEFAULT_ZONE, zone_at
@@ -599,7 +599,10 @@ def test_an_items_unit_is_fixed_once_stock_has_moved(
             {"item_id": place.cable.id, "quantity": "1.5", "unit": place.cable.unit}
         ],
     )
-    for unit, rule in (("each", "item_unit_fixed"), ("m", items.UNIT_UNCONFIRMED)):
+    for unit, rule in (
+        ("each", "item_unit_fixed"),
+        ("m", unit_changes.UNIT_UNCONFIRMED),
+    ):
         with breaks(session, rule):
             items.save(
                 session, place.cable, item_fields(place.cable, unit=unit), seen=None

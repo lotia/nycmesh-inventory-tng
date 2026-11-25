@@ -5,7 +5,7 @@ inventory-tng-2rlr)
 A new migration, not a rewrite of the initial one, so a database already
 at head keeps its data (coordinator, 2026-11-25). Each unit is filled from
 its item's as it is now: exact, as an item's unit is fixed once stock has
-moved in it or a label names it (catalogue/items.unit_fixed).
+moved in it or a label names it (catalogue/unit_changes.unit_fixed).
 
 Revision ID: 0005
 Revises: 0004
