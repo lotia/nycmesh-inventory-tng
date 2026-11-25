@@ -68,6 +68,7 @@ from inventory_tng.core.db_locking import (
 )
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.models.base import QUANTITY_MAX
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
     SMALLEST_PACKAGE_FIRST,
@@ -97,7 +98,8 @@ tracking_changed = meter.create_counter(
 unit_changes_refused = meter.create_counter(
     "inventory.unit_changes.refused",
     unit="{change}",
-    description="Changes to an item's unit refused, by why it is fixed",
+    description="Changes to an item's unit refused, by why: what fixes it, "
+    "or, between lengths, what stops what is recorded converting",
 )
 unit_changes_converted = meter.create_counter(
     "inventory.unit_changes.converted",
@@ -392,6 +394,10 @@ UNIT_UNCONFIRMED = "item_unit_unconfirmed"
 # Refused: that change while a line of the item recorded with more than
 # was moved waits, its amounts in the line's unit (stock/over_recorded.py).
 UNIT_CHECKS_WAITING = "item_unit_checks_waiting"
+# Refused: that change, an amount it converts too large to keep in the new
+# unit, or a package's size or too-short length too small or no longer
+# below its size there (QUANTITY_MAX, SMALLEST).
+UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
 # The database's check (models.catalogue.Item) on a fractional Reorder at
 # for an item counted each, which the form refuses first (Ali, 2026-11-23,
 # inventory-tng-gfes).
@@ -493,9 +499,16 @@ def save(
     enforce("retired_read_only", when=item.retired_at is not None)
     if fields.unit != item.unit and (why := unit_fixed(session, item.id)):
         if not convertible(item.unit, fields.unit):
-            log.info("unit change refused", item_id=item.id, reason=why)
-            unit_changes_refused.add(1, {"reason": why})
-            enforce(UNIT_FIXED_RULES[why])
+            _unit_refused(item.id, why, UNIT_FIXED_RULES[why])
+        # Refused before it is asked: a line recorded with more than was
+        # moved, waiting, is undone in the line's unit (stock/over_recorded.py).
+        waiting = (
+            OverRecorded.movement_id == Movement.id,
+            Movement.item_id == item.id,
+            OverRecorded.settled_at.is_(None),
+        )
+        if exists_where(session, *waiting):
+            _unit_refused(item.id, "checks_waiting", UNIT_CHECKS_WAITING)
         if recorded_in != item.unit:
             log.info("unit change asked", item_id=item.id, reason=why)
             enforce(UNIT_UNCONFIRMED)
@@ -548,57 +561,71 @@ def save(
     return Renamed(kept, swapped)
 
 
+def _unit_refused(item_id: int, reason: str, rule: str) -> None:
+    """A change of the item's unit refused by `rule`, logged and counted
+    by `reason`, from a fixed list: UnitFixed's, "checks_waiting" or
+    "out_of_range"."""
+    log.info("unit change refused", item_id=item_id, reason=reason)
+    unit_changes_refused.add(1, {"reason": reason})
+    enforce(rule)
+
+
 def _converted(session: Session, item: Item, fields: Fields, why: UnitFixed) -> Fields:
     """What the item records in its unit converted into `fields`' (Ali,
     2026-11-24, inventory-tng-y50b), holding it FOR UPDATE, then each row
     it changes by id, in the ledger's order (stock/ledger.py): its Reorder
     at, from `fields`, as typed in its unit, which `fields` comes back
     with; what is on order; its vendor offers' units per order, retired
-    ones too; and what volunteers said is on its open packages. Its
-    stock converts as the ledger is read (stock/line_amounts.py), its
-    lines keeping their unit, and its packages keep theirs. Refused while
-    a line of it recorded with more than was moved waits
-    (UNIT_CHECKS_WAITING), as that check is undone in the line's unit."""
+    ones too; and what volunteers said is on its open packages. Every open
+    one not closed is held, so a report being written of one is converted
+    once it is in, never left in the old unit. Its stock converts as the
+    ledger is read (stock/line_amounts.py), its lines keeping their unit,
+    and its packages keep theirs. Refused (UNIT_OUT_OF_RANGE) if an amount
+    converted is too large to keep, or a package would not keep its size
+    or too-short length in the new unit."""
     old, new = item.unit, fields.unit
-    waiting = (
-        OverRecorded.movement_id == Movement.id,
-        Movement.item_id == item.id,
-        OverRecorded.settled_at.is_(None),
-    )
-    if exists_where(session, *waiting):
-        log.info("unit change refused", item_id=item.id, reason="checks_waiting")
-        unit_changes_refused.add(1, {"reason": "checks_waiting"})
-        enforce(UNIT_CHECKS_WAITING)
-
-    def into(amount: Decimal) -> Decimal:
-        return converted(amount, old, new)
-
-    if item.on_order is not None:
-        item.on_order = into(item.on_order)
     offers = select(VendorOffer).where(VendorOffer.item_id == item.id)
-    offer_ids = []
-    for offer in session.scalars(locked(offers.order_by(VendorOffer.id))):
-        if offer.units_per_order is not None:
-            # Never none at all: so few per order in m is still some.
-            offer.units_per_order = max(
-                converted(offer.units_per_order, offer.unit, new), SMALLEST
-            )
-        offer.unit = new
-        offer_ids.append(offer.id)
-    reported = select(OpenPackage).where(
-        OpenPackage.item_id == item.id, OpenPackage.length_reported.is_not(None)
+    offered = session.scalars(locked(offers.order_by(VendorOffer.id))).all()
+    opened = select(OpenPackage).where(
+        OpenPackage.item_id == item.id,
+        or_(OpenPackage.closed_at.is_(None), OpenPackage.length_reported.is_not(None)),
     )
-    open_ids = []
-    for row in session.scalars(
-        locked(reported.order_by(OpenPackage.id), key_share=True)
+    held = session.scalars(
+        locked(opened.order_by(OpenPackage.id), key_share=True)
+    ).all()
+    minimum = None if fields.minimum is None else converted(fields.minimum, old, new)
+    on_order = None if item.on_order is None else converted(item.on_order, old, new)
+    per_order = {
+        # Never none at all: so few per order in m is still some.
+        offer.id: max(converted(offer.units_per_order, offer.unit, new), SMALLEST)
+        for offer in offered
+        if offer.units_per_order is not None
+    }
+    reported = [row for row in held if row.length_reported is not None]
+    lengths = {
+        # Set with its unit (its check).
+        row.id: converted(row.length_reported, row.length_reported_unit or old, new)
+        for row in reported
+        if row.length_reported is not None
+    }
+    amounts = [minimum, on_order, *per_order.values(), *lengths.values()]
+    # Under the catalogue lock (relock), which every package write takes.
+    packages = session.scalars(
+        select(ItemPackage).where(ItemPackage.item_id == item.id)
+    )
+    if any(each is not None and each > QUANTITY_MAX for each in amounts) or not all(
+        _kept_in(package, new) for package in packages
     ):
-        assert row.length_reported is not None  # The query asked for one.
-        assert row.length_reported_unit is not None  # Set with it (its check).
-        row.length_reported = converted(
-            row.length_reported, row.length_reported_unit, new
-        )
+        _unit_refused(item.id, "out_of_range", UNIT_OUT_OF_RANGE)
+    item.on_order = on_order
+    for offer in offered:
+        offer.units_per_order = per_order.get(offer.id)
+        offer.unit = new
+    for row in reported:
+        row.length_reported = lengths[row.id]
         row.length_reported_unit = new
-        open_ids.append(row.id)
+    offer_ids = [offer.id for offer in offered]
+    open_ids = sorted(lengths)
     once_committed(session, unit_changes_converted.add, 1, {"from": old, "to": new})
     once_committed(
         session,
@@ -611,8 +638,20 @@ def _converted(session: Session, item: Item, fields: Fields, why: UnitFixed) -> 
         vendor_offer_ids=offer_ids,
         open_package_ids=open_ids,
     )
-    minimum = None if fields.minimum is None else into(fields.minimum)
     return replace(fields, minimum=minimum)
+
+
+def _kept_in(package: ItemPackage, unit: str) -> bool:
+    """Whether `package`'s size and too-short length, in its own unit, are
+    kept in `unit`, its item's once converted: the size no less than
+    SMALLEST nor more than QUANTITY_MAX, the length no less than SMALLEST
+    and below the size, as their checks hold them in their own."""
+    size = converted(package.size, package.unit, unit)
+    if not SMALLEST <= size <= QUANTITY_MAX:
+        return False
+    if package.short_below is None:
+        return True
+    return SMALLEST <= converted(package.short_below, package.unit, unit) < size
 
 
 def _amounts_follow(session: Session, item_id: int, unit: str) -> None:

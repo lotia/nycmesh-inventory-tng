@@ -151,9 +151,9 @@ TRACKS_OPENED = func.coalesce(ItemPackage.track_opened, Item.track_opened)
 
 class PackageFacts(NamedTuple):
     """What the ledger's rules read of a package: its item, its size in
-    its item's unit (ItemPackage.size_in_items_unit), whether opening one makes an open package (tracks_opened), whether it
-    is retired, and whether a line takes it sealed with none left
-    (_none_sealed)."""
+    its item's unit (ItemPackage.size_in_items_unit), whether opening one
+    makes an open package (tracks_opened), whether it is retired, and
+    whether a line takes it sealed with none left (_none_sealed)."""
 
     item_id: int
     size: Decimal
@@ -341,9 +341,9 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 #
 # A change of an item's unit between lengths that converts what is
 # recorded (items.save) holds the item FOR UPDATE, as 2 waits for, then
-# its vendor offers FOR UPDATE and its open packages FOR NO KEY UPDATE, by
-# id, as 5: a save holding them is converted after, or refused, never
-# mixed.
+# its vendor offers FOR UPDATE and its open packages not closed, or
+# reported, FOR NO KEY UPDATE, by id, as 5: a save holding them is
+# converted after, or refused, never mixed.
 #
 # A change to whether an item's or package's opened ones are followed
 # (open_packages.unfollowing) takes the places of their open packages FOR

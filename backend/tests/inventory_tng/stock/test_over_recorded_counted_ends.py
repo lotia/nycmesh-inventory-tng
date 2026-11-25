@@ -303,7 +303,7 @@ def test_one_moved_whole_is_closed_by_setting_its_length_where_it_arrived(
     moment = session.scalar(select(func.max(LedgerTransaction.id)))
     assert moment is not None
     answer = length_checks_routes.Answer(
-        made.id, open_packages.check_seen(made), Decimal(300), Decimal(305), moment
+        made.id, open_packages.check_seen(made, "m"), Decimal(300), Decimal(305), moment
     )
     assert length_checks_routes._set(
         session, new_admin_id(session), answer, [spools.van.id]
@@ -324,7 +324,7 @@ def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
     moved = session.get_one(Movement, check.movement_id).transaction_id
     assert made.length_reported_in_id == moved
     answer = length_checks_routes.Answer(
-        made.id, open_packages.check_seen(made), made.length_reported, as_of=moved
+        made.id, open_packages.check_seen(made, "m"), made.length_reported, as_of=moved
     )
     assert length_checks_routes._set(
         session, new_admin_id(session), answer, [spools.van.id]
@@ -340,7 +340,7 @@ def test_only_a_report_after_the_batch_that_moved_it_whole_puts_it_right(
     assert made.length_reported_in_id > moved
     answer = length_checks_routes.Answer(
         made.id,
-        open_packages.check_seen(made),
+        open_packages.check_seen(made, "m"),
         made.length_reported,
         as_of=made.length_reported_in_id,
     )

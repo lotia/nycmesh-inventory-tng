@@ -394,8 +394,12 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   offers' units per order, and what volunteers said is on its open
   packages. A save under way waits and is converted, or comes after and
   is refused as shown in the old unit, never written in one and read in
-  the other. Refused while a line of it recorded with more than was
-  moved waits, as that check is undone in the line's unit.
+  the other; so is an answer from a length-checks page shown before.
+  Refused, before it is asked, while a line of it recorded with more
+  than was moved waits, as that check is undone in the line's unit; and
+  on Yes if an amount converted would be too large to keep, or a
+  package's size or too-short length too small or no longer below its
+  size.
 - No converts nothing and says how to put right a unit wrong from the
   start, until the guided recount (inventory-tng-qety) does it: count
   its stock in the old unit first, then change its unit; or, only

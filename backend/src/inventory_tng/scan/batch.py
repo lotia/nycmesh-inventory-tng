@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.amount_rules import whole_enough
-from inventory_tng.catalogue.unit_conversion import converted
+from inventory_tng.catalogue.unit_conversion import converted, convertible
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
@@ -233,8 +233,8 @@ def record(
     # its item's unit (open_packages.report_length). Read without a lock:
     # an open package exists only once stock moved in its item, which
     # fixes it as counted each or a length for good
-    # (catalogue/items.unit_fixed); a change between lengths, converting
-    # its reports, waits for the open packages this holds.
+    # (catalogue/items.unit_fixed); a change between lengths waits for the
+    # open packages this holds, then converts what this reports of them.
     units = values_by(
         session,
         Item.id,
@@ -812,8 +812,10 @@ def _packages(session: Session, package_ids: set[int]) -> dict[int, ItemPackage]
 def _size_in(package: ItemPackage | None, unit: str) -> Decimal | None:
     """A package's size in `unit`, a line's, as the ledger took it when the
     line was written in it (unit_conversion.converted): its item's unit
-    may have changed since (inventory-tng-y50b). None for no package."""
-    if package is None:
+    may have changed since (inventory-tng-y50b). None for no package, or
+    for a unit it is never in, as a batch sent again may say: then it is
+    not the batch written."""
+    if package is None or not (package.unit == unit or convertible(package.unit, unit)):
         return None
     return converted(package.size, package.unit, unit)
 

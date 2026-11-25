@@ -43,7 +43,7 @@ def left_on(session: Session, made: OpenPackage) -> Decimal:
 def seen(session: Session, made: OpenPackage) -> str:
     """What the check page shows of its check."""
     session.refresh(made)
-    return open_packages.check_seen(made)
+    return open_packages.check_seen(made, session.get_one(Item, made.item_id).unit)
 
 
 def set_form(session: Session, made: OpenPackage, left: str) -> dict[str, str]:

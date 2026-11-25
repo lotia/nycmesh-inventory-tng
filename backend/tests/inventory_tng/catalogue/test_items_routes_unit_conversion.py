@@ -16,14 +16,15 @@ from inventory_tng.catalogue import items
 from inventory_tng.catalogue.items_routes import RECORDED, RECORDED_IN
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.labels import labels
-from inventory_tng.models.catalogue import Item, VendorOffer
+from inventory_tng.models.catalogue import Item, ItemPackage, VendorOffer
 from inventory_tng.models.stock import Movement
 from inventory_tng.scan.batch import BatchRefused, KeyReused, record
 from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.scan.catalogue_api import catalogue
-from inventory_tng.stock import moments, queries
+from inventory_tng.stock import moments, open_packages, queries
 from inventory_tng.stock.ledger import Entry
 from inventory_tng.stock.moments import expected
+from inventory_tng.stock.paths import LENGTHS
 from inventory_tng.web.forms import RULES
 
 from helpers.items import NOW, shown_item_form
@@ -194,7 +195,7 @@ def test_refused_while_a_line_recorded_with_more_than_moved_waits(
     admin_client: TestClient, session: Session
 ) -> None:
     """Its check is undone in the line's unit (stock/over_recorded.py), so
-    it is settled first."""
+    it is settled first, as said before the question is asked."""
     place = _shelf_a(session)
     moved = write(
         session,
@@ -202,12 +203,81 @@ def test_refused_while_a_line_recorded_with_more_than_moved_waits(
         lines=[{"item_id": place.cable.id, "quantity": "5", "unit": "m"}],
     )
     raise_check(session, moved)
-    refused = admin_client.post(
-        f"{ITEMS}/{place.cable.id}", data=_yes(place.cable, unit="ft")
-    )
-    assert refused.status_code == 400
-    assert problem(refused.text, "unit") == str(RULES[items.UNIT_CHECKS_WAITING])
+    for form in (shown_item_form(place.cable, unit="ft"), _yes(place.cable, unit="ft")):
+        refused = admin_client.post(f"{ITEMS}/{place.cable.id}", data=form)
+        assert refused.status_code == 400
+        assert QUESTION not in words_on(refused.text)
+        assert problem(refused.text, "unit") == str(RULES[items.UNIT_CHECKS_WAITING])
     assert place.cable.unit == "m"
+
+
+def test_refused_when_an_amount_would_not_keep_in_the_new_unit(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A Reorder at of 400,000,000 m is more than an amount holds in ft;
+    a too-short length of 0.001 ft, or a package of 0.001 ft, is less than
+    one holds in m. None converts, and nothing is saved."""
+    cable = _shelf_a(session).cable
+    huge = _yes(cable, unit="ft", minimum="400000000")
+    refused = admin_client.post(f"{ITEMS}/{cable.id}", data=huge)
+    assert refused.status_code == 400
+    assert problem(refused.text, "unit") == str(RULES[items.UNIT_OUT_OF_RANGE])
+    session.refresh(cable)
+    assert (cable.unit, cable.minimum) == ("m", 100)
+    place = Place(session, cable_unit="ft")
+    reel = ItemPackage(
+        item_id=place.cable.id,
+        name="Reel",
+        size=Decimal(10),
+        short_below=Decimal("0.001"),
+    )
+    add(session, reel)
+    write(
+        session,
+        place,
+        kind="receipt",
+        from_location_id=None,
+        to_location_id=place.store.id,
+        lines=[{"item_id": place.cable.id, "quantity": "10", "unit": "ft"}],
+    )
+    for crumb in (None, Decimal("0.001")):
+        if crumb is not None:
+            reel.short_below = None
+            add(session, ItemPackage(item_id=place.cable.id, name="Crumb", size=crumb))
+        tiny = admin_client.post(
+            f"{ITEMS}/{place.cable.id}", data=_yes(place.cable, unit="m")
+        )
+        assert problem(tiny.text, "unit") == str(RULES[items.UNIT_OUT_OF_RANGE])
+        assert place.cable.unit == "ft"
+
+
+def test_a_length_check_shown_before_the_change_is_not_set(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Its page said 300 m; set after the cable is in ft, 300 would be read
+    as ft. So it is refused as changed since, nothing counted, and the
+    page shows it again in ft."""
+    spools = Spools(session)
+    made = spools.opened()
+    record(
+        session,
+        Batch.model_validate(report(spools, length(made, "300"))),
+        device_id=None,
+    )
+    session.flush()
+    seen = open_packages.check_seen(made, "m")
+    cable = spools.cable
+    followed = _yes(cable, unit="ft", track_opened="on")
+    assert admin_client.post(f"{ITEMS}/{cable.id}", data=followed).status_code == 303
+    before = counts_written(session)
+    form = {"left": "300", "seen": seen, "showed": "305", "as_of": "1"}
+    admin_client.post(f"{LENGTHS}/{made.id}/set", data=form)
+    assert counts_written(session) == before
+    session.refresh(made)
+    assert made.length_reported_at is not None
+    ticked = {"open_package": [f"{made.id} {seen}"], "do": "set"}
+    admin_client.post(LENGTHS, data=ticked)
+    assert counts_written(session) == before
 
 
 def test_packages_keep_their_size_and_move_whole_in_the_new_unit(
@@ -338,6 +408,21 @@ def test_a_batch_sent_again_is_answered_in_the_unit_it_was_recorded_in(
         "m",
         Decimal(305),
     )
+
+
+def test_a_batch_sent_again_in_a_unit_its_package_is_never_in_is_another(
+    session: Session,
+) -> None:
+    """An opening sent again under its key, its line in each, is told it
+    is not the one recorded (KeyReused), not failed reading a spool's size
+    in each."""
+    spools = Spools(session)
+    sent = opening(spools, sealed_line(spools, "305"))
+    record(session, Batch.model_validate(sent), device_id=None)
+    each = sealed_line(spools, "305") | {"unit": "each"}
+    again = opening(spools, each) | {"key": sent["key"]}
+    with pytest.raises(KeyReused):
+        record(session, Batch.model_validate(again), device_id=None)
 
 
 def test_no_for_a_labelled_item_says_to_revoke_its_labels(

@@ -8,7 +8,7 @@ import re
 import unicodedata
 from decimal import Decimal
 from enum import StrEnum
-from typing import Final, Literal
+from typing import Literal
 
 import structlog
 from opentelemetry import metrics
@@ -19,7 +19,7 @@ from inventory_tng.core.db_base import Base
 from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext, number
 from inventory_tng.models.base import (
     INTEGER_MAX,
-    QUANTITY_PRECISION,
+    QUANTITY_MAX,
     QUANTITY_SCALE,
     whole,
 )
@@ -59,6 +59,10 @@ RULES = {
     ),
     "item_unit_checks_waiting": lazy_gettext(
         "Settle its lines in Recorded more than moved first: they are in its unit now."
+    ),
+    "item_unit_out_of_range": lazy_gettext(
+        "Not converted: some of its amounts would be too large in that unit, "
+        "or a package too small."
     ),
     "package_size_fixed": lazy_gettext(
         "Its size is fixed, as some has moved or been opened: "
@@ -165,8 +169,6 @@ def name_problem(name: str) -> str | None:
 TOO_BIG = lazy_gettext("That number is too big.")
 ABOVE_ZERO = lazy_gettext("Use a number above 0.")
 ZERO_OR_MORE = lazy_gettext("Use 0 or more.")
-# The largest amount models.base.QUANTITY holds: every digit a 9.
-QUANTITY_MAX: Final = Decimal(10**QUANTITY_PRECISION - 1).scaleb(-QUANTITY_SCALE)
 
 
 class Unreadable(StrEnum):

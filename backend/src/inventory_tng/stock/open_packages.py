@@ -246,12 +246,15 @@ def _clear_check(row: OpenPackage) -> bool:
     return checked
 
 
-def check_seen(row: OpenPackage) -> str:
+def check_seen(row: OpenPackage, unit: str) -> str:
     """What an administrator saw of a check: the report and the fall below
-    zero it was raised by. A page sends it back, so a check raised again
-    since, as by a newer report, is not settled unseen."""
+    zero it was raised by, and `unit`, its item's, which the page said its
+    amounts in. A page sends it back, so a check raised again since, as by
+    a newer report, is not settled unseen, nor one whose item changed unit
+    since, converting what it showed (inventory-tng-y50b): what the page
+    typed is in the old."""
     below = row.below_zero_at.isoformat() if row.below_zero_at else ""
-    return f"{row.length_reported_in_id or ''}/{below}"
+    return f"{row.length_reported_in_id or ''}/{below}/{unit}"
 
 
 def settle_check(
@@ -259,11 +262,14 @@ def settle_check(
 ) -> bool:
     """A check of what an open package has, settled `how`: cleared, whoever
     raised it, if it is still as `seen` (check_seen). False if there is no
-    such package, nothing to settle, or it changed since it was seen."""
+    such package, nothing to settle, or it changed since it was seen. Call
+    it holding its item, as a change of its unit waits for (stock/ledger.py
+    hold_across)."""
     row = get_locked(session, OpenPackage, open_id, key_share=True)
     if row is None or (row.length_reported_at is None and row.below_zero_at is None):
         return False
-    if check_seen(row) != seen:
+    unit = session.scalar(select(Item.unit).where(Item.id == row.item_id))
+    if unit is None or check_seen(row, unit) != seen:
         return False
     _clear_check(row)
     _check_settled(session, how)

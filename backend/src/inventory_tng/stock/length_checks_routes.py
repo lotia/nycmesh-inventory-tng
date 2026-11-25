@@ -254,7 +254,7 @@ def _checks_page(
             each,
             volunteers.get(each.row.length_reported_by_volunteer_id),
             cuts[each.row.id],
-            open_packages.check_seen(each.row),
+            open_packages.check_seen(each.row, each.unit),
         )
         for each in found
     ]

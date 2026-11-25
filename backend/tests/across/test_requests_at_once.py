@@ -1229,6 +1229,40 @@ def test_a_save_while_a_unit_is_converted_is_converted_or_refused(
 
 
 @pytest.mark.concurrency
+def test_a_length_reported_while_a_unit_is_converted_is_converted(
+    own_committed: Committed,
+) -> None:
+    """A batch reporting 300 m on an open spool, none reported before,
+    holds it FOR NO KEY UPDATE and reads the cable's unit, m, without a
+    lock. A change to ft holds every open package of the cable not closed,
+    so waits for it, then converts the report with the rest: 984.252 ft,
+    never 300 kept in m on a cable in ft (Ali, 2026-11-24,
+    inventory-tng-y50b)."""
+    setup = own_committed.session()
+    spools = Spools(setup)
+    made = spools.opened()
+    setup.commit()
+    said = Batch.model_validate(report(spools, length(made, "300")))
+    one, two = own_committed.session(), own_committed.session()
+    record(one, said, device_id=None)
+
+    def to_ft() -> None:
+        cable = two.get_one(Item, spools.cable.id)
+        items.save(
+            two, cable, item_fields(cable, unit="ft"), seen=None, recorded_in="m"
+        )
+        two.flush()
+
+    worker = own_committed.blocked(two, to_ft)
+    one.commit()
+    assert worker.finished().error is None
+    two.commit()
+    check = own_committed.session()
+    row = check.get_one(OpenPackage, made.id)
+    assert (row.length_reported, row.length_reported_unit) == (Decimal("984.252"), "ft")
+
+
+@pytest.mark.concurrency
 @pytest.mark.parametrize("package", [False, True])
 def test_a_unit_or_size_changed_while_its_label_is_revoked_waits_then_is_made(
     committed: Committed, package: bool
@@ -2097,7 +2131,7 @@ def test_length_checks_answered_together_hold_their_items_by_id(
         setup, two_spools(setup), lambda spools, row: report(spools, length(row, "250"))
     )
     setup.commit()
-    ticked = [f"{row.id} {open_packages.check_seen(row)}" for row in opened]
+    ticked = [f"{row.id} {open_packages.check_seen(row, 'm')}" for row in opened]
     page, client = signed_in(own_committed, make_client, totp)
     form = {"open_package": ticked, "do": "set"}
     answered = answered_while_held(
@@ -2148,7 +2182,7 @@ def test_length_checks_answered_together_hold_the_checks_they_settle_by_id(
         setup, spools, lambda each, row: report(each, length(row, "250"))
     )
     setup.commit()
-    ticked = [f"{row.id} {open_packages.check_seen(row)}" for row in opened]
+    ticked = [f"{row.id} {open_packages.check_seen(row, 'm')}" for row in opened]
     page, client = signed_in(own_committed, make_client, totp)
     form = {"open_package": ticked, "do": "set"}
     lower, higher = (held(OverRecorded.id, check) for check in raised)

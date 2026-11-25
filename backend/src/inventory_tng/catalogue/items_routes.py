@@ -91,6 +91,7 @@ REFUSED_FIELDS = {
     items.MINIMUM_WHOLE: "minimum",
     **dict.fromkeys(items.UNIT_FIXED_RULES.values(), "unit"),
     items.UNIT_CHECKS_WAITING: "unit",
+    items.UNIT_OUT_OF_RANGE: "unit",
 }
 # The item form's answer to "Were the recorded amounts really in m?"
 # (items.UNIT_UNCONFIRMED): its button, Yes or No, and the unit it asked

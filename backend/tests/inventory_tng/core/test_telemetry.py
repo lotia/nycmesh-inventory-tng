@@ -71,6 +71,7 @@ from helpers.stock import (
     count_form_at,
     cut,
     length,
+    raise_check,
     received,
     report,
     retire,
@@ -727,7 +728,7 @@ def test_counts_length_checks_set_as_counts(
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     session.refresh(reported)
-    ticked = f"{reported.id} {open_packages.check_seen(reported)}"
+    ticked = f"{reported.id} {open_packages.check_seen(reported, 'm')}"
     with each_recorded_once(reader, session, 1, 0):
         for _ in range(2):
             client.post(
@@ -1060,32 +1061,51 @@ def test_counts_labels_made_printed_and_revoked(
     assert sum(counted(reader, "inventory.labels.revoked").values()) >= 1
 
 
-def test_counts_unit_changes_refused_by_why_the_unit_is_fixed(
+def test_counts_unit_changes_refused_by_why(
     rolled_back: Recorded, session: Session
 ) -> None:
-    """Counted and logged at once, as a refusal writes nothing to commit."""
+    """Counted and logged at once, as a refusal writes nothing to commit:
+    by what fixes the unit, or, between lengths, a check waiting or an
+    amount too large in the new unit."""
     _, _, reader, _ = rolled_back
     name = "inventory.unit_changes.refused"
     before = counted(reader, name)
     moved = stocked(session).item
     labelled = Place(session).cable
     assert labels.make_for_item(session, labelled.id) is not None
+    place, other = Place(session), Place(session)
+    for each in (place, other):
+        line = {"item_id": each.cable.id, "quantity": "5", "unit": "m"}
+        moved_at = write(session, each, lines=[line])
+    raise_check(session, moved_at)
+    waiting, huge = other.cable, place.cable
+    refusals = (
+        (moved, "m", "item_unit_fixed", {}),
+        (labelled, "each", "item_unit_labelled", {}),
+        (waiting, "ft", items.UNIT_CHECKS_WAITING, {}),
+        (huge, "ft", items.UNIT_OUT_OF_RANGE, {"minimum": Decimal(400_000_000)}),
+    )
     with capture_logs() as logs:
-        for item, unit, rule in (
-            (moved, "m", "item_unit_fixed"),
-            (labelled, "each", "item_unit_labelled"),
-        ):
+        for item, unit, rule, more in refusals:
+            fields = item_fields(item, unit=unit, **more)
             with breaks(session, rule):
-                items.save(session, item, item_fields(item, unit=unit), seen=None)
+                items.save(session, item, fields, seen=None, recorded_in=item.unit)
     assert added(reader, name, before) == {
         (("reason", "moved"),): 1,
         (("reason", "labelled"),): 1,
+        (("reason", "checks_waiting"),): 1,
+        (("reason", "out_of_range"),): 1,
     }
     assert [
         (line["item_id"], line["reason"], line["log_level"])
         for line in logs
         if line["event"] == "unit change refused"
-    ] == [(moved.id, "moved", "info"), (labelled.id, "labelled", "info")]
+    ] == [
+        (moved.id, "moved", "info"),
+        (labelled.id, "labelled", "info"),
+        (waiting.id, "checks_waiting", "info"),
+        (huge.id, "out_of_range", "info"),
+    ]
 
 
 def test_counts_unit_changes_converted_by_unit(
@@ -1561,11 +1581,11 @@ def test_counts_length_checks_raised_and_settled(
     lengths = "/admin/stock/length-checks"
     for row in (reported, cut_from):
         session.refresh(row)
-    ticked = f"{reported.id} {open_packages.check_seen(reported)}"
+    ticked = f"{reported.id} {open_packages.check_seen(reported, 'm')}"
     client.post(lengths, data={"open_package": [ticked], "do": "set"})
     client.post(
         f"{lengths}/{cut_from.id}/leave",
-        data={"seen": open_packages.check_seen(cut_from)},
+        data={"seen": open_packages.check_seen(cut_from, "m")},
     )
     client.post(f"/admin/items/{spools.cable.id}/open-packages/{closing.id}/close")
     assert added(reader, "inventory.open_packages.length_checks.settled", settled) == {
