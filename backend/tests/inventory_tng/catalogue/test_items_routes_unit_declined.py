@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, object_session
 
+from inventory_tng.catalogue import unit_changes
 from inventory_tng.catalogue.paths import ITEMS, unit_recount
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
@@ -117,6 +118,52 @@ def test_stock_moved_none_left_leaves_the_example_out(
     )
     note = read(page).one("span", id="unit-problem")
     note.one("a", "recount it in ft", href=unit_recount(cable.id, "ft"))
+
+
+def test_stock_moved_gives_a_place_holding_some_not_one_short(
+    admin_client: TestClient, session: Session
+) -> None:
+    """5 m moved from a store that held none leaves it short (-5), and
+    first in the stock pages' order: the van, holding the 5, is the
+    example."""
+    place = Place(session)
+    cable = place.cable
+    write(session, place, lines=[{"item_id": cable.id, "quantity": "5", "unit": "m"}])
+    page = _declined(admin_client, cable, "ft")
+    assert problem(page, "unit").startswith(
+        "The unit is still m. Changing it to ft recalculates every recorded "
+        f"amount from m: the 5 m at {place.van.name} would become 16.404 ft. "
+        "If the 5 was really ft,"
+    )
+
+
+def test_no_to_a_change_not_between_lengths_asks_afresh(
+    admin_client: TestClient, session: Session
+) -> None:
+    """No sent about a change to each, which no question asks, as from a
+    page drawn before the item changed into each: nothing to recalculate,
+    so no note, and no server error."""
+    place = _moved(session, "m", "300", "5")
+    cable = place.cable
+    answered = unit_answered(cable, "no", unit="each")
+    page = admin_client.post(f"{ITEMS}/{cable.id}", data=answered)
+    assert page.status_code == 200
+    assert read(page.text).all("span", id="unit-problem") == []
+    session.refresh(cable)
+    assert cable.unit == "m"
+
+
+def test_labels_revoked_since_the_unit_was_read_asks_afresh(
+    admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Its last label revoked between reading why its unit is fixed and
+    counting its labels, as a request at once can: no note of 0 labels."""
+    cable = Place(session).cable
+    monkeypatch.setattr(unit_changes, "unit_fixed", lambda *_: "labelled")
+    answered = unit_answered(cable, "no", unit="ft")
+    page = admin_client.post(f"{ITEMS}/{cable.id}", data=answered)
+    assert page.status_code == 200
+    assert read(page.text).all("span", id="unit-problem") == []
 
 
 @pytest.mark.parametrize(

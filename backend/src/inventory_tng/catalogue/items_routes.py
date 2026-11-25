@@ -32,6 +32,7 @@ from inventory_tng.catalogue.amount_rules import becomes_counted_whole, counted_
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS, unit_recount
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
+from inventory_tng.catalogue.unit_conversion import convertible
 from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
@@ -831,13 +832,19 @@ def _unit_declined(
     """No to "Were the recorded amounts really in m?": nothing saved, the
     form shown again in its unit as it is, saying what to do instead."""
     why = unit_changes.unit_fixed(session, item)
-    if why is None or unit == item.unit:
-        # Answered on a page drawn before the item changed: ask afresh.
+    printed = len(labels.current_of(session, Label.item_id == item.id))
+    if (
+        why is None
+        or not convertible(item.unit, unit)
+        or (why == "labelled" and not printed)
+    ):
+        # Answered on a page drawn before the item changed, its labels
+        # revoked since, or about a change that is not between lengths:
+        # ask afresh.
         return _item_page(request, session, signed, item, values=form)
     log.info("unit change declined", item_id=item.id, reason=why)
     values = {**form, "unit": item.unit}
     example = unit_changes.example(session, item, unit, why)
-    printed = len(labels.current_of(session, Label.item_id == item.id))
     problems = {
         "unit": forms.unit_declined_problem(item.unit, unit, why, example, printed)
     }

@@ -401,11 +401,13 @@ class Recounted(NamedTuple):
 def revoked_packages(
     session: Session, item_id: int, label_ids: Collection[int]
 ) -> list[ItemPackage]:
-    """The item's packages of these labels, as a recount revoked them:
-    current ones first, then retired ones, which print again only once
-    brought back, each by name."""
+    """The item's packages of these labels, those revoked, as a recount
+    revoked them: current ones first, then retired ones, which print
+    again only once brought back, each by name."""
     of_labels = select(Label.package_id).where(
-        Label.id.in_(label_ids), Label.item_id == item_id
+        Label.id.in_(label_ids),
+        Label.item_id == item_id,
+        Label.revoked_at.is_not(None),
     )
     return list(
         session.scalars(

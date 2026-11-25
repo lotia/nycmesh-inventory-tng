@@ -68,9 +68,21 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     <span class="problem" id="unit-problem">{{ problems.unit }} {# Translators: follows "The unit is still m. Until …, changing it recalculates its amounts from m."; %(revoke)s is the link to revoke its labels, as "revoke its 2 labels". #}{% trans new=recount_to, revoke=revoke_link(labels_printed, its_labels, opens=false) %}If they were really in {{ new }}, {{ revoke }}, then change its unit to {{ new }}; the amounts stay as they are.{% endtrans %}</span>
     {% elif unit_declined == "moved" and not retired %}
     {#- The guided recount (catalogue/unit_recounts.py). #}
-    <span class="problem" id="unit-problem">{{ problems.unit }} {% if unit_example %}{#- Translators: follows "…: the 305 m at Shelf A would become 1000.656 ft."; %(amount)s is that 305, %(new)s the unit asked for. The link goes to the guided recount. #}{% trans amount=unit_example.amount | amount, new=recount_to, link=recount_in %}If the {{ amount }} was really {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: its records are set to nothing, its unit becomes {{ new }}, and you count each place in {{ new }}.{% endtrans %}{% else %}{#- Translators: follows "The unit is still m. Changing it to ft recalculates every recorded amount from m."; the link goes to the guided recount. #}{% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: its records are set to nothing, its unit becomes {{ new }}, and you count each place in {{ new }}.{% endtrans %}{% endif %}</span>
+    <span class="problem" id="unit-problem">{{ problems.unit }} {% if unit_example -%}
+    {#- Translators: follows "…: the 305 m at Shelf A would become 1000.656 ft."; %(amount)s is that 305, %(new)s the unit asked for. The link goes to the guided recount. -#}
+    {% trans amount=unit_example.amount | amount, new=recount_to, link=recount_in %}If the {{ amount }} was really {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: its records are set to nothing, its unit becomes {{ new }}, and you count each place in {{ new }}.{% endtrans %}
+    {%- else -%}
+    {#- Translators: follows "The unit is still m. Changing it to ft recalculates every recorded amount from m."; the link goes to the guided recount. -#}
+    {% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: its records are set to nothing, its unit becomes {{ new }}, and you count each place in {{ new }}.{% endtrans %}
+    {%- endif %}</span>
     {% elif unit_declined == "converted" and not retired %}
-    <span class="problem" id="unit-problem">{{ problems.unit }} {% if recount_resizes %}{#- Translators: follows "The unit is still ft. Changing it to m recalculates its amounts from ft…", for an item converted before with packages in ft; the link goes to the guided recount. #}{% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: you give its amounts and package sizes again in {{ new }}, and its unit becomes {{ new }}.{% endtrans %}{% else %}{#- Translators: as "If they were really in m, recount it in m: you give its amounts and package sizes again in m…", for an item with no packages in its unit. #}{% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: you give its amounts again in {{ new }}, and its unit becomes {{ new }}.{% endtrans %}{% endif %}</span>
+    <span class="problem" id="unit-problem">{{ problems.unit }} {% if recount_resizes -%}
+    {#- Translators: follows "The unit is still ft. Changing it to m recalculates its amounts from ft…", for an item converted before with packages in ft; the link goes to the guided recount. -#}
+    {% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: you give its amounts and package sizes again in {{ new }}, and its unit becomes {{ new }}.{% endtrans %}
+    {%- else -%}
+    {#- Translators: as "If they were really in m, recount it in m: you give its amounts and package sizes again in m…", for an item with no packages in its unit. -#}
+    {% trans new=recount_to, link=recount_in %}If they were really in {{ new }}, <a href="{{ link }}">recount it in {{ new }}</a>: you give its amounts again in {{ new }}, and its unit becomes {{ new }}.{% endtrans %}
+    {%- endif %}</span>
     {% else %}
     {% with name = "unit" %}{% include "_field_problem.html" %}{% endwith %}
     {% endif %}

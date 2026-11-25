@@ -312,7 +312,7 @@ def example(session: Session, item: Item, new: str, why: UnitFixed) -> Example |
     None if it has none."""
     if why == "moved":
         held = balances(
-            session, and_(balance.c.item_id == item.id, balance.c.quantity != 0)
+            session, and_(balance.c.item_id == item.id, balance.c.quantity > 0)
         )
         if not held:
             return None

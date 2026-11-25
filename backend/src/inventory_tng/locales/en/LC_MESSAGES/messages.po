@@ -1881,8 +1881,8 @@ msgid ""
 "administrator to reset your sign-in."
 msgstr ""
 
-#. follows "The unit is still m. Changing it to ft recalculates every recorded
-#. amount from m."; the link goes to the guided recount.
+#. follows "…: the 305 m at Shelf A would become 1000.656 ft."; %(amount)s is
+#. that 305, %(new)s the unit asked for. The link goes to the guided recount.
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
@@ -1901,6 +1901,8 @@ msgid ""
 "%(new)s; the amounts stay as they are."
 msgstr ""
 
+#. follows "The unit is still m. Changing it to ft recalculates every recorded
+#. amount from m."; the link goes to the guided recount.
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
@@ -1909,6 +1911,8 @@ msgid ""
 "and you count each place in %(new)s."
 msgstr ""
 
+#. as "If they were really in m, recount it in m: you give its amounts and
+#. package sizes again in m…", for an item with no packages in its unit.
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""
@@ -1917,8 +1921,9 @@ msgid ""
 "%(new)s."
 msgstr ""
 
-#. as "If they were really in m, recount it in m: you give its amounts and
-#. package sizes again in m…", for an item with no packages in its unit.
+#. follows "The unit is still ft. Changing it to m recalculates its amounts
+#. from ft…", for an item converted before with packages in ft; the link goes
+#. to the guided recount.
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
 msgid ""

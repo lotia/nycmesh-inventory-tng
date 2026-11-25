@@ -823,10 +823,14 @@ def test_several_packages_labels_revoked_are_said_by_name(
 def test_the_page_after_names_only_the_items_packages(
     admin_client: TestClient, session: Session
 ) -> None:
-    """A label id in its address of another item's package, or none at
-    all, names nothing."""
+    """A label id in its address not revoked, of another item's package,
+    or none at all, names nothing."""
     cable, _, _, on_box = _retired_box(session)
     path = UNIT_RECOUNTED.format(item_id=cable.id)
+    assert "revoked" not in words_on(
+        admin_client.get(f"{path}?labels={on_box.id}").text
+    )
+    assert labels.revoke(session, on_box.id, datetime.now(UTC))
     assert "revoked" in words_on(admin_client.get(f"{path}?labels={on_box.id}").text)
     other = add(session, Item(name="Other", category_id=cable.category_id))
     elsewhere = UNIT_RECOUNTED.format(item_id=other.id)
