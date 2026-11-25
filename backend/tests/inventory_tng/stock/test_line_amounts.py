@@ -13,9 +13,10 @@ import pytest
 from sqlalchemy import exc, func, select, true
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.unit_conversion import at_scale, converted
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import Movement
-from inventory_tng.stock import counts, moments, open_packages, queries
+from inventory_tng.stock import counts, line_amounts, moments, open_packages, queries
 from inventory_tng.stock.balance import balance, by_form
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 from inventory_tng.stock.moved_out import moved_out
@@ -334,3 +335,43 @@ def test_a_count_of_nothing_where_nothing_is_held_writes_nothing(
         moments.moment(session, store),
     )
     assert not done.differed
+
+
+@pytest.mark.parametrize(("written", "now"), [("m", "ft"), ("ft", "m")])
+@pytest.mark.parametrize("amount", ["305", "6100", "1001", "0.001", "123.457"])
+def test_by_packages_reads_a_sealed_side_as_the_ledger_does(
+    session: Session, written: str, now: str, amount: str
+) -> None:
+    """by_packages(), the Python a batch sent again is compared by
+    (scan/batch.py, _more_written), says an amount of a sealed line as
+    the ledger's SQL reads it (said_in_items_unit), to the thousandth: a
+    package of 305 in the unit written in, and a drum of 1001 in the
+    other, so neither reading drifts from the other. Each line is two
+    whole packages; the amount said of it need not be."""
+    spools = Spools(session, cable_unit=written)
+    drum = add(
+        session,
+        ItemPackage(item_id=spools.cable.id, name="Drum", size=1001, unit=now),
+    )
+    for package in (spools.spool, drum):
+        sealed = Form(package_id=package.id)
+        transaction = spools.write(
+            {"kind": "receipt", "to_location_id": spools.store.id},
+            Entry(
+                spools.cable.id,
+                2 * converted(package.size, package.unit, written),
+                LOOSE,
+                sealed,
+            ),
+        )
+        assert transaction is not None
+        (movement_id,) = session.scalars(
+            select(Movement.id).where(Movement.transaction_id == transaction.id)
+        )
+        spools.cable.unit = now
+        session.flush()
+        said, _ = line_amounts.said_in_items_unit(session, movement_id, Decimal(amount))
+        spools.cable.unit = written
+        session.flush()
+        python = line_amounts.by_packages(Decimal(amount), package, written, now)
+        assert said["to"] == at_scale(python)

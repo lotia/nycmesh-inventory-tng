@@ -21,7 +21,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.amount_rules import whole_enough
-from inventory_tng.catalogue.unit_conversion import at_scale, converted, convertible
+from inventory_tng.catalogue.unit_conversion import (
+    at_scale,
+    converted,
+    converted_exactly,
+    convertible,
+)
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
@@ -701,7 +706,8 @@ def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction |
             session,
             {
                 package_id
-                for line in [*compared, *(started or [])]
+                # None needed with no started, as nothing is compared then.
+                for line in ([*compared, *started] if started is not None else [])
                 if (package_id := line.leaves.package_id or line.arrives.package_id)
             },
         )
@@ -728,7 +734,7 @@ def _more_written(
     its item's lines were written in: a line typed again since in another
     length, its item changed between lengths, converts into it as the
     ledger reads a line (stock/line_amounts.py): one in sealed `packages`
-    by how many, any other exactly."""
+    by how many, any other exactly, each form's sum rounded once."""
     if started is None:
         return {}
     # One unit for each item: a transaction is written in its items' units.
@@ -742,14 +748,17 @@ def _more_written(
                 package = packages.get(
                     line.leaves.package_id or line.arrives.package_id or 0
                 )
+                # A package a line sent again names may be another item's,
+                # or too small to be kept in its unit: then not by it.
                 quantity = (
-                    converted(quantity, unit, into)
-                    if package is None
-                    else at_scale(
-                        line_amounts.by_packages(quantity, package, unit, into)
-                    )
+                    line_amounts.by_packages(quantity, package, unit, into)
+                    if package is not None and _size_in(package, unit)
+                    else converted_exactly(quantity, unit, into)
                 )
             by[line.item_id, line.leaves, line.arrives] += quantity
+        # Each form's sum rounded once, as the ledger reads a sum.
+        for form, quantity in by.items():
+            by[form] = at_scale(quantity)
         return by
 
     sent_by, started_by = tally(sent), tally(started)

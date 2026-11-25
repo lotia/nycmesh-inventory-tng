@@ -285,6 +285,29 @@ def test_lines_of_one_item_in_the_same_forms_are_over_once_together() -> None:
     }
 
 
+def test_lines_sent_again_in_another_length_are_summed_then_rounded() -> None:
+    """Nine loose lines of 1 ft, sent again of a batch of 3.048 m written
+    in m, are 2.743 m (2.7432), as the ledger reads a sum, not nine of
+    0.305 m each rounded first: 0.305 m was taken off, not 0.303 m."""
+    written = {1: Entry(1, Decimal("3.048"), unit="m")}
+    sent = [Entry(1, Decimal(1), unit="ft")] * 9
+    assert _more_written(written, sent, list(written.values()), {}) == {
+        1: Decimal("0.305")
+    }
+
+
+def test_a_line_sent_again_naming_a_package_not_its_own_converts_exactly() -> None:
+    """A line sent again in ft naming another item's package, of each, is
+    not read by it: no KeyError, so the reply is still the 409."""
+    sealed = Form(package_id=7)
+    written = {1: Entry(1, Decimal("3.048"), sealed, sealed, "m")}
+    radios = ItemPackage(id=7, item_id=2, name="Box", size=Decimal(4), unit="each")
+    sent = [Entry(1, Decimal(5), sealed, sealed, "ft")]
+    assert _more_written(written, sent, list(written.values()), {7: radios}) == {
+        1: Decimal("1.524")
+    }
+
+
 def test_a_batch_older_than_the_one_recorded_takes_nothing_off(
     registered_client: TestClient, session: Session, place: Place, bags: ItemPackage
 ) -> None:
