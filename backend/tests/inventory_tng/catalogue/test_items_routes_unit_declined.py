@@ -415,21 +415,87 @@ def test_converted_with_no_stored_amount_or_package_in_its_unit(
     )
 
 
-def test_a_retired_item_whose_stock_moved_ends_with_no_link(
-    admin_client: TestClient, session: Session
+def _retired_declined(client: TestClient, item: Item, unit: str) -> str:
+    """The page answering No to changing the item to `unit`, from a page
+    drawn before it was retired, as a retired item's form is read only;
+    checked to link neither the recount nor its labels."""
+    answered = unit_answered(item, "no", unit=unit)
+    session = object_session(item)
+    assert session is not None
+    retire(session, item)
+    page = client.post(f"{ITEMS}/{item.id}", data=answered)
+    assert page.status_code == 400
+    note = read(page.text).one("span", id="unit-problem")
+    assert note.all("a") == []
+    return page.text
+
+
+@pytest.mark.parametrize(
+    ("unit", "into", "becomes"), [("m", "ft", "1000.656"), ("ft", "m", "301.752")]
+)
+def test_a_retired_item_whose_stock_moved_says_only_the_unit_and_example(
+    admin_client: TestClient, session: Session, unit: str, into: str, becomes: str
 ) -> None:
-    """Answered No from a page drawn before the item was retired: it may
-    not be recounted, so its note ends where it is."""
-    place = _moved(session, "m", "310", "5")
-    answered = unit_answered(place.cable, "no", unit="ft")
-    retire(session, place.cable)
-    declined = admin_client.post(f"{ITEMS}/{place.cable.id}", data=answered)
-    assert problem(declined.text, "unit") == (
-        "The unit is still m. Changing it to ft recalculates every recorded "
-        f"amount from m. The stock at {place.store.name} would change from "
-        "305 m to 1000.656 ft."
+    """It can't be changed until it is brought back, so no "recalculates"
+    sentence and no recount link: as a retired labelled item (Ali,
+    2026-11-25, inventory-tng-aknv)."""
+    held = "305" if unit == "m" else "990"
+    place = _moved(session, unit, str(Decimal(held) + 5), "5")
+    page = _retired_declined(admin_client, place.cable, into)
+    assert problem(page, "unit") == (
+        f"The unit is still {unit}. The stock at {place.store.name} would "
+        f"change from {held} {unit} to {becomes} {into}."
     )
-    assert read(declined.text).all("a", href=unit_recount(place.cable.id, "ft")) == []
+
+
+@pytest.mark.parametrize(("unit", "into"), [("m", "ft"), ("ft", "m")])
+def test_a_retired_item_whose_stock_moved_and_no_example_says_only_the_unit(
+    admin_client: TestClient, session: Session, unit: str, into: str
+) -> None:
+    """All of it installed and no amount stored: nothing to give."""
+    cable = _installed(session, unit)
+    page = _retired_declined(admin_client, cable, into)
+    assert problem(page, "unit") == f"The unit is still {unit}."
+
+
+def _converted(session: Session, unit: str) -> Item:
+    """A cable in `unit` converted before, so fixed by that alone."""
+    cable = Place(session, cable_unit=unit).cable
+    cable.unit_converted = True
+    session.flush()
+    return cable
+
+
+@pytest.mark.parametrize(
+    ("unit", "into", "stored", "amount", "example"), STORED_EXAMPLES
+)
+def test_a_retired_converted_item_says_only_the_unit_and_example(
+    admin_client: TestClient,
+    session: Session,
+    unit: str,
+    into: str,
+    stored: str,
+    amount: str,
+    example: str,
+) -> None:
+    """As a retired item whose stock moved (Ali, 2026-11-25,
+    inventory-tng-aknv)."""
+    cable = _converted(session, unit)
+    _stored(cable, stored, amount)
+    page = _retired_declined(admin_client, cable, into)
+    assert problem(page, "unit") == f"The unit is still {unit}. {example}."
+    note = read(page).one("span", id="unit-problem")
+    assert [each.text for each in note.all("strong")] == [FIELD[stored]]
+
+
+@pytest.mark.parametrize(("unit", "into"), [("m", "ft"), ("ft", "m")])
+def test_a_retired_converted_item_with_no_example_says_only_the_unit(
+    admin_client: TestClient, session: Session, unit: str, into: str
+) -> None:
+    """No amount stored: nothing to give."""
+    cable = _converted(session, unit)
+    page = _retired_declined(admin_client, cable, into)
+    assert problem(page, "unit") == f"The unit is still {unit}."
 
 
 @pytest.mark.parametrize(

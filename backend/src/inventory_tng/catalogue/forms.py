@@ -237,9 +237,10 @@ def unit_declined_problem(
     inventory-tng-y50b, inventory-tng-aknv): that it is still in `old`,
     and what a change would do, with `example`, one of its own amounts,
     if it has one (queries.unit_change_example). Only labelled (`why`),
-    until its `labels_printed` labels are revoked, unless `retired`, as a
-    retired item's labels are inactive. The way to put right a unit wrong
-    from the start follows, a link in it, unless it is retired
+    until its `labels_printed` labels are revoked. A `retired` item, which
+    can't be changed until it is brought back, says only that it is still
+    in `old`, with the example (Ali, 2026-11-25). The way to put right a
+    unit wrong from the start follows, a link in it, unless it is retired
     (catalogue/item.html). Markup, as the example's field name is bold:
     the values in it escaped."""
     values = {"old": escape(old), "new": escape(new)}
@@ -256,19 +257,21 @@ def _unit_note(
 ) -> str:
     """unit_declined_problem's words, `said` its example, if it has one,
     and `values` its units, escaped."""
-    if why == "labelled":
-        if not retired:
-            return _unit_labelled(labels_printed, said, values)
+    if retired:
         if said is None:
             # Translators: answered No to "Were the recorded amounts really in
-            # %(old)s?" for a retired item with labels printed for it.
+            # %(old)s?" for a retired item, which can't be changed until it
+            # is brought back.
             return gettext("The unit is still %(old)s.", **values)
         # Translators: as "The unit is still %(old)s.", for an item with
         # %(example)s, one of its amounts converted, as "Its Reorder at would
-        # change from 100 m to 328.084 ft".
+        # change from 100 m to 328.084 ft" or "The stock at Shelf A would
+        # change from 305 m to 1000.656 ft".
         return gettext(
             "The unit is still %(old)s. %(example)s.", example=said, **values
         )
+    if why == "labelled":
+        return _unit_labelled(labels_printed, said, values)
     if why == "moved":
         if said is None:
             # Translators: answered No to "Were the recorded amounts really in
@@ -363,8 +366,8 @@ def _example(example: UnitChangeExample, units: Mapping[str, str]) -> str:
         **units,
     }
     if example.of == "place":
-        # Translators: completes "…recalculates every recorded amount from
-        # m."; %(name)s is a place of any kind, such as a store, a shelf, a
+        # Translators: follows "…recalculates every recorded amount from
+        # m." or "The unit is still m."; %(name)s is a place of any kind, such as a store, a shelf, a
         # bin or a volunteer's home; %(amount)s %(old)s is what the records
         # hold there, %(becomes)s %(new)s that converted.
         return gettext(

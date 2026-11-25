@@ -488,7 +488,7 @@ def _item_page(
     stock moved or its amounts converted, and it links to the guided
     recount (unit_recounts), saying what it does: `unit_example`, the
     amount the note gives as an example (queries.unit_change_example), if
-    any."""
+    any. A retired item's No leaves it unset: its note links nothing."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -831,7 +831,9 @@ def _unit_declined(
     unit: str,
 ) -> Response:
     """No to "Were the recorded amounts really in m?": nothing saved, the
-    form shown again in its unit as it is, saying what to do instead."""
+    form shown again in its unit as it is, saying what to do instead; for
+    a retired item, which can't be changed until it is brought back, only
+    that the unit is unchanged, linking nothing (Ali, 2026-11-25)."""
     why = unit_changes.unit_fixed(session, item)
     printed = len(labels.current_of(session, Label.item_id == item.id))
     if (
@@ -859,7 +861,7 @@ def _unit_declined(
         item,
         problems=problems,
         values=values,
-        unit_declined=why,
+        unit_declined=None if retired else why,
         unit_declined_to=unit,
         unit_example=example,
     )

@@ -422,8 +422,9 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   only labelled, revoking its labels (Ali, 2026-11-25,
   inventory-tng-aknv). It never says "converting". The amount is stock
   at a place if stock has moved and some is held, else a stored one. A
-  retired item's note links nothing; if only labelled, it drops "Until
-  … revoked", as its labels are inactive.
+  retired item can't be changed until it is brought back, so its note
+  says only that the unit is unchanged, with the example, and links
+  nothing.
 - Once converted, an item stays fixed (`Item.unit_converted`, set on
   Yes): every later change between m and ft is asked and converts on
   Yes, any number of times, and it never becomes counted each again.
