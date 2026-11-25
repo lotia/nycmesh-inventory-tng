@@ -1,10 +1,11 @@
 """What the catalogue's pages read (categories_routes.py,
 items_routes.py, reading_rules_routes.py, the guided recount's
-unit_recounts.py, and admins/home_routes.py's counts of its tables):
+unit_recounts.py and unit_recount_routes.py, and admins/home_routes.py's
+counts of its tables):
 plain functions taking a Session, each named for what it returns
 (docs/decisions/0023)."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from decimal import Decimal
 from typing import Literal, NamedTuple
 
@@ -12,7 +13,11 @@ from sqlalchemy import ColumnElement, Row, and_, func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.unit_changes import UnitFixed
-from inventory_tng.catalogue.unit_conversion import converted_kept
+from inventory_tng.catalogue.unit_conversion import (
+    at_scale,
+    converted,
+    converted_kept,
+)
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.catalogue import (
     SMALLEST_PACKAGE_FIRST,
@@ -23,9 +28,11 @@ from inventory_tng.models.catalogue import (
     Vendor,
     VendorOffer,
 )
+from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
-from inventory_tng.stock.balance import balance
+from inventory_tng.stock.balance import balance, by_form
+from inventory_tng.stock.line_amounts import by_packages
 from inventory_tng.stock.queries import balances
 
 # Each item's category's name, for a select of items to sort by.
@@ -126,9 +133,8 @@ def unit_change_example(
         )
         if held:
             _, place, quantity = held[0]
-            return UnitChangeExample(
-                "place", quantity, converted_kept(quantity, item.unit, new), place.name
-            )
+            becomes = _place_in(session, item, place.id, new)
+            return UnitChangeExample("place", quantity, becomes, place.name)
     stored: list[tuple[ExampleOf, Decimal | None]] = [
         ("minimum", item.minimum),
         ("on_order", item.on_order),
@@ -146,6 +152,36 @@ def unit_change_example(
                 each.named,
             )
     return None
+
+
+def _place_in(session: Session, item: Item, location_id: int, new: str) -> Decimal:
+    """What the records hold of the item at a place, read in `new` as the
+    ledger would once the item is in it (stock/line_amounts.py): each
+    form's sum, sealed packages by how many, the rest exactly, rounded,
+    as stock/balance.py keeps a place's total."""
+    forms = session.execute(
+        select(
+            by_form.c.package_id, by_form.c.open_package_id, by_form.c.quantity
+        ).where(by_form.c.item_id == item.id, by_form.c.location_id == location_id)
+    ).all()
+    sealed = {row.package_id for row in forms if row.open_package_id is None}
+    packages = {
+        package.id: package
+        for package in session.scalars(
+            select(ItemPackage).where(ItemPackage.id.in_(sealed - {None}))
+        )
+    }
+    return sum(
+        (
+            at_scale(
+                by_packages(quantity, packages[package_id], item.unit, new)
+                if package_id in packages and open_id is None
+                else converted(quantity, item.unit, new)
+            )
+            for package_id, open_id, quantity in forms
+        ),
+        Decimal(0),
+    )
 
 
 class Offer(NamedTuple):
@@ -173,3 +209,28 @@ def current_offers(session: Session, item_id: int) -> list[Offer]:
             .order_by(VendorOffer.id)
         )
     ]
+
+
+def revoked_packages(
+    session: Session, item_id: int, label_ids: Collection[int]
+) -> list[ItemPackage]:
+    """The item's packages of these labels, those revoked, as a guided
+    recount revoked them (catalogue/unit_recounts.py): current ones
+    first, then retired ones, which print again only once brought back,
+    each by name."""
+    of_labels = select(Label.package_id).where(
+        Label.id.in_(label_ids),
+        Label.item_id == item_id,
+        Label.revoked_at.is_not(None),
+    )
+    return list(
+        session.scalars(
+            select(ItemPackage)
+            .where(ItemPackage.item_id == item_id, ItemPackage.id.in_(of_labels))
+            .order_by(
+                ItemPackage.retired_at.is_not(None),
+                func.lower(ItemPackage.name),
+                ItemPackage.id,
+            )
+        )
+    )

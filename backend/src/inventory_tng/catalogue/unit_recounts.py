@@ -49,7 +49,7 @@ it gives a new size, retired ones' too, which print the old one
 (inventory-tng-l26i)."""
 
 import uuid
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import NamedTuple
@@ -370,34 +370,10 @@ def recount(
 class Recounted(NamedTuple):
     """What is left to do after a recount: count the item again at the
     places it brought to zero, by id, and print again the labels it
-    revoked, by id (revoked_packages names their packages)."""
+    revoked, by id (queries.revoked_packages names their packages)."""
 
     places: list[int]
     revoked: list[int]
-
-
-def revoked_packages(
-    session: Session, item_id: int, label_ids: Collection[int]
-) -> list[ItemPackage]:
-    """The item's packages of these labels, those revoked, as a recount
-    revoked them: current ones first, then retired ones, which print
-    again only once brought back, each by name."""
-    of_labels = select(Label.package_id).where(
-        Label.id.in_(label_ids),
-        Label.item_id == item_id,
-        Label.revoked_at.is_not(None),
-    )
-    return list(
-        session.scalars(
-            select(ItemPackage)
-            .where(ItemPackage.item_id == item_id, ItemPackage.id.in_(of_labels))
-            .order_by(
-                ItemPackage.retired_at.is_not(None),
-                func.lower(ItemPackage.name),
-                ItemPackage.id,
-            )
-        )
-    )
 
 
 def _places_of(session: Session, item_id: int) -> set[int]:

@@ -499,7 +499,10 @@ other unit, and retiring the item for a new one.
 - The item keeps its last ledger transaction then
   (`Item.unit_recounted_after`). What left a place since a count form
   was first shown leaves out the lines up to it, and so must use summed
-  over a time window, as they are in no unit to add to.
+  over a time window, as they are in no unit to add to. A batch sent
+  again after the recount raises no check of a line up to it: the
+  recount wrote it all off, and correcting one would write it back
+  (2026-11-25, batch-wide review of inventory-tng-v00h).
 - It revokes no labels, for the reason Yes revokes none (previous
   amendment); a retired package's label stops scanning anyway (Ali,
   2026-11-25, replacing his decision earlier that day that it revokes

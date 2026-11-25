@@ -29,6 +29,7 @@ from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.phrases import lazy_gettext
+from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import (
     LedgerTransaction,
     Movement,
@@ -91,7 +92,9 @@ WAITING = OverRecorded.settled_at.is_(None)
 def raise_checks(session: Session, over: Mapping[int, Decimal]) -> None:
     """Keep, for each movement, how much more of it was recorded than moved,
     in the unit it was recorded in: a new check, or one waiting told the
-    newest amount; one settled stays settled. The caller commits."""
+    newest amount; one settled stays settled. None of a line up to its
+    item's guided recount (_since_recounts). The caller commits."""
+    over = _since_recounts(session, over)
     if not over:
         return
     units = values_by(session, Movement.id, Movement.unit, over)
@@ -113,6 +116,39 @@ def raise_checks(session: Session, over: Mapping[int, Decimal]) -> None:
         )
     if changed:
         once_committed(session, raised_counter.add, len(changed))
+
+
+def _since_recounts(
+    session: Session, over: Mapping[int, Decimal]
+) -> Mapping[int, Decimal]:
+    """`over` but for the movements up to their item's guided recount
+    (Item.unit_recounted_after): in a unit wrong from the start, all of
+    it written off by the recount, so nothing is left to correct, and a
+    correction would write it back. Their items held FOR KEY SHARE, by
+    id, which a recount holding one FOR UPDATE makes wait, so its mark
+    is read as committed; one raised first makes the recount refused, as
+    a check waits."""
+    if not over:
+        return over
+    rows = session.execute(
+        locked(
+            select(Movement.id, Movement.transaction_id, Item.unit_recounted_after)
+            .join(Item, Item.id == Movement.item_id)
+            .where(Movement.id.in_(over))
+            .order_by(Item.id, Movement.id),
+            key_share=True,
+            shared=True,
+            of=Item,
+        )
+    ).all()
+    kept = {
+        movement_id: over[movement_id]
+        for movement_id, transaction_id, recounted_after in rows
+        if recounted_after is None or transaction_id > recounted_after
+    }
+    if dropped := sorted(over.keys() - kept.keys()):
+        log.info("over recorded not raised: recounted since", movement_ids=dropped)
+    return kept
 
 
 def _measure_settled(
@@ -418,8 +454,8 @@ def _said_now(
     inventory-tng-77eu). The item held first, as the ledger holds it after
     the check's places, so a change of its unit between lengths
     (catalogue/items.py), which holds it FOR UPDATE, has committed or
-    waits. A check raised while that change ran, after it looked for
-    checks waiting, so converts here too."""
+    waits. A check raised while that change ran waited for it
+    (_since_recounts), so converts here too."""
     ledger.hold_across(session, item_ids=[movement.item_id])
     amounts, unit = line_amounts.said_in_items_unit(session, movement.id, amount)
     if unit != movement.unit:

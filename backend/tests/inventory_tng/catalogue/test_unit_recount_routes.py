@@ -105,7 +105,7 @@ def test_the_page_says_beforehand_all_it_will_do(
     page = _page(admin_client, cable.id)
     said = words_on(page.text)
     assert f"Recount {cable.name} in ft" in said
-    assert "was never really in m: nothing is converted" in said
+    assert "was never really in m: nothing is recalculated" in said
     assert table_rows(page.text) == [
         [spools.store.name, "610 m"],
         [spools.van.name, "-5 m"],

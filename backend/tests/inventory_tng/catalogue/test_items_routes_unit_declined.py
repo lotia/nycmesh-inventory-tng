@@ -5,10 +5,12 @@ put right a unit wrong from the start (Ali, 2026-11-25,
 inventory-tng-aknv). Converting itself is
 test_items_routes_unit_conversion.py's."""
 
+import uuid
 from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import ColumnElement
 from sqlalchemy.orm import Session, object_session
 
 from inventory_tng.catalogue import unit_changes
@@ -20,7 +22,7 @@ from inventory_tng.models.catalogue import Item, ItemPackage, Vendor, VendorOffe
 from helpers.items import unit_answered
 from helpers.markup import problem, read
 from helpers.rows import add
-from helpers.stock import Place, converted_reel, received, retire, write
+from helpers.stock import Place, Spools, converted_reel, received, retire, write
 
 
 def _declined(client: TestClient, item: Item, unit: str) -> str:
@@ -183,6 +185,30 @@ def _installed(session: Session, unit: str = "m") -> Item:
     return cable
 
 
+def test_a_label_revoked_while_the_note_is_drawn_changes_no_count(
+    admin_client: TestClient, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Its one label revoked after the note counted it, as a request at
+    once can, before the page is drawn: the page links to revoke the
+    label the note counted, never "revoke its 0 labels"."""
+    cable = Place(session).cable
+    _labelled(session, cable, 1)
+    reads = []
+    current_of = labels.current_of
+
+    def revoked_after_the_first(
+        session: Session, names: ColumnElement[bool]
+    ) -> list[labels.Named]:
+        reads.append(names)
+        return current_of(session, names) if len(reads) == 1 else []
+
+    monkeypatch.setattr(labels, "current_of", revoked_after_the_first)
+    page = _declined(admin_client, cable, "ft")
+    assert [a.text for a in read(page).all("a") if "revoke its" in a.text] == [
+        "revoke its label"
+    ]
+
+
 @pytest.mark.parametrize(
     ("unit", "into", "stored", "amount", "example"), STORED_EXAMPLES
 )
@@ -243,6 +269,21 @@ def test_stock_moved_gives_a_place_holding_some_not_one_short(
         f"amount from m. The stock at {place.van.name} would change from 5 m "
         "to 16.404 ft. "
         "If the 5 was really ft,"
+    )
+
+
+def test_stock_in_sealed_packages_changes_by_how_many(
+    admin_client: TestClient, session: Session
+) -> None:
+    """20 sealed spools of 305 m become 20 of 1000.656 ft, as the ledger
+    reads a sealed side once the item is in ft: 20013.12 ft, not the
+    20013.123 ft of 6100 m converted exactly."""
+    spools = Spools(session)
+    spools.receive(uuid.uuid4(), spools=18)
+    page = _declined(admin_client, spools.cable, "ft")
+    assert (
+        f"The stock at {spools.store.name} would change from 6100 m to "
+        "20013.12 ft." in problem(page, "unit")
     )
 
 

@@ -475,6 +475,7 @@ def _item_page(
     unit_declined: unit_changes.UnitFixed | None = None,
     unit_declined_to: str | None = None,
     unit_example: queries.UnitChangeExample | None = None,
+    printed: Sequence[labels.Named] | None = None,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
     `asking_unit`, the form sent back asks whether what was recorded was
@@ -488,7 +489,9 @@ def _item_page(
     stock moved or its amounts converted, and it links to the guided
     recount (unit_recounts), saying what it does: `unit_example`, the
     amount the note gives as an example (queries.unit_change_example), if
-    any. A retired item's No leaves it unset: its note links nothing."""
+    any. A retired item's No leaves it unset: its note links nothing.
+    `printed`, the item's labels not revoked as the note counted them,
+    so the page says the same count; read here if not given."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -499,7 +502,8 @@ def _item_page(
     short_fraction = _short_fraction(session, item, problems, values)
     fixed = unit_changes.unit_fixed(session, item)
     # Not revoked, its own and its packages': how many each hint says.
-    printed = labels.current_of(session, Label.item_id == item.id)
+    if printed is None:
+        printed = labels.current_of(session, Label.item_id == item.id)
     by_package = Counter(each.label.package_id for each in printed)
     # Labels revoked between the reads fix nothing: no hint says "0 labels".
     if fixed == "labelled" and not printed:
@@ -835,7 +839,9 @@ def _unit_declined(
     a retired item, which can't be changed until it is brought back, only
     that the unit is unchanged, linking nothing (Ali, 2026-11-25)."""
     why = unit_changes.unit_fixed(session, item)
-    printed = len(labels.current_of(session, Label.item_id == item.id))
+    # Read once: a label revoked meanwhile never makes the page's count
+    # differ from the note's.
+    printed = labels.current_of(session, Label.item_id == item.id)
     if (
         why is None
         or not convertible(item.unit, unit)
@@ -851,7 +857,7 @@ def _unit_declined(
     retired = item.retired_at is not None
     problems = {
         "unit": forms.unit_declined_problem(
-            item.unit, unit, why, example, printed, retired
+            item.unit, unit, why, example, len(printed), retired
         )
     }
     return _item_page(
@@ -864,6 +870,7 @@ def _unit_declined(
         unit_declined=None if retired else why,
         unit_declined_to=unit,
         unit_example=example,
+        printed=printed,
     )
 
 

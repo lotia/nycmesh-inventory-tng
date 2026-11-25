@@ -1717,7 +1717,7 @@ msgstr ""
 #, python-format
 msgid ""
 "For when what was recorded of %(item)s was never really in %(old)s: "
-"nothing is converted. In one change, which can't be undone, it:"
+"nothing is recalculated. In one change, which can't be undone, it:"
 msgstr ""
 
 #: src/inventory_tng/admins/reset_routes.py
@@ -4343,10 +4343,10 @@ msgid "The site's (%(zone)s)"
 msgstr ""
 
 #. Translators: follows "…recalculates every recorded amount from
-#. m." or "The unit is still m."; %(name)s is a place of any kind, such as a
-#. store, a shelf, a
-#. bin or a volunteer's home; %(amount)s %(old)s is what the records
-#. hold there, %(becomes)s %(new)s that converted.
+#. m." or "The unit is still m."; %(name)s is a place of any kind,
+#. such as a store, a shelf, a bin or a volunteer's home; %(amount)s
+#. %(old)s is what the records hold there, %(becomes)s %(new)s that
+#. converted.
 #: src/inventory_tng/catalogue/forms.py
 #, python-format
 msgid ""

@@ -308,6 +308,19 @@ def test_a_line_sent_again_naming_a_package_not_its_own_converts_exactly() -> No
     }
 
 
+def test_a_line_sent_again_naming_another_items_length_converts_exactly() -> None:
+    """A line sent again in ft naming another item's package in m, of
+    0.001 m (0.003 ft kept), is not read by it, which would make 5 ft
+    5 / 0.003 * 0.001 m: 5 ft is 1.524 m exactly, so 1.524 m is over."""
+    sealed = Form(package_id=7)
+    written = {1: Entry(1, Decimal("3.048"), sealed, sealed, "m")}
+    tiny = ItemPackage(id=7, item_id=2, name="Bit", size=Decimal("0.001"), unit="m")
+    sent = [Entry(1, Decimal(5), sealed, sealed, "ft")]
+    assert _more_written(written, sent, list(written.values()), {7: tiny}) == {
+        1: Decimal("1.524")
+    }
+
+
 def test_a_batch_older_than_the_one_recorded_takes_nothing_off(
     registered_client: TestClient, session: Session, place: Place, bags: ItemPackage
 ) -> None:

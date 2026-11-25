@@ -1307,6 +1307,35 @@ def test_a_save_while_a_unit_is_recounted_waits_then_is_refused(
     assert either_first(own_committed, recounting, receipt, swapped=swapped) == refused
 
 
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused", "raised"),
+    [(False, None, 0), (True, "item_unit_checks_waiting", 1)],
+)
+def test_a_check_raised_while_a_unit_is_recounted(
+    own_committed: Committed, swapped: bool, refused: str | None, raised: int
+) -> None:
+    """A batch sent again raising a check of the receipt before the
+    recount holds the cable FOR KEY SHARE, which the recount's FOR UPDATE
+    waits for: raised second, it waits, then reads the recount's mark and
+    raises none, as the recount wrote the receipt off; raised first, the
+    recount waits, then is refused as a check waits. Never a check left
+    to write back what the recount wrote off."""
+    place, seen, admin_id = _shown_for_recount(own_committed)
+    reader = own_committed.session()
+    movement_id = reader.scalars(
+        select(Movement.id).where(Movement.item_id == place.cable.id)
+    ).one()
+
+    def raising(session: Session) -> None:
+        over_recorded.raise_checks(session, {movement_id: Decimal("0.5")})
+
+    recounting = _recounting(place, seen, admin_id)
+    assert either_first(own_committed, recounting, raising, swapped=swapped) == refused
+    reader.rollback()
+    assert len(reader.scalars(select(OverRecorded)).all()) == raised
+
+
 def _shown_converted(committed: Committed) -> tuple[Place, int, Write]:
     """A cable converted to ft, no stock moved, its Reel in ft
     (converted_reel), all committed; its Reel's id, and its recount into
@@ -1462,15 +1491,15 @@ def test_a_length_reported_while_a_unit_is_converted_is_converted(
 
 
 @pytest.mark.concurrency
-def test_a_check_raised_while_a_unit_is_converted_is_corrected_in_the_new_unit(
+def test_a_check_raised_while_a_unit_is_converted_waits_then_is_corrected(
     own_committed: Committed,
 ) -> None:
     """A change to ft holds the cable FOR UPDATE, then looks for checks
-    waiting, taking no lock. A check of 3 m raised after that does not
-    hold the cable, so commits, and the change, not seeing it, converts.
-    Correct holds the cable FOR KEY SHARE before it reads its unit
-    (over_recorded._said_now), so waits for the change, then writes
-    3 m as 9.843 ft, never refused as shown in m (inventory-tng-4fjq)."""
+    waiting. A check of 3 m raised meanwhile holds the cable FOR KEY
+    SHARE (over_recorded._since_recounts), so waits for the change, then
+    is raised in m, the line's unit. Correct reads the cable's unit now
+    (over_recorded._said_now) and writes 3 m as 9.843 ft, never refused
+    as shown in m (inventory-tng-4fjq)."""
     setup = own_committed.session()
     place = Place(setup)
     cable = place.cable
@@ -1488,15 +1517,16 @@ def test_a_check_raised_while_a_unit_is_converted_is_corrected_in_the_new_unit(
     held = changing.get_one(Item, cable.id)
     items.save(changing, held, item_fields(held, unit="ft"), seen=None, recorded_in="m")
     changing.flush()
-    check = raise_check(raising, moved, Decimal(3))
-    raising.commit()
-    seen = over_recorded.seen(check)
     worker = own_committed.blocked(
-        correcting, lambda: correct_check(correcting, check, seen, admin_id)
+        raising, lambda: raise_check(raising, moved, Decimal(3))
     )
     changing.commit()
     assert worker.finished().error is None
-    assert worker.result == "corrected"
+    check = cast(OverRecorded, worker.result)
+    raising.commit()
+    assert check.unit == "m"
+    seen = over_recorded.seen(check)
+    assert correct_check(correcting, check, seen, admin_id) == "corrected"
     correcting.commit()
     lines = own_committed.session().execute(
         select(Movement.quantity, Movement.unit)

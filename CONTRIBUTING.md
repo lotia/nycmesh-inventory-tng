@@ -298,15 +298,16 @@ names (`db_protection.protection`, below), such as `catalogue/items.py` for
 items and their packages; saving an item whose unit changes hands what
 that does to its packages, vendor offers and open packages to
 `catalogue/unit_changes.py`, and the guided recount of a unit wrong from
-the start is `catalogue/unit_recounts.py`. Admin pages and the seed call those modules'
-functions, one per kind of change, which take the catalogue lock, lock and
-read what the rules need, and refuse a change that breaks one by raising
-`db_errors.RuleBroken` with the rule's name. `db_errors.attempt` returns
-that name, and `web/forms.py`'s `RULES` says it in words. A page reads rows
-with `session.get` and leaves locking to those functions. The ledger is
-written only by `ledger.insert_transaction`, which saves, counts and
-adjustments all call, and which checks its rules the same way. A rule about
-one row's own values is a check constraint, or, where PostgreSQL cannot
+the start is `catalogue/unit_recounts.py`. Admin pages and the seed call
+those modules' functions, one per kind of change, which take the
+catalogue lock, lock and read what the rules need, and refuse a change
+that breaks one by raising `db_errors.RuleBroken` with the rule's name.
+`db_errors.attempt` returns that name, and `web/forms.py`'s `RULES` says
+it in words. A page reads rows with `session.get` and leaves locking to
+those functions. The ledger is written only by
+`ledger.insert_transaction`, which saves, counts and adjustments all
+call, and which checks its rules the same way. A rule about one row's
+own values is a check constraint, or, where PostgreSQL cannot
 check it, the model's own `@validates`, as `SiteSettings` checks the site's
 time zone.
 

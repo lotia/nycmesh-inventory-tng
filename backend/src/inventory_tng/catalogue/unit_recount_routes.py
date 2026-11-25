@@ -191,7 +191,7 @@ def recounted(
         for each in places_with_ids(session, _ids_in(places))
         if not each.retired_at
     ]
-    revoked = unit_recounts.revoked_packages(session, item_id, _ids_in(labels))
+    revoked = queries.revoked_packages(session, item_id, _ids_in(labels))
     item_path = f"{ITEMS}/{item_id}"
     return admin_page(
         request,

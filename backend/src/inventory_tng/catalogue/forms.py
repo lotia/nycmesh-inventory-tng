@@ -367,9 +367,10 @@ def _example(example: UnitChangeExample, units: Mapping[str, str]) -> str:
     }
     if example.of == "place":
         # Translators: follows "…recalculates every recorded amount from
-        # m." or "The unit is still m."; %(name)s is a place of any kind, such as a store, a shelf, a
-        # bin or a volunteer's home; %(amount)s %(old)s is what the records
-        # hold there, %(becomes)s %(new)s that converted.
+        # m." or "The unit is still m."; %(name)s is a place of any kind,
+        # such as a store, a shelf, a bin or a volunteer's home; %(amount)s
+        # %(old)s is what the records hold there, %(becomes)s %(new)s that
+        # converted.
         return gettext(
             "The stock at %(name)s would change from %(amount)s %(old)s to "
             "%(becomes)s %(new)s",

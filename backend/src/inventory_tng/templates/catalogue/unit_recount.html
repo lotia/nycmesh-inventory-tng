@@ -4,7 +4,7 @@
 (catalogue/unit_recounts.py): all it does, said before it is done, and the
 amounts to give again in the new unit (Ali, 2026-11-25). -#}
 {% block main %}
-<p>{% trans item=item.name_shown, old=item.unit, new=unit %}For when what was recorded of {{ item }} was never really in {{ old }}: nothing is converted. In one change, which can't be undone, it:{% endtrans %}</p>
+<p>{% trans item=item.name_shown, old=item.unit, new=unit %}For when what was recorded of {{ item }} was never really in {{ old }}: nothing is recalculated. In one change, which can't be undone, it:{% endtrans %}</p>
 <ol>
   {#- Left out for an item converted before, whose stock never moved
   (Ali, 2026-11-25). #}

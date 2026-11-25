@@ -753,7 +753,9 @@ def _more_written(
                 # or too small to be kept in its unit: then not by it.
                 quantity = (
                     line_amounts.by_packages(quantity, package, unit, into)
-                    if package is not None and _size_in(package, unit)
+                    if package is not None
+                    and package.item_id == line.item_id
+                    and _size_in(package, unit)
                     else converted(quantity, unit, into)
                 )
             by[line.item_id, line.leaves, line.arrives] += quantity

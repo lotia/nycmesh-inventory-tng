@@ -161,7 +161,8 @@ def convert(
         _refused(item.id, why, UNIT_FIXED_RULES[why])
     # Refused before it is asked: a line recorded with more than was
     # moved, waiting, is shown in the line's unit. One raised while this
-    # runs is converted as it is corrected (stock/over_recorded.py).
+    # runs waits for it, holding the item, and is converted as it is
+    # corrected (stock/over_recorded.py).
     if checks_waiting(session, item.id):
         _refused(item.id, "checks_waiting", UNIT_CHECKS_WAITING)
     if recorded_in != item.unit:
