@@ -71,9 +71,6 @@ def _page(
             "item": item,
             "unit": unit,
             "plan": plan,
-            # Converted before, its stock never moved: nothing to count, and
-            # its packages kept, given new sizes (unit_recounts.planned).
-            "converted": unit_changes.unit_fixed(session, item) == "converted",
             "key": uuid.uuid4(),
             "on_order": forms.ON_ORDER,
             "per_order": forms.PER_ORDER,
@@ -189,7 +186,7 @@ def recounted(
             "title": recounted_title(found.name_shown, found.unit),
             "back_link": (item_path, found.name_shown),
             "item": found,
-            # Its packages kept, given new sizes: none to add (_page).
+            # Its packages kept, given new sizes: none to add (Planned.converted).
             "converted": unit_changes.unit_fixed(session, found) == "converted",
             "places": sorted(
                 current,

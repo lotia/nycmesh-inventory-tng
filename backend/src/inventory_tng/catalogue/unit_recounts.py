@@ -130,15 +130,17 @@ class Renamed(NamedTuple):
 class Planned(NamedTuple):
     """What a recount of the item, as it is now, does: the places it
     brings to zero, the open packages it closes, its packages in its unit
-    and the name each is given as retired, or, converted before, those it
-    asks the size of again and their labels it revokes, by id; the vendor
-    offers it asks for again; whether a line of it recorded with more
-    than was moved waits, which refuses it; and `seen`, all that as one
-    string, which a recount sent from a page showing it compares."""
+    and the name each is given as retired, or, `converted` before with no
+    stock moved, those it asks the size of again and their labels it
+    revokes, by id; the vendor offers it asks for again; whether a line of
+    it recorded with more than was moved waits, which refuses it; and
+    `seen`, all that as one string, which a recount sent from a page
+    showing it compares."""
 
     held: list[Held]
     opened: list[OpenPackage]
     packages: list[Renamed]
+    converted: bool
     resized: list[ItemPackage]
     revoking: list[int]
     offers: list[Offer]
@@ -201,11 +203,11 @@ def planned(session: Session, item: Item) -> Planned:
             .order_by(ItemPackage.id)
         )
     )
-    in_unit = [package for package in every if package.unit == item.unit]
     # Converted before, no stock moved: asked again, not retired.
     converted = unit_changes.unit_fixed(session, item) == "converted"
-    renamed = _renamed(session, [] if converted else in_unit, every, item.unit)
-    resized = _current(in_unit) if converted else []
+    old = [] if converted else [each for each in every if each.unit == item.unit]
+    renamed = _renamed(session, old, every, item.unit)
+    resized = _asked_again(every, item.unit) if converted else []
     revoking = _labels_of(session, [package.id for package in resized])
     offers = offers_of(session, item.id)
     waiting = unit_changes.checks_waiting(session, item.id)
@@ -223,7 +225,9 @@ def planned(session: Session, item: Item) -> Planned:
             _ids(revoking),
         ]
     )
-    return Planned(held, opened, renamed, resized, revoking, offers, waiting, seen)
+    return Planned(
+        held, opened, renamed, converted, resized, revoking, offers, waiting, seen
+    )
 
 
 def resized_of(session: Session, item: Item) -> list[ItemPackage]:
@@ -233,14 +237,14 @@ def resized_of(session: Session, item: Item) -> list[ItemPackage]:
     retires those instead."""
     if unit_changes.unit_fixed(session, item) != "converted":
         return []
-    in_unit = select(ItemPackage).where(
-        ItemPackage.item_id == item.id, ItemPackage.unit == item.unit
-    )
-    return _current(session.scalars(in_unit.order_by(ItemPackage.id)))
+    every = select(ItemPackage).where(ItemPackage.item_id == item.id)
+    return _asked_again(session.scalars(every.order_by(ItemPackage.id)), item.unit)
 
 
-def _current(packages: Iterable[ItemPackage]) -> list[ItemPackage]:
-    return [package for package in packages if package.retired_at is None]
+def _asked_again(packages: Iterable[ItemPackage], unit: str) -> list[ItemPackage]:
+    """Those of an item's packages whose size a recount asks again: the
+    current ones in its `unit`."""
+    return [each for each in packages if each.unit == unit and each.retired_at is None]
 
 
 def _labels_of(session: Session, package_ids: Sequence[int]) -> list[int]:
@@ -431,15 +435,7 @@ def _recounted(
     for package in session.scalars(locked(retiring.order_by(ItemPackage.id))):
         package.name = names[package.id]
         package.retired_at = package.retired_at or at
-    resizing = select(ItemPackage).where(
-        ItemPackage.id.in_([package.id for package in plan.resized])
-    )
-    for package in session.scalars(locked(resizing.order_by(ItemPackage.id))):
-        package.size, package.short_below = amounts.sizes[package.id]
-        package.unit = unit
-    # Each prints its package's size as it was (labels.package_label).
-    for label_id in plan.revoking:
-        labels.revoke(session, label_id, at)
+    _resize(session, plan, amounts.sizes, unit, at)
     offers = select(VendorOffer).where(
         VendorOffer.id.in_([each.offer.id for each in plan.offers])
     )
@@ -466,6 +462,26 @@ def _recounted(
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
     return Recounted(places, len(plan.revoking))
+
+
+def _resize(
+    session: Session,
+    plan: Planned,
+    sizes: Mapping[int, Sized],
+    unit: str,
+    at: datetime,
+) -> None:
+    """The packages the recount asks the size of again given `sizes` in
+    `unit`, and their labels revoked, as each prints its package's size as
+    it was (labels.package_label)."""
+    resizing = select(ItemPackage).where(
+        ItemPackage.id.in_([package.id for package in plan.resized])
+    )
+    for package in session.scalars(locked(resizing.order_by(ItemPackage.id))):
+        package.size, package.short_below = sizes[package.id]
+        package.unit = unit
+    for label_id in plan.revoking:
+        labels.revoke(session, label_id, at)
 
 
 def _write_off(

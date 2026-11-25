@@ -302,10 +302,9 @@ def _resized(
     short = quantity(form.get(short_box, ""), positive=True, separator=separator)
     if isinstance(size, str):
         problems[size_box] = size
-    if isinstance(short, str):
-        problems[short_box] = short
-    elif isinstance(size, Decimal) and short is not None and short >= size:
-        problems[short_box] = SHORTER_THAN_WHOLE
+    read_size = size if isinstance(size, Decimal) else None
+    if (problem := _short_problem(short, read_size)) is not None:
+        problems[short_box] = problem
     if not isinstance(size, Decimal) or isinstance(short, str):
         return None
     return unit_recounts.Sized(size, short)
@@ -532,13 +531,21 @@ def package_settings_fields(
         short = quantity(short_below, positive=True, unit=unit, separator=separator)
     minimum = whole(minimum_sealed, 0, INTEGER_MAX) if minimum_sealed.strip() else None
     problems = {}
-    if isinstance(short, str):
-        problems["short_below"] = short
-    elif short is not None and short >= package.size:
-        problems["short_below"] = SHORTER_THAN_WHOLE
+    if (problem := _short_problem(short, package.size)) is not None:
+        problems["short_below"] = problem
     if minimum_sealed.strip() and minimum is None:
         problems["minimum_sealed"] = WHOLE_PACKAGES
     return (None if isinstance(short, str) else short), minimum, problems
+
+
+def _short_problem(short: Decimal | str | None, size: Decimal | None) -> Words | None:
+    """What is wrong with a too-short-to-use length as read (quantity), if
+    anything: unreadable, or not shorter than a whole `size`, if known."""
+    if isinstance(short, str):
+        return short
+    if short is not None and size is not None and short >= size:
+        return SHORTER_THAN_WHOLE
+    return None
 
 
 def alias_problem(

@@ -134,9 +134,8 @@ def follow(session: Session, item_id: int, unit: str) -> None:
     """An item's packages and vendor offers, retired ones too, recorded in
     its new unit, their amounts as they were: its unit may change, so no
     stock has moved in it, nothing it records was converted and no label
-    fixes it (unit_fixed), and what was
-    typed was meant in the unit chosen (Ali, 2026-11-23,
-    inventory-tng-rpud)."""
+    fixes it (unit_fixed), and what was typed was meant in the unit chosen
+    (Ali, 2026-11-23, inventory-tng-rpud)."""
     for model in (ItemPackage, VendorOffer):
         query = select(model).where(model.item_id == item_id).order_by(model.id)
         for row in session.scalars(locked(query)):
