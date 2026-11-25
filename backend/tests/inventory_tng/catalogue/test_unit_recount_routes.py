@@ -4,7 +4,9 @@ zero in the old unit, its open packages closed, its packages in the old
 unit retired and renamed, its unit switched, and Reorder at, what is on
 order and its vendor offers given again in the new unit; then a count at
 each place. Nothing converts, and no label is revoked (Ali, 2026-11-25,
-inventory-tng-8ema)."""
+inventory-tng-8ema). An item converted before whose stock never moved is
+given its packages' sizes in its old unit again instead, their labels
+revoked (Ali, 2026-11-25, inventory-tng-l26i)."""
 
 import uuid
 from collections.abc import Callable
@@ -43,6 +45,7 @@ from helpers.sign_in import new_admin_id
 from helpers.stock import (
     Place,
     Spools,
+    converted_reel,
     counts_written,
     held_by_form,
     raise_check,
@@ -475,3 +478,164 @@ def test_one_no_longer_to_be_recounted_once_held_goes_to_its_page(
     refused = admin_client.post(unit_recount(spools.cable.id, "ft"), data=_sent(page))
     assert refused.headers["location"] == f"{ITEMS}/{spools.cable.id}"
     assert spools.cable.unit == "m"
+
+
+def _converted(session: Session) -> tuple[Item, ItemPackage, ItemPackage, Label]:
+    """The cable converted to ft with no stock moved (converted_reel), its
+    Reel, its Spool still in m, and each labelled, the cable too: the Reel's
+    label, the one a recount into m revokes."""
+    place, spool, reel = converted_reel(session)
+    cable = place.cable
+    for package_id in (None, spool.id):
+        assert labels.make_for_item(session, cable.id, package_id) is not None
+    on_reel = labels.make_for_item(session, cable.id, reel.id)
+    assert on_reel is not None
+    return cable, spool, reel, on_reel
+
+
+def test_a_converted_item_is_recounted_by_its_amounts_and_package_sizes(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Converted to ft, no stock moved, and wrong: its Reel, typed in ft,
+    is given its size again in m and keeps its name, its label revoked as
+    it prints 1000 ft; the Spool, in m already, is not asked, and its
+    label and the cable's stay; nothing is written off, retired or
+    converted (Ali, 2026-11-25, inventory-tng-l26i)."""
+    cable, spool, reel, on_reel = _converted(session)
+    offer = add(session, VendorOffer(item_id=cable.id, url="https://example.org"))
+    offer.units_per_order = Decimal(1000)
+    cable.on_order = Decimal(2000)
+    session.flush()
+    kept = [
+        each.label
+        for each in labels.current_of(session, Label.item_id == cable.id)
+        if each.label.id != on_reel.id
+    ]
+    page = _page(admin_client, cable.id, "m")
+    said = words_on(page.text)
+    assert "writes off nothing" in said
+    assert "becomes" not in said
+    assert (
+        "gives the size of each of its packages in ft again, below, in m, each "
+        "keeping its name and links; revokes their printed label, as it shows "
+        "the size as it was;"
+    ) in said
+    fieldset = read(page.text).one("fieldset")
+    assert fieldset.one("legend").text == "Reel"
+    assert "Holds in m; was 1000 ft" in words_on(fieldset)
+    assert box_values(page.text, f"size_{reel.id}") == ["1000"]
+    assert box_values(page.text, f"short_below_{reel.id}") == ["10"]
+    assert box_values(page.text, f"size_{spool.id}") == []
+    with capture_logs() as logs:
+        done = admin_client.post(
+            unit_recount(cable.id, "m"),
+            data=_sent(
+                page,
+                **{
+                    f"size_{reel.id}": "300",
+                    f"short_below_{reel.id}": "3",
+                    f"per_order_{offer.id}": "305",
+                    "on_order": "610",
+                },
+            ),
+        )
+    assert done.status_code == 303
+    session.expire_all()
+    assert (cable.unit, cable.on_order, cable.unit_converted) == ("m", 610, True)
+    assert (offer.units_per_order, offer.unit) == (305, "m")
+    assert (reel.name, reel.size, reel.short_below, reel.unit) == (
+        "Reel",
+        300,
+        3,
+        "m",
+    )
+    assert (spool.size, spool.unit, spool.retired_at) == (305, "m", None)
+    assert reel.retired_at is None
+    assert on_reel.revoked_at is not None
+    assert [each.revoked_at for each in kept] == [None, None]
+    assert counts_written(session) == []
+    (logged,) = [each for each in logs if each["event"] == "item unit recounted"]
+    assert (logged["resized_package_ids"], logged["label_ids"]) == (
+        [reel.id],
+        [on_reel.id],
+    )
+    after = read(admin_client.get(done.headers["location"]).text)
+    assert "nothing to count" in words_on(after)
+    assert "Its package's printed label was revoked: print a new one." in words_on(
+        after
+    )
+    after.one("a", "print a new one", href=f"{ITEMS}/{cable.id}#labels")
+
+
+def test_a_converted_item_with_no_labels_revokes_none(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Nothing said of labels before or after."""
+    place, _, reel = converted_reel(session)
+    page = _page(admin_client, place.cable.id, "m")
+    assert "revoke" not in words_on(page.text)
+    done = admin_client.post(
+        unit_recount(place.cable.id, "m"),
+        data=_sent(page, **{f"size_{reel.id}": "300"}),
+    )
+    assert done.status_code == 303
+    assert "labels=" not in done.headers["location"]
+    after = admin_client.get(done.headers["location"])
+    assert "revoked" not in words_on(after.text)
+
+
+def test_a_converted_items_package_sizes_are_checked(
+    admin_client: TestClient, session: Session
+) -> None:
+    place, _, reel = converted_reel(session)
+    page = _page(admin_client, place.cable.id, "m")
+    path = unit_recount(place.cable.id, "m")
+    blank = admin_client.post(
+        path,
+        data=_sent(page, **{f"size_{reel.id}": "", f"short_below_{reel.id}": "0"}),
+    )
+    assert blank.status_code == 400
+    assert problem(blank.text, f"size_{reel.id}") == (
+        "How many of the item's unit it holds."
+    )
+    assert problem(blank.text, f"short_below_{reel.id}") == "Use a number above 0."
+    longer = admin_client.post(
+        path,
+        data=_sent(page, **{f"size_{reel.id}": "5", f"short_below_{reel.id}": "5"}),
+    )
+    assert problem(longer.text, f"short_below_{reel.id}") == (
+        "Shorter than a whole one, or blank."
+    )
+    session.expire_all()
+    assert (place.cable.unit, reel.size) == ("ft", 1000)
+
+
+def test_a_converted_items_package_added_since_shown_is_refused(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Its size was not asked: refused as changed, and asked once shown
+    again."""
+    place, _, _ = converted_reel(session)
+    cable = place.cable
+    page = _page(admin_client, cable.id, "m")
+    box = items.add_package(session, cable, "Box", Decimal(500), shown_unit="ft")
+    refused = admin_client.post(unit_recount(cable.id, "m"), data=_sent(page))
+    assert refused.status_code == 409
+    assert str(RULES["changed_since_shown"]) in words_on(refused.text)
+    assert box_values(refused.text, f"size_{box.id}") == ["500"]
+    assert cable.unit == "ft"
+
+
+def test_a_label_printed_on_a_package_to_resize_since_shown_is_refused(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The page did not say it would be revoked."""
+    place, _, reel = converted_reel(session)
+    cable = place.cable
+    page = _page(admin_client, cable.id, "m")
+    label = labels.make_for_item(session, cable.id, reel.id)
+    assert label is not None
+    refused = admin_client.post(unit_recount(cable.id, "m"), data=_sent(page))
+    assert refused.status_code == 409
+    session.expire_all()
+    assert (cable.unit, label.revoked_at) == ("ft", None)

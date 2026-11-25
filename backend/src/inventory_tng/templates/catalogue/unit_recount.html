@@ -19,6 +19,8 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
     <ul>
       {% for each in plan.packages %}<li>{% trans old=each.package.name_shown, new=each.shown %}{{ old }} becomes {{ new }}{% endtrans %}</li>{% endfor %}
     </ul></li>{% endif %}
+  {% if plan.resized %}<li>{% trans old=item.unit, new=unit %}gives the size of each of its packages in {{ old }} again, below, in {{ new }}, each keeping its name and links;{% endtrans %}
+    {%- if plan.revoking %} {% trans count=plan.revoking | length %}revokes their printed label, as it shows the size as it was;{% pluralize %}revokes their {{ count }} printed labels, as they show the sizes as they were;{% endtrans %}{% endif %}</li>{% endif %}
   <li>{% trans new=unit %}changes its unit to {{ new }}, and keeps the amounts below in {{ new }}.{% endtrans %}</li>
 </ol>
 <p>{% trans new=unit %}Then count it at each place in {{ new }}, and add its packages in {{ new }}.{% endtrans %}</p>
@@ -44,6 +46,24 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
     <input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, each.offer.units_per_order | box_amount(decimal) if each.offer.units_per_order is not none else '') }}">
     {% include "_field_problem.html" %}
   </label>
+  {% endfor %}
+  {% for package in plan.resized %}
+  {#- Labelled as on its own form (forms.HOLDS), named by the package. #}
+  <fieldset>
+    <legend>{{ package.name_shown }}</legend>
+    {% set name = size_of ~ package.id %}
+    <label>{{ holds }} <span class="hint">{% trans new=unit, size=package.size | amount, old=package.unit %}in {{ new }}; was {{ size }} {{ old }}{% endtrans %}</span>
+      <input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, package.size | box_amount(decimal)) }}" required>
+      {% include "_field_problem.html" %}
+    </label>
+    {% if package.short_below is not none %}
+    {% set name = short_below_of ~ package.id %}
+    <label>{% trans %}Too short to use{% endtrans %} <span class="hint">{% trans unit=unit %}below, in {{ unit }}; blank: none{% endtrans %}</span>
+      <input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, package.short_below | box_amount(decimal)) }}">
+      {% include "_field_problem.html" %}
+    </label>
+    {% endif %}
+  </fieldset>
   {% endfor %}
   <div class="actions">
     <button class="danger">{% trans new=unit %}Recount in {{ new }}{% endtrans %}</button>

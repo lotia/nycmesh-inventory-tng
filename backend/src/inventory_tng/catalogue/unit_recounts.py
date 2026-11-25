@@ -3,8 +3,9 @@ corrected on the same item in one transaction, keeping its history,
 labels' records and links (Ali, 2026-11-24, inventory-tng-qety). Converting
 (unit_changes.convert) is right only when what was recorded really was in
 the old unit; here the numbers may already be in the new one, so nothing
-converts. Offered for an item in a length whose unit stock having moved
-fixes, into another length, as answering No to a conversion points here.
+converts. Offered for an item in a length whose unit stock having moved,
+or a conversion before, fixes, into another length, as answering No to a
+conversion points here.
 
 In the ledger's lock order (stock/ledger.py): the catalogue lock, then
 every place it has been at, then the item; the places read again, and
@@ -27,14 +28,20 @@ then, in order:
    starts after it, as use summed over a time window must
    (inventory-tng-ueg2).
 
-An item that holds nothing, as one converted before may (Ali, 2026-11-25,
-inventory-tng-l26i), has nothing to bring to zero or close; the rest is
-done as above, and its packages in the other unit, as a conversion left
-them, stay. Then each place is counted in the new unit; the page after
-links to each count.
+An item whose stock moved but holds nothing now has nothing to bring to
+zero or close; the rest is done as above, and its packages in the other
+unit, as a conversion left them, stay. Then each place is counted in the
+new unit; the page after links to each count.
+
+An item converted before whose stock never moved (Ali, 2026-11-25,
+inventory-tng-l26i) has nothing to write off, close or count, and no
+package is retired: each current package in its old unit keeps its name
+and links, its size, and its too-short length if it has one, given again
+in the new unit; those in the other unit stay as they are.
 
 It revokes no labels, as none names the item's unit (Ali, 2026-11-25,
-inventory-tng-8ema; why: docs/decisions/0003)."""
+inventory-tng-8ema; why: docs/decisions/0003), but those of the packages
+it gives a new size, which print the old one (inventory-tng-l26i)."""
 
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -52,6 +59,7 @@ from inventory_tng.catalogue.name_keys import name_key
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import lock_catalogue, locked, relock
 from inventory_tng.core.db_once_committed import once_committed
+from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import (
     Item,
     ItemPackage,
@@ -59,6 +67,7 @@ from inventory_tng.models.catalogue import (
     VendorOffer,
     reading_rules_held,
 )
+from inventory_tng.models.labels import Label
 from inventory_tng.models.names import unit_key
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import Movement, OpenPackage
@@ -80,11 +89,12 @@ recounted = meter.create_counter(
 
 def units_open(session: Session, item: Item) -> tuple[str, ...]:
     """The units the item may be recounted into: another length, while it
-    is current and stock having moved fixes its unit. None, otherwise: a
-    free change, or revoking its labels first, corrects it then."""
+    is current and stock having moved, or a conversion before, fixes its
+    unit. None, otherwise: a free change, or revoking its labels first,
+    corrects it then."""
     if item.retired_at is not None:
         return ()
-    if unit_changes.unit_fixed(session, item.id) != "moved":
+    if unit_changes.unit_fixed(session, item) not in ("moved", "converted"):
         return ()
     return unit_changes.units_open(item.unit, "moved")[1:]
 
@@ -120,14 +130,17 @@ class Renamed(NamedTuple):
 class Planned(NamedTuple):
     """What a recount of the item, as it is now, does: the places it
     brings to zero, the open packages it closes, its packages in its unit
-    and the name each is given as retired, the vendor offers it asks for
-    again; whether a line of it recorded with more than was moved waits,
-    which refuses it; and `seen`, all that as one string, which a recount
-    sent from a page showing it compares."""
+    and the name each is given as retired, or, converted before, those it
+    asks the size of again and their labels it revokes, by id; the vendor
+    offers it asks for again; whether a line of it recorded with more
+    than was moved waits, which refuses it; and `seen`, all that as one
+    string, which a recount sent from a page showing it compares."""
 
     held: list[Held]
     opened: list[OpenPackage]
     packages: list[Renamed]
+    resized: list[ItemPackage]
+    revoking: list[int]
     offers: list[Offer]
     waiting: bool
     seen: str
@@ -188,8 +201,12 @@ def planned(session: Session, item: Item) -> Planned:
             .order_by(ItemPackage.id)
         )
     )
-    old = [package for package in every if package.unit == item.unit]
-    renamed = _renamed(session, old, every, item.unit)
+    in_unit = [package for package in every if package.unit == item.unit]
+    # Converted before, no stock moved: asked again, not retired.
+    converted = unit_changes.unit_fixed(session, item) == "converted"
+    renamed = _renamed(session, [] if converted else in_unit, every, item.unit)
+    resized = _current(in_unit) if converted else []
+    revoking = _labels_of(session, [package.id for package in resized])
     offers = offers_of(session, item.id)
     waiting = unit_changes.checks_waiting(session, item.id)
     last = _last_transaction(session, item.id)
@@ -203,9 +220,40 @@ def planned(session: Session, item: Item) -> Planned:
             # Each with its version: one renamed since is named otherwise.
             ",".join(f"{package.id}.{package.edit_version}" for package in every),
             _ids(each.offer.id for each in offers),
+            _ids(revoking),
         ]
     )
-    return Planned(held, opened, renamed, offers, waiting, seen)
+    return Planned(held, opened, renamed, resized, revoking, offers, waiting, seen)
+
+
+def resized_of(session: Session, item: Item) -> list[ItemPackage]:
+    """The packages a recount of the item asks the size of again, in
+    order (Planned.resized): if a conversion before, and no stock moved,
+    fixes its unit, its current ones in its unit; else none, as it
+    retires those instead."""
+    if unit_changes.unit_fixed(session, item) != "converted":
+        return []
+    in_unit = select(ItemPackage).where(
+        ItemPackage.item_id == item.id, ItemPackage.unit == item.unit
+    )
+    return _current(session.scalars(in_unit.order_by(ItemPackage.id)))
+
+
+def _current(packages: Iterable[ItemPackage]) -> list[ItemPackage]:
+    return [package for package in packages if package.retired_at is None]
+
+
+def _labels_of(session: Session, package_ids: Sequence[int]) -> list[int]:
+    """The labels of these packages not revoked, by id, in order."""
+    if not package_ids:
+        return []
+    return list(
+        session.scalars(
+            select(Label.id)
+            .where(Label.package_id.in_(package_ids), Label.revoked_at.is_(None))
+            .order_by(Label.id)
+        )
+    )
 
 
 def offers_of(session: Session, item_id: int) -> list[Offer]:
@@ -261,14 +309,24 @@ def _keys(name: str, rules: units.Rules) -> set[str]:
     return {name_key(name), unit_key(name, rules)}
 
 
+class Sized(NamedTuple):
+    """A package's size and too-short length given again in the new unit;
+    None for no length."""
+
+    size: Decimal
+    short_below: Decimal | None
+
+
 class Amounts(NamedTuple):
     """What the administrator typed in the new unit: Reorder at, what is on
-    order, and each current vendor offer's units per order, by its id;
-    None for blank."""
+    order, and each current vendor offer's units per order, by its id,
+    None for blank; and each package asked again (Planned.resized), by its
+    id."""
 
     minimum: Decimal | None
     on_order: Decimal | None
     per_order: Mapping[int, Decimal | None]
+    sizes: Mapping[int, Sized]
 
 
 def recount(
@@ -281,11 +339,10 @@ def recount(
     key: uuid.UUID,
     admin_id: int,
     at: datetime,
-) -> list[int]:
+) -> Recounted:
     """The item recounted into `unit` (above), as the page that showed
     `seen` (Planned.seen) said it would be, its adjustments written under
-    keys made from `key`; the places it brought to zero, by id, to count
-    again.
+    keys made from `key`; what is left to do after it.
     RuleBroken: CHANGED if anything it does changed since, or it may no
     longer be recounted into `unit`; RETIRED for a retired item;
     unit_changes.UNIT_CHECKS_WAITING while a check of it waits."""
@@ -299,6 +356,15 @@ def recount(
         _refused(item.id, "places_added", CHANGED)
     plan = planned(session, item)
     return _recounted(session, item, unit, amounts, plan, seen, key, admin_id, at)
+
+
+class Recounted(NamedTuple):
+    """What is left to do after a recount: count the item again at the
+    places it brought to zero, by id, and print the labels it revoked,
+    how many."""
+
+    places: list[int]
+    revoked: int
 
 
 def _places_of(session: Session, item_id: int) -> set[int]:
@@ -328,7 +394,7 @@ def _recounted(
     key: uuid.UUID,
     admin_id: int,
     at: datetime,
-) -> list[int]:
+) -> Recounted:
     """recount's writes, holding the places and the item."""
     if item.retired_at is not None:
         _refused(item.id, "retired", RETIRED)
@@ -362,6 +428,15 @@ def _recounted(
     for package in session.scalars(locked(retiring.order_by(ItemPackage.id))):
         package.name = names[package.id]
         package.retired_at = package.retired_at or at
+    resizing = select(ItemPackage).where(
+        ItemPackage.id.in_([package.id for package in plan.resized])
+    )
+    for package in session.scalars(locked(resizing.order_by(ItemPackage.id))):
+        package.size, package.short_below = amounts.sizes[package.id]
+        package.unit = unit
+    # Each prints its package's size as it was (labels.package_label).
+    for label_id in plan.revoking:
+        labels.revoke(session, label_id, at)
     offers = select(VendorOffer).where(
         VendorOffer.id.in_([each.offer.id for each in plan.offers])
     )
@@ -383,9 +458,11 @@ def _recounted(
         location_ids=places,
         open_package_ids=[row.id for row in plan.opened],
         item_package_ids=sorted(names),
+        resized_package_ids=[package.id for package in plan.resized],
+        label_ids=plan.revoking,
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
-    return places
+    return Recounted(places, len(plan.revoking))
 
 
 def _write_off(

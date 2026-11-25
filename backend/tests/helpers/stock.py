@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
 from inventory_tng.catalogue import items
+from inventory_tng.labels import labels
 from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.places import Location
@@ -93,6 +94,27 @@ class Place:
                 {"item_id": self.item.id, "quantity": "3", "unit": self.item.unit}
             ],
         } | fields
+
+
+def converted_reel(session: Session) -> tuple[Place, ItemPackage, ItemPackage]:
+    """A Place whose cable, no stock moved, had its Spool of 305 m, then,
+    labelled, was converted to ft, as answering Yes does
+    (unit_changes.convert), and was given a Reel of 1000 ft, too short to
+    use below 10 ft; its label revoked, its unit is fixed by the
+    conversion alone (Ali, 2026-11-25, inventory-tng-l26i). The cable,
+    its Spool and its Reel."""
+    place = Place(session)
+    cable = place.cable
+    spool = add(session, ItemPackage(item_id=cable.id, name="Spool", size=305))
+    label = labels.make_for_item(session, cable.id)
+    assert label is not None
+    fields = item_fields(cable, unit="ft")
+    items.save(session, cable, fields, seen=None, recorded_in="m")
+    assert labels.revoke(session, label.id, datetime.now(UTC))
+    reel = items.add_package(session, cable, "Reel", Decimal(1000), shown_unit="ft")
+    reel.short_below = Decimal(10)
+    session.flush()
+    return place, spool, reel
 
 
 def committed_place(committed: Committed) -> Place:

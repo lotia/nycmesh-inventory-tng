@@ -1100,6 +1100,8 @@ def test_counts_unit_changes_refused_by_why(
     moved = stocked(session).item
     labelled = Place(session).cable
     assert labels.make_for_item(session, labelled.id) is not None
+    converted = Place(session).cable
+    converted.unit_converted = True
     place, other = Place(session), Place(session)
     for each in (place, other):
         line = {"item_id": each.cable.id, "quantity": "5", "unit": "m"}
@@ -1109,6 +1111,7 @@ def test_counts_unit_changes_refused_by_why(
     refusals = (
         (moved, "m", "item_unit_fixed", {}),
         (labelled, "each", "item_unit_labelled", {}),
+        (converted, "each", "item_unit_converted", {}),
         (waiting, "ft", unit_changes.UNIT_CHECKS_WAITING, {}),
         (huge, "ft", unit_changes.UNIT_OUT_OF_RANGE, {"minimum": Decimal(400_000_000)}),
     )
@@ -1120,6 +1123,7 @@ def test_counts_unit_changes_refused_by_why(
     assert added(reader, name, before) == {
         (("reason", "moved"),): 1,
         (("reason", "labelled"),): 1,
+        (("reason", "converted"),): 1,
         (("reason", "checks_waiting"),): 1,
         (("reason", "out_of_range"),): 1,
     }
@@ -1130,6 +1134,7 @@ def test_counts_unit_changes_refused_by_why(
     ] == [
         (moved.id, "moved", "info"),
         (labelled.id, "labelled", "info"),
+        (converted.id, "converted", "info"),
         (waiting.id, "checks_waiting", "info"),
         (huge.id, "out_of_range", "info"),
     ]
@@ -1201,6 +1206,8 @@ def test_counts_unit_recounts_by_unit(rolled_back: Recorded, session: Session) -
         "location_ids": [place.store.id, place.van.id],
         "open_package_ids": [],
         "item_package_ids": [],
+        "resized_package_ids": [],
+        "label_ids": [],
         "vendor_offer_ids": [],
     }
 

@@ -219,8 +219,9 @@ PICK_A_UNIT = lazy_gettext("Pick a unit.")
 def unit_declined_problem(new: str, why: unit_changes.UnitFixed) -> str:
     """What the item form says beside its unit when the administrator
     answers No: nothing converts, and how to put right a unit wrong from
-    the start: revoking its labels, or, stock moved, the guided recount,
-    which the form links to after these words (unit_recounts)."""
+    the start: revoking its labels, or, stock moved or its amounts
+    converted before, the guided recount, which the form links to after
+    these words (unit_recounts)."""
     if why == "labelled":
         # Translators: answered No to "Were the recorded amounts really in
         # %(old)s?"; the item's labels fix its unit; revoking them lets
@@ -240,18 +241,28 @@ def unit_declined_problem(new: str, why: unit_changes.UnitFixed) -> str:
     )
 
 
-# A recount's boxes besides Reorder at: what is on order, and each current
-# vendor offer's units per order, this then its id.
+# A recount's boxes besides Reorder at: what is on order, each current
+# vendor offer's units per order, and each package's size and too-short
+# length asked again, these then its id.
 ON_ORDER, PER_ORDER = "on_order", "per_order_"
+SIZE_OF, SHORT_BELOW_OF = "size_", "short_below_"
 
 
 def recount_amounts(
-    form: Mapping[str, str], offer_ids: Sequence[int], *, separator: Separator
+    form: Mapping[str, str],
+    offer_ids: Sequence[int],
+    packages: Sequence[ItemPackage],
+    *,
+    separator: Separator,
 ) -> tuple[unit_recounts.Amounts | None, dict[str, Words]]:
     """What a guided recount's form sets in the new unit, unless something
     is wrong, and what is, by field: Reorder at and what is on order zero
     or more, each offer's units per order above zero, each blank for none;
-    in the decimal `separator` of the page's boxes."""
+    each package's size above zero, and its too-short length, asked only
+    of one that has one, blank for none, shorter than its size. A package
+    whose size its page did not ask, added since, is left out, so the
+    recount is refused as changed (Planned.seen). In the decimal
+    `separator` of the page's boxes."""
     problems: dict[str, Words] = {}
     read: dict[str, Decimal | None] = {}
     fields = {"minimum": False, ON_ORDER: False}
@@ -262,10 +273,42 @@ def recount_amounts(
             problems[name] = typed
         else:
             read[name] = typed
+    sizes: dict[int, unit_recounts.Sized] = {}
+    for package in packages:
+        if (sized := _resized(form, package, problems, separator)) is not None:
+            sizes[package.id] = sized
     if problems:
         return None, problems
     per_order = {each: read[f"{PER_ORDER}{each}"] for each in offer_ids}
-    return unit_recounts.Amounts(read["minimum"], read[ON_ORDER], per_order), {}
+    minimum, on_order = read["minimum"], read[ON_ORDER]
+    return unit_recounts.Amounts(minimum, on_order, per_order, sizes), {}
+
+
+def _resized(
+    form: Mapping[str, str],
+    package: ItemPackage,
+    problems: dict[str, Words],
+    separator: Separator,
+) -> unit_recounts.Sized | None:
+    """A package's size and too-short length as a recount's form gives
+    them again, if it asked and both are right; else None, and what is
+    wrong added to `problems`."""
+    size_box, short_box = f"{SIZE_OF}{package.id}", f"{SHORT_BELOW_OF}{package.id}"
+    if size_box not in form:
+        return None
+    size = quantity(
+        form[size_box], positive=True, required=SIZE_REQUIRED, separator=separator
+    )
+    short = quantity(form.get(short_box, ""), positive=True, separator=separator)
+    if isinstance(size, str):
+        problems[size_box] = size
+    if isinstance(short, str):
+        problems[short_box] = short
+    elif isinstance(size, Decimal) and short is not None and short >= size:
+        problems[short_box] = SHORTER_THAN_WHOLE
+    if not isinstance(size, Decimal) or isinstance(short, str):
+        return None
+    return unit_recounts.Sized(size, short)
 
 
 def confirmed(session: Session, form: Mapping[str, str], fields: items.Fields) -> bool:
@@ -431,6 +474,8 @@ def item_fields(
     return fields, problems, typed
 
 
+# The label of a package's size, on its form and a recount's.
+HOLDS = lazy_gettext("Holds")
 # A package refused as another of its item's, retired ones too, has its name.
 PACKAGE_TAKEN = lazy_gettext("It already has a package by that name.")
 SIZE_REQUIRED = lazy_gettext("How many of the item's unit it holds.")

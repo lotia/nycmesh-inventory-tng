@@ -392,7 +392,7 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
 - The item form offers only the other length, and asks "Were the
   recorded amounts really in m?", naming the unit it is in, with Yes and
   No. A change between each and a length still needs the item never to
-  have moved and no current label, as above.
+  have moved or converted, and no current label, as above.
 - Yes converts, in one transaction holding the item, its vendor offers
   and its open packages in the ledger's lock order: its stock, its
   Reorder at (as typed in the old unit), what is on order, its vendor
@@ -418,6 +418,13 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
 - No converts nothing and says how to put right a unit wrong from the
   start: the guided recount (next amendment); or, only labelled, revoke
   its labels first.
+- Once converted, an item stays fixed (`Item.unit_converted`, set on
+  Yes): every later change between m and ft is asked and converts on
+  Yes, any number of times, and it never becomes counted each again.
+  Revoking its labels does not free it, as a free change would keep its
+  converted numbers in the other unit (Ali, 2026-11-25,
+  inventory-tng-l26i). Rejected: a free change that converts silently,
+  and keeping the free change as it was.
 - Old ledger lines keep their unit; each sum converts them as it reads
   them. A foot is 0.3048 m exactly (`catalogue/unit_conversion.py`, in
   Python and SQL alike). Each side of a line is read apart (Ali,
@@ -452,10 +459,10 @@ corrects it on the same item, keeping its history and links
 (`catalogue/unit_recounts.py`). Rejected: restating the numbers in the
 other unit, and retiring the item for a new one.
 
-- Offered from the answer No, for an item whose stock has moved, into
-  another length. Its page says beforehand all it will do, and asks
-  Reorder at, what is on order and its vendor offers' units per order
-  again in the new unit.
+- Offered from the answer No, for an item whose stock has moved, or
+  which has converted before, into another length. Its page says
+  beforehand all it will do, and asks Reorder at, what is on order and
+  its vendor offers' units per order again in the new unit.
 - In one transaction, holding the catalogue, every place the item has
   been at, then the item: each place is brought to zero form by form
   in the old unit, by adjustments with the reason Records were wrong,
@@ -466,9 +473,16 @@ other unit, and retiring the item for a new one.
   be added; its unit changes; and the amounts typed are kept. Refused,
   to be shown again, if anything it would do changed since its page was
   shown, or if it reached another place before the item was held.
-- An item holding nothing, such as one converted before, has nothing to
-  write off or close; the rest is done as above. Its packages in the
-  other unit, as a conversion left them, stay.
+- An item whose stock moved but holds nothing has nothing to write off
+  or close; the rest is done as above. Its packages in the other unit,
+  as a conversion left them, stay.
+- An item converted before whose stock never moved has nothing to write
+  off, close or count, and retires no package. Each of its current
+  packages in the old unit is asked its size again in the new unit, and
+  its too-short length if it has one, and keeps its name and links;
+  those in the other unit are not asked (Ali, 2026-11-25,
+  inventory-tng-l26i). Rejected: retiring and renaming them, and
+  leaving them as they are.
 - The item keeps its last ledger transaction then
   (`Item.unit_recounted_after`). What left a place since a count form
   was first shown leaves out the lines up to it, and so must use summed
@@ -476,6 +490,9 @@ other unit, and retiring the item for a new one.
 - It revokes no labels, for the reason Yes revokes none (previous
   amendment); a retired package's label stops scanning anyway (Ali,
   2026-11-25, replacing his decision earlier that day that it revokes
-  the item's labels).
+  the item's labels). The one exception: the labels of the packages it
+  asks the size of again, as they print the size as it was. Its page
+  says so beforehand, and the page after links to the item's labels to
+  print new ones (Ali, 2026-11-25, inventory-tng-l26i).
 - The page after links to a count of the item at each place, in the new
   unit.

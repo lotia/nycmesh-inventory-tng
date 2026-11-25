@@ -1,9 +1,11 @@
 """The guided recount of an item whose unit was wrong from the start
 (catalogue/unit_recounts.py): its page, saying beforehand all it will do,
 and asking Reorder at, what is on order and its vendor offers again in the
-new unit; and the page after, linking to a count of it at each place it
-brought to zero (Ali, 2026-11-25, inventory-tng-qety). The answer to No
-on the item page links here (items_routes)."""
+new unit, and, for one converted before whose stock never moved, its
+packages' sizes; and the page after, linking to a count of it at each
+place it brought to zero, and to its labels if it revoked any to print
+again (Ali, 2026-11-25, inventory-tng-qety, inventory-tng-l26i). The
+answer to No on the item page links here (items_routes)."""
 
 import uuid
 from collections.abc import Mapping
@@ -20,6 +22,7 @@ from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.phrases import Words, gettext
 from inventory_tng.core.sent_forms import form_key
+from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.stock.queries import places_with_ids
@@ -71,6 +74,9 @@ def _page(
             "key": uuid.uuid4(),
             "on_order": forms.ON_ORDER,
             "per_order": forms.PER_ORDER,
+            "size_of": forms.SIZE_OF,
+            "short_below_of": forms.SHORT_BELOW_OF,
+            "holds": forms.HOLDS,
             "waiting": RULES[unit_changes.UNIT_CHECKS_WAITING],
             "values": values,
             "problems": problems,
@@ -110,16 +116,18 @@ def recount(
     unit = form.get("unit", "")
     if unit not in unit_recounts.units_open(session, found):
         return redirect(f"{ITEMS}/{item_id}")
-    # The offers as now: one added or retired since is refused as changed.
+    # The offers and packages as now: one added or retired since is
+    # refused as changed.
     offers = [each.offer.id for each in unit_recounts.offers_of(session, item_id)]
+    packages = unit_recounts.resized_of(session, found)
     amounts, problems = forms.recount_amounts(
-        form, offers, separator=decimal_separator(request)
+        form, offers, packages, separator=decimal_separator(request)
     )
     if amounts is None:
         return _page(
             request, session, signed, found, unit, values=form, problems=problems
         )
-    zeroed, broken = refusal(
+    done, broken = refusal(
         session,
         lambda: unit_recounts.recount(
             session,
@@ -142,11 +150,12 @@ def recount(
         return _page(
             request, session, signed, found, unit, values=form, alert=RULES[broken]
         )
-    assert zeroed is not None  # Refused, or done.
+    assert done is not None  # Refused, or done.
     session.commit()
     return redirect(
         UNIT_RECOUNTED.format(item_id=item_id),
-        places=",".join(str(each) for each in zeroed),
+        places=",".join(str(each) for each in done.places),
+        **({"labels": str(done.revoked)} if done.revoked else {}),
     )
 
 
@@ -157,9 +166,11 @@ def recounted(
     session: DbSession,
     item_id: int,
     places: str = "",
+    labels: str = "",
 ) -> Response:
     """The page after a recount: the places it brought to zero, in its
-    address, each linked to its count of the item."""
+    address, each linked to its count of the item; and how many labels it
+    revoked, to print again."""
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
@@ -181,5 +192,6 @@ def recounted(
             ),
             "counts_path": COUNTS,
             "item_path": item_path,
+            "revoked": whole(labels, 0, INTEGER_MAX) or 0,
         },
     )

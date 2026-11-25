@@ -3,7 +3,8 @@ what is recorded once the administrator answers Yes to "Were the recorded
 amounts really in m?" (Ali, 2026-11-24, inventory-tng-y50b): its stock,
 Reorder at, what is on order, its vendor offers and what volunteers said is
 on its open packages. Its old ledger lines and its packages keep their own
-unit. No converts nothing; each and a length never convert."""
+unit. No converts nothing; each and a length never convert. Converted
+once, an item stays fixed (Ali, 2026-11-25, inventory-tng-l26i)."""
 
 from decimal import Decimal
 
@@ -559,3 +560,91 @@ def test_no_revokes_nothing(admin_client: TestClient, session: Session) -> None:
         session.refresh(each)
     assert (own.revoked_at, on_reel.revoked_at) == (None, None)
     assert place.cable.unit == "m"
+
+
+def _spool_offered(session: Session) -> tuple[Place, ItemPackage, VendorOffer, Label]:
+    """The example of inventory-tng-l26i: a cable in m, labelled, no stock
+    moved; its Spool holds 305 m, a vendor offer of 305 per order, 610 on
+    order."""
+    place = Place(session)
+    cable = place.cable
+    spool = add(session, ItemPackage(item_id=cable.id, name="Spool", size=305))
+    offer = add(
+        session,
+        VendorOffer(item_id=cable.id, url="https://example.org", units_per_order=305),
+    )
+    cable.on_order = Decimal(610)
+    label = labels.make_for_item(session, cable.id)
+    assert label is not None
+    return place, spool, offer, label
+
+
+def test_a_converted_item_stays_fixed_and_converts_back(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Yes marks it converted. Its labels revoked, a change back to m is
+    asked still, never kept free with the numbers converted to ft, and
+    converts them back: the offer 305 m, 610 m on order, the Spool 305 m
+    as it always was (Ali, 2026-11-25, inventory-tng-l26i)."""
+    place, spool, offer, label = _spool_offered(session)
+    cable = place.cable
+    assert not cable.unit_converted
+    path = f"{ITEMS}/{cable.id}"
+    admin_client.post(path, data=unit_answered(cable, unit="ft"))
+    session.refresh(cable)
+    session.refresh(offer)
+    assert cable.unit_converted
+    assert (cable.unit, cable.on_order) == ("ft", Decimal("2001.312"))
+    assert offer.units_per_order == Decimal("1000.656")
+    assert labels.revoke(session, label.id, NOW)
+    assert unit_changes.unit_fixed(session, cable) == "converted"
+    shown = words_on(admin_client.get(path).text)
+    assert (
+        "only another length, as its recorded amounts have been recalculated: "
+        "they are recalculated again"
+    ) in shown
+    asked = admin_client.post(path, data=shown_item_form(cable, unit="m"))
+    assert "Were the recorded amounts really in ft?" in words_on(asked.text)
+    assert cable.unit == "ft"
+    admin_client.post(path, data=unit_answered(cable, unit="m"))
+    for each in (cable, offer, spool):
+        session.refresh(each)
+    assert (cable.unit, cable.on_order) == ("m", Decimal(610))
+    assert (offer.units_per_order, offer.unit) == (Decimal(305), "m")
+    assert (spool.size, spool.unit) == (Decimal(305), "m")
+    assert cable.unit_converted
+
+
+def test_a_converted_item_never_becomes_counted_each(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Its form offers only the other length; each sent all the same is
+    refused, as a converted item stays a length (Ali, 2026-11-25)."""
+    place, _, _, label = _spool_offered(session)
+    cable = place.cable
+    path = f"{ITEMS}/{cable.id}"
+    admin_client.post(path, data=unit_answered(cable, unit="ft"))
+    assert labels.revoke(session, label.id, NOW)
+    page = read(admin_client.get(path).text)
+    assert [each.text for each in page.one("select", name="unit").all("option")] == [
+        "ft",
+        "m",
+    ]
+    refused = admin_client.post(path, data=unit_answered(cable, unit="each"))
+    assert problem(refused.text, "unit") == str(RULES["item_unit_converted"])
+    session.refresh(cable)
+    assert cable.unit == "ft"
+
+
+def test_no_for_a_converted_item_with_no_stock_links_to_the_recount(
+    admin_client: TestClient, session: Session
+) -> None:
+    place, _, _, label = _spool_offered(session)
+    cable = place.cable
+    path = f"{ITEMS}/{cable.id}"
+    admin_client.post(path, data=unit_answered(cable, unit="ft"))
+    assert labels.revoke(session, label.id, NOW)
+    declined = admin_client.post(path, data=unit_answered(cable, "no", unit="m"))
+    unit_problem = read(declined.text).one("span", id="unit-problem")
+    unit_problem.one("a", "Recount it in m", href=unit_recount(cable.id, "m"))
+    assert admin_client.get(unit_recount(cable.id, "m")).status_code == 200

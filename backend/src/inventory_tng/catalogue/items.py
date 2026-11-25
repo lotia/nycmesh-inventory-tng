@@ -435,7 +435,7 @@ def save(
     # label of it being made, which locks the item too (labels.make_for_item).
     relock(session, item, seen=seen)
     enforce("retired_read_only", when=item.retired_at is not None)
-    if fields.unit != item.unit and (why := unit_changes.unit_fixed(session, item.id)):
+    if fields.unit != item.unit and (why := unit_changes.unit_fixed(session, item)):
         minimum = unit_changes.convert(
             session, item, fields.unit, fields.minimum, why=why, recorded_in=recorded_in
         )

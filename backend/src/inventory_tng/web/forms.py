@@ -54,6 +54,9 @@ RULES = {
         "Its category is retired: bring that back, or pick another, first."
     ),
     "item_unit_fixed": lazy_gettext("Its unit is fixed, as stock has moved in it."),
+    "item_unit_converted": lazy_gettext(
+        "Its unit is fixed, as its recorded amounts have been recalculated."
+    ),
     "item_unit_labelled": lazy_gettext(
         "Its unit is fixed, as a label has been printed for it."
     ),

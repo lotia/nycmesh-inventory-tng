@@ -1,10 +1,11 @@
 """Items and the packages they come in. An item's unit is fixed once stock
-has moved in it, or while a label of it is printed and not revoked
-(unit_changes.unit_fixed): the form offers only another length, for one in a
-length, and asks "Were the recorded amounts really in m?" before it
-converts them (Ali, 2026-11-24, inventory-tng-y50b). Answered No, it
-links to the guided recount (unit_recount_routes), or, fixed only by
-labels, to the item's labels, to revoke them and correct a mistake. A
+has moved in it or its amounts have been converted, or while a label of it
+is printed and not revoked (unit_changes.unit_fixed): the form offers only
+another length, for one in a length, and asks "Were the recorded amounts
+really in m?" before it converts them (Ali, 2026-11-24, inventory-tng-y50b).
+Answered No, it links to the guided recount (unit_recount_routes), or,
+fixed only by labels, to the item's labels, to revoke them and correct a
+mistake. A
 package's size fixed only by labels says so too (items.sizes_fixed). A
 retired item with stock left may still be taken, never received
 (docs/decisions/0003)."""
@@ -482,7 +483,8 @@ def _item_page(
     outlined, the whole numbers it may be beside it. `unit_declined`, why
     the unit is fixed when its question was answered No, to change it to
     `unit_declined_to`: labels, and the form links to revoke them; or
-    stock moved, and it links to the guided recount (unit_recounts)."""
+    stock moved or its amounts converted, and it links to the guided
+    recount (unit_recounts)."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -491,7 +493,7 @@ def _item_page(
     )
     log.debug("open packages listed", item_id=item.id, found=len(opened), sort=view.by)
     short_fraction = _short_fraction(session, item, problems, values)
-    fixed = unit_changes.unit_fixed(session, item.id)
+    fixed = unit_changes.unit_fixed(session, item)
     # Not revoked, its own and its packages': how many each hint says.
     printed = labels.current_of(session, Label.item_id == item.id)
     by_package = Counter(each.label.package_id for each in printed)
@@ -516,6 +518,7 @@ def _item_page(
             "item": item,
             **retirement(session, item),
             "packages": packages,
+            "holds": forms.HOLDS,
             "aliases": items.aliases(session, item.id),
             "sizes_fixed": sizes,
             "undo": undo,
@@ -821,7 +824,7 @@ def _unit_declined(
 ) -> Response:
     """No to "Were the recorded amounts really in m?": nothing saved, the
     form shown again in its unit as it is, saying what to do instead."""
-    why = unit_changes.unit_fixed(session, item.id)
+    why = unit_changes.unit_fixed(session, item)
     if why is None or unit == item.unit:
         # Answered on a page drawn before the item changed: ask afresh.
         return _item_page(request, session, signed, item, values=form)

@@ -64,7 +64,7 @@ def test_an_item_retired_since_its_page_is_refused(session: Session) -> None:
             session,
             spools.cable,
             "ft",
-            unit_recounts.Amounts(None, None, {}),
+            unit_recounts.Amounts(None, None, {}, {}),
             seen=seen,
             key=uuid.uuid4(),
             admin_id=new_admin_id(session),

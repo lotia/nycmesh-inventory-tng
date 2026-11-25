@@ -63,6 +63,7 @@ from inventory_tng.labels import labels
 from inventory_tng.models.admins import Admin, AdminPassword, AdminSession
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.core import SentForm
+from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import SignInSettings
 from inventory_tng.models.stock import (
@@ -115,6 +116,7 @@ from helpers.stock import (
     Place,
     Spools,
     committed_place,
+    converted_reel,
     count_form,
     held_by_form,
     length,
@@ -1242,17 +1244,24 @@ def test_a_save_while_a_unit_is_converted_is_converted_or_refused(
     assert seen == ([converted] if swapped else [("m", Decimal("1.500")), converted])
 
 
-def _recounting(place: Place, seen: str, admin_id: int) -> Write:
-    """A guided recount of the place's cable into ft, from a page that
-    showed `seen`, as its route sends it (catalogue/unit_recounts.py)."""
+def _recounting(
+    place: Place,
+    seen: str,
+    admin_id: int,
+    unit: str = "ft",
+    sizes: dict[int, unit_recounts.Sized] | None = None,
+) -> Write:
+    """A guided recount of the place's cable into `unit`, its packages
+    given `sizes`, from a page that showed `seen`, as its route sends it
+    (catalogue/unit_recounts.py)."""
 
     def recounting(session: Session) -> None:
         cable = session.get_one(Item, place.cable.id)
         unit_recounts.recount(
             session,
             cable,
-            "ft",
-            unit_recounts.Amounts(None, None, {}),
+            unit,
+            unit_recounts.Amounts(None, None, {}, sizes or {}),
             seen=seen,
             key=uuid.uuid4(),
             admin_id=admin_id,
@@ -1296,6 +1305,70 @@ def test_a_save_while_a_unit_is_recounted_waits_then_is_refused(
 
     recounting = _recounting(place, seen, admin_id)
     assert either_first(own_committed, recounting, receipt, swapped=swapped) == refused
+
+
+def _shown_converted(committed: Committed) -> tuple[Place, int, Write]:
+    """A cable converted to ft, no stock moved, its Reel in ft
+    (converted_reel), all committed; its Reel's id, and its recount into
+    m, giving the Reel 300 m, from a page shown now."""
+    setup = committed.session()
+    place, _, reel = converted_reel(setup)
+    admin_id = new_admin_id(setup)
+    setup.commit()
+    seen = unit_recounts.planned(setup, setup.get_one(Item, place.cable.id)).seen
+    sizes = {reel.id: unit_recounts.Sized(Decimal(300), None)}
+    return place, reel.id, _recounting(place, seen, admin_id, "m", sizes)
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"), [(False, None), (True, "changed_since_shown")]
+)
+def test_a_label_made_while_a_converted_item_is_recounted(
+    own_committed: Committed, swapped: bool, refused: str | None
+) -> None:
+    """Making a label of the Reel locks the cable, which the recount holds
+    FOR UPDATE (Ali, 2026-11-25, inventory-tng-l26i). Made second, it
+    waits, then is made once the Reel is resized. Made first, the recount
+    waits, then is refused, as its page did not say it would revoke it.
+    Never revoked unsaid."""
+    place, reel_id, recounting = _shown_converted(own_committed)
+
+    def labelling(session: Session) -> None:
+        assert labels.make_for_item(session, place.cable.id, reel_id) is not None
+
+    assert either_first(own_committed, recounting, labelling, swapped=swapped) == (
+        refused
+    )
+    # Only the first is committed (at_once).
+    check = own_committed.session()
+    reel = check.get_one(ItemPackage, reel_id)
+    assert (reel.size, reel.unit) == ((1000, "ft") if swapped else (300, "m"))
+    revoked = select(Label.revoked_at).where(Label.package_id == reel_id)
+    assert check.scalars(revoked).all() == ([None] if swapped else [])
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"),
+    [(False, "package_unit_changed"), (True, "changed_since_shown")],
+)
+def test_a_package_added_while_a_converted_item_is_recounted(
+    own_committed: Committed, swapped: bool, refused: str
+) -> None:
+    """Adding a package takes the catalogue lock, as the recount does.
+    Added second, from a form shown in ft, it is refused once the cable is
+    in m. Added first, the recount waits, then is refused, as its page
+    asked no size of it. Never left in ft unasked."""
+    place, _, recounting = _shown_converted(own_committed)
+
+    def adding(session: Session) -> None:
+        cable = session.get_one(Item, place.cable.id)
+        items.add_package(session, cable, "Box", Decimal(500), shown_unit="ft")
+
+    assert either_first(own_committed, recounting, adding, swapped=swapped) == refused
+    cable = own_committed.session().get_one(Item, place.cable.id)
+    assert cable.unit == ("ft" if swapped else "m")
 
 
 @pytest.mark.concurrency

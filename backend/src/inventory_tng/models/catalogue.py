@@ -160,6 +160,11 @@ class Item(KeyedName, Searchable, Versioned, Base):
     # window must (inventory-tng-ueg2). NULL: never recounted, or
     # recounted before anything moved.
     unit_recounted_after: Mapped[int | None] = reference("ledger_transaction.id")
+    # Set once its recorded amounts are converted between lengths
+    # (catalogue/unit_changes.convert): its unit stays fixed for good, so
+    # changing back converts them again (Ali, 2026-11-25,
+    # inventory-tng-l26i).
+    unit_converted: Mapped[bool] = mapped_column(server_default=text("false"))
 
     # Everything a volunteer might type to find an item, as one string,
     # folded (Searchable), and its name alone so, for close names

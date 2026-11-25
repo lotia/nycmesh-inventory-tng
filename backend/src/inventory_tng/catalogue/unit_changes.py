@@ -6,6 +6,8 @@ changes only between lengths, converting what is recorded once an
 administrator confirms it was in the old unit (convert; Ali, 2026-11-24,
 inventory-tng-y50b), revoking no labels, as none names the item's unit
 (Ali, 2026-11-25, inventory-tng-8ema); never between each and a length.
+Converted once, it stays fixed, so changing back converts again (Ali,
+2026-11-25, inventory-tng-l26i).
 A package form drawn before a change, its amount typed in the unit it
 showed, is refused (require_unit_shown), never kept in the new one.
 
@@ -49,9 +51,10 @@ unit_changes_converted = meter.create_counter(
 )
 
 # Why an item's unit is fixed, and the rule each refuses a change by.
-UnitFixed = Literal["moved", "labelled"]
+UnitFixed = Literal["moved", "converted", "labelled"]
 UNIT_FIXED_RULES: dict[UnitFixed, str] = {
     "moved": "item_unit_fixed",
+    "converted": "item_unit_converted",
     "labelled": "item_unit_labelled",
 }
 # Asked: a change between lengths, the item's unit fixed, that converts
@@ -94,21 +97,26 @@ def require_unit_shown(
     enforce(UNIT_CHANGED)
 
 
-def unit_fixed(session: Session, item_id: int) -> UnitFixed | None:
+def unit_fixed(session: Session, item: Item) -> UnitFixed | None:
     """Why the item's unit can no longer change freely, if it can't: stock
-    has moved in it, for good, or a label not revoked has been printed for
-    it or one of its packages (a package's label names its item too). Its
-    ledger's lines record it, and a free change re-tags its packages'
-    units, which their labels print (Ali, 2026-11-23, inventory-tng-rpud;
-    2026-11-25, inventory-tng-8ema). It may still change between lengths,
-    converting what is recorded, once an administrator confirms what was
-    recorded was in its unit (convert); never between each and a length.
-    A revoked label scans as no label, so it fixes nothing, and revoking
-    an item's labels lets a mistaken unit be corrected without converting
+    has moved in it, for good; what it records has been converted between
+    lengths, for good, as a free change would keep converted numbers
+    (Item.unit_converted; Ali, 2026-11-25, inventory-tng-l26i); or a label
+    not revoked has been printed for it or one of its packages (a
+    package's label names its item too). Its ledger's lines record it, and
+    a free change re-tags its packages' units, which their labels print
+    (Ali, 2026-11-23, inventory-tng-rpud; 2026-11-25, inventory-tng-8ema).
+    It may still change between lengths, converting what is recorded,
+    once an administrator confirms what was recorded was in its unit
+    (convert); never between each and a length. A revoked label scans as
+    no label, so it fixes nothing, and revoking the labels of an item
+    never converted lets a mistaken unit be corrected without converting
     (Ali, 2026-11-23, inventory-tng-37dj)."""
-    if exists_where(session, Movement.item_id == item_id):
+    if exists_where(session, Movement.item_id == item.id):
         return "moved"
-    if exists_where(session, Label.item_id == item_id, Label.revoked_at.is_(None)):
+    if item.unit_converted:
+        return "converted"
+    if exists_where(session, Label.item_id == item.id, Label.revoked_at.is_(None)):
         return "labelled"
     return None
 
@@ -125,7 +133,8 @@ def units_open(unit: str, why: UnitFixed | None) -> tuple[str, ...]:
 def follow(session: Session, item_id: int, unit: str) -> None:
     """An item's packages and vendor offers, retired ones too, recorded in
     its new unit, their amounts as they were: its unit may change, so no
-    stock has moved in it and no label fixes it (unit_fixed), and what was
+    stock has moved in it, nothing it records was converted and no label
+    fixes it (unit_fixed), and what was
     typed was meant in the unit chosen (Ali, 2026-11-23,
     inventory-tng-rpud)."""
     for model in (ItemPackage, VendorOffer):
@@ -194,7 +203,8 @@ def _converted(
     closed is held, so a report being written of one is converted once it
     is in, never left in the old unit. Its stock converts as the ledger is
     read (stock/line_amounts.py), its lines keeping their unit, and its
-    packages keep theirs. Refused (UNIT_OUT_OF_RANGE) if an amount
+    packages keep theirs; and it is marked converted, which fixes its unit
+    for good (unit_fixed). Refused (UNIT_OUT_OF_RANGE) if an amount
     converted is too large to keep, or a package would not keep its size
     or too-short length in the new unit."""
     old = item.unit
@@ -238,6 +248,7 @@ def _converted(
     ):
         _refused(item.id, "out_of_range", UNIT_OUT_OF_RANGE)
     item.on_order = on_order
+    item.unit_converted = True
     for offer in offered:
         offer.units_per_order = per_order.get(offer.id)
         offer.unit = new

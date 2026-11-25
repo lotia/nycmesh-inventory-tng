@@ -481,17 +481,17 @@ def test_a_label_fixes_the_unit_until_revoked_a_movement_for_good(
     reel = add(session, ItemPackage(item_id=item.id, name="Reel", size=10))
     label = labels.make_for_item(session, item.id, reel.id if package else None)
     assert label is not None
-    assert unit_changes.unit_fixed(session, item.id) == "labelled"
+    assert unit_changes.unit_fixed(session, item) == "labelled"
     with breaks(session, "item_unit_labelled"):
         items.save(session, item, item_fields(item, unit="each"), seen=None)
     with breaks(session, unit_changes.UNIT_UNCONFIRMED):
         items.save(session, item, item_fields(item, unit="ft"), seen=None)
     assert labels.revoke(session, label.id, NOW)
-    assert unit_changes.unit_fixed(session, item.id) is None
+    assert unit_changes.unit_fixed(session, item) is None
     items.save(session, item, item_fields(item, unit="ft"), seen=None)
     assert item.unit == "ft"
     _moved(session, item)
-    assert unit_changes.unit_fixed(session, item.id) == "moved"
+    assert unit_changes.unit_fixed(session, item) == "moved"
     with breaks(session, "item_unit_fixed"):
         items.save(session, item, item_fields(item, unit="each"), seen=None)
     with breaks(session, unit_changes.UNIT_UNCONFIRMED):

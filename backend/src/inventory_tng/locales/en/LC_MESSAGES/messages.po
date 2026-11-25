@@ -614,6 +614,11 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 #, python-format
+msgid "%(unit)s: fixed, as its recorded amounts have been recalculated"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/item.html
+#, python-format
 msgid "%(unit)s: fixed, as stock has moved in it"
 msgstr ""
 
@@ -1781,7 +1786,7 @@ msgstr ""
 msgid "Holding stock"
 msgstr ""
 
-#: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/catalogue/forms.py
 msgid "Holds"
 msgstr ""
 
@@ -2030,6 +2035,17 @@ msgstr ""
 msgid "Its code, <span class=\"key\">%(code)s</span>, names %(names)s."
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid ""
+"Its package's printed label was revoked: <a href=\"%(link)s\">print a new"
+" one</a>."
+msgid_plural ""
+"Its packages' %(count)s printed labels were revoked: <a "
+"href=\"%(link)s\">print new ones</a>."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/inventory_tng/templates/places/location.html
 #, python-format
 msgid "Its parent's (%(zone)s)"
@@ -2061,6 +2077,10 @@ msgstr ""
 
 #: src/inventory_tng/web/forms.py
 msgid "Its unit is fixed, as a label has been printed for it."
+msgstr ""
+
+#: src/inventory_tng/web/forms.py
+msgid "Its unit is fixed, as its recorded amounts have been recalculated."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
@@ -4421,6 +4441,7 @@ msgid "Too many tries. Wait a few minutes, then try again."
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/unit_recount.html
 msgid "Too short to use"
 msgstr ""
 
@@ -4956,6 +4977,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: src/inventory_tng/templates/catalogue/item.html
+#: src/inventory_tng/templates/catalogue/unit_recount.html
 #, python-format
 msgid "below, in %(unit)s; blank: none"
 msgstr ""
@@ -5092,12 +5114,24 @@ msgstr ""
 msgid "gain"
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid ""
+"gives the size of each of its packages in %(old)s again, below, in "
+"%(new)s, each keeping its name and links;"
+msgstr ""
+
 #: src/inventory_tng/templates/volunteers/volunteers.html
 msgid "holds stock"
 msgstr ""
 
 #: src/inventory_tng/site_settings/forms.py
 msgid "hours"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "in %(new)s; was %(size)s %(old)s"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/unit_recount.html
@@ -5226,6 +5260,12 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 msgid ""
+"only another length, as its recorded amounts have been recalculated: they"
+" are recalculated again"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/item.html
+msgid ""
 "only another length, as stock has moved in it: its recorded amounts are "
 "recalculated"
 msgstr ""
@@ -5321,6 +5361,15 @@ msgstr ""
 #: src/inventory_tng/templates/devices/device_list.html
 msgid "revoked"
 msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "revokes their printed label, as it shows the size as it was;"
+msgid_plural ""
+"revokes their %(count)s printed labels, as they show the sizes as they "
+"were;"
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 msgid "set on this package"

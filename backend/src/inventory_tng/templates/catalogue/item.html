@@ -33,6 +33,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {% if unit_fixed and units | length > 1 and not retired %}
     {% if unit_fixed == "moved" %}
     <span class="hint">{% trans %}only another length, as stock has moved in it: its recorded amounts are recalculated{% endtrans %}</span>
+    {% elif unit_fixed == "converted" %}
+    <span class="hint">{% trans %}only another length, as its recorded amounts have been recalculated: they are recalculated again{% endtrans %}</span>
     {% else %}
     <span class="hint">{#- Translators: %(until)s says why, as "until both its printed labels are revoked"; %(revoke)s is the link to revoke them, as "Revoke its 2 labels". #}{% trans until=until_revoked(labels_printed), revoke=revoke_link(labels_printed, its_labels) %}only another length {{ until }}: its recorded amounts are recalculated. {{ revoke }} to change it without recalculating its amounts.{% endtrans %}</span>
     {% endif %}
@@ -42,6 +44,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {% elif unit_fixed %}
     {% if unit_fixed == "moved" %}
     <span class="hint">{% trans unit=item.unit %}{{ unit }}: fixed, as stock has moved in it{% endtrans %}</span>
+    {% elif unit_fixed == "converted" %}
+    <span class="hint">{% trans unit=item.unit %}{{ unit }}: fixed, as its recorded amounts have been recalculated{% endtrans %}</span>
     {% elif retired %}
     {#- Read only, and its labels inactive: nothing to revoke. #}
     <span class="hint">{% trans unit=item.unit %}{{ unit }}: fixed, as a label has been printed for it{% endtrans %}</span>
@@ -59,9 +63,10 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {#- Answered No, only labels fixing the unit: the way to revoke them;
     a retired item's are inactive, nothing to revoke. #}
     <span class="problem" id="unit-problem">{{ problems.unit }} {{ revoke_link(labels_printed, its_labels) }}</span>
-    {% elif unit_declined == "moved" and not retired %}
-    {#- Answered No, stock moved: the guided recount puts a unit wrong from
-    the start right (catalogue/unit_recounts.py). #}
+    {% elif unit_declined in ("moved", "converted") and not retired %}
+    {#- Answered No, stock moved or its amounts converted before: the
+    guided recount puts a unit wrong from the start right
+    (catalogue/unit_recounts.py). #}
     <span class="problem" id="unit-problem">{{ problems.unit }} <a href="{{ recount_in }}">{% trans unit=recount_to %}Recount it in {{ unit }}{% endtrans %}</a></span>
     {% else %}
     {% with name = "unit" %}{% include "_field_problem.html" %}{% endwith %}
@@ -164,7 +169,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
           </label>
           {% with typed = sent.get('package_name', package.name) %}{% include "catalogue/_units_read.html" %}{% endwith %}
           {% if package.id not in sizes_fixed %}
-          <label>{% trans %}Holds{% endtrans %} <span class="hint">{% trans unit=package.unit %}in {{ unit }}; fixed once some has moved or been opened, or while it is labelled{% endtrans %}</span>
+          <label>{{ holds }} <span class="hint">{% trans unit=package.unit %}in {{ unit }}; fixed once some has moved or been opened, or while it is labelled{% endtrans %}</span>
             <input name="size" inputmode="{{ package.unit | keyboard }}" value="{{ sent.get('size', package.size | box_amount(decimal)) }}" required>
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
@@ -237,7 +242,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
       {% if adding %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = new.get('package_name', ''), sent = new %}{% include "catalogue/_units_read.html" %}{% endwith %}
-    <label>{% trans %}Holds{% endtrans %} <input name="size" value="{{ new.get('size', '') }}" inputmode="{{ item.unit | keyboard }}" required
+    <label>{{ holds }} <input name="size" value="{{ new.get('size', '') }}" inputmode="{{ item.unit | keyboard }}" required
       {%- if held_back %} aria-invalid="true" aria-describedby="held-back" autofocus{% endif %}>
       {% if adding %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
