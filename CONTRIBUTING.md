@@ -674,7 +674,8 @@ is left as it is. Until then Record refuses the cart, as the rest without
 it would record less than was moved (`toBatch`). A count kept before the
 cart kept sizes is taken as counted at the size shown. So too each line
 keeps the unit its amounts were typed in, until they are typed again
-(`sized`), and sends it, so the server refuses a line of an item counted
+(`sized`), and sends it with the line and with what is said to be on its
+open packages, so the server refuses either of an item counted
 in another unit since (`unit_changed`, docs/decisions/0003, work saved as
 it was shown). Where the page's catalogue shows another unit, everything
 typed on the line is cleared, its package counts too, and the line says

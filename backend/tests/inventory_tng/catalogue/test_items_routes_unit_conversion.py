@@ -342,6 +342,32 @@ def test_a_scan_batch_opens_a_spool_in_the_new_unit_and_one_drawn_before_is_refu
     assert moments.left_at(session, made, latest) == Decimal("1000.656")
 
 
+def test_a_length_reported_on_a_page_drawn_before_the_change_is_refused(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A report of 50 m on an open spool, from a page drawn while the cable
+    was in m, sent once it is in ft, is refused as shown otherwise, never
+    kept as 50 ft (inventory-tng-fs50). One in ft is kept in ft."""
+    spools = Spools(session)
+    made = spools.opened()
+    cable = spools.cable
+    admin_client.post(
+        f"{ITEMS}/{cable.id}", data=_yes(cable, unit="ft", track_opened="on")
+    )
+    drawn_before = report(spools, length(made, "50", "m"))
+    with pytest.raises(BatchRefused) as refused:
+        record(session, Batch.model_validate(drawn_before), device_id=None)
+    assert refused.value.problems == [(("lengths", 0, "unit"), "unit_changed")]
+    session.refresh(made)
+    assert made.length_reported is None
+    record(
+        session,
+        Batch.model_validate(report(spools, length(made, "50", "ft"))),
+        device_id=None,
+    )
+    assert (made.length_reported, made.length_reported_unit) == (Decimal(50), "ft")
+
+
 def test_a_count_after_the_change_counts_spools_in_the_new_unit(
     admin_client: TestClient, session: Session
 ) -> None:

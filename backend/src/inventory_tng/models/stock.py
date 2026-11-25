@@ -181,7 +181,7 @@ class LedgerTransaction(Base):
         ARRAY(Uuid), server_default=text("'{}'")
     )
     # What its batch said is really on open packages, as sent: a list of
-    # {"open_package_key", "left"}, compared as used_up is.
+    # {"open_package_key", "left", "unit"}, compared as used_up is.
     lengths: Mapped[list[dict[str, str]]] = mapped_column(
         JSONB, server_default=text("'[]'")
     )

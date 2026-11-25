@@ -455,6 +455,11 @@ export interface components {
       open_package_key: string;
       /** Left */
       left: number | string;
+      /**
+       * Unit
+       * @description The item's unit the page showed `left` in, from the catalogue. A report on an open package of an item counted in another unit since is refused (unit_changed), as a line is, never kept in the new unit.
+       */
+      unit: string;
     };
     /** Line */
     Line: {
@@ -716,6 +721,8 @@ export interface components {
       open_package_key: string;
       /** Left */
       left: string;
+      /** Unit */
+      unit: string;
     };
     /**
      * RecordedLine

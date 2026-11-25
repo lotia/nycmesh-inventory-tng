@@ -1062,10 +1062,17 @@
               }
             ],
             "title": "Left"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Unit",
+            "description": "The item's unit the page showed `left` in, from the catalogue. A report on an open package of an item counted in another unit since is refused (unit_changed), as a line is, never kept in the new unit."
           }
         },
         "type": "object",
-        "required": ["open_package_key", "left"],
+        "required": ["open_package_key", "left", "unit"],
         "title": "LengthReport",
         "description": "What a volunteer says is really on an open package, for an\nadministrator to check (docs/decisions/0020, 2026-11-12)."
       },
@@ -1557,10 +1564,14 @@
           "left": {
             "type": "string",
             "title": "Left"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
           }
         },
         "type": "object",
-        "required": ["open_package_key", "left"],
+        "required": ["open_package_key", "left", "unit"],
         "title": "RecordedLength",
         "description": "A report of what is on an open package, as recorded (LengthReport)."
       },

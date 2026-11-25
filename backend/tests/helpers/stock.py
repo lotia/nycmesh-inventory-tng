@@ -340,9 +340,10 @@ def netted_retired(session: Session) -> Spools:
     return spools
 
 
-def length(made: OpenPackage, left: str) -> dict[str, str]:
-    """A batch's report of what is really on an open package."""
-    return {"open_package_key": str(made.key), "left": left}
+def length(made: OpenPackage, left: str, unit: str = "m") -> dict[str, str]:
+    """A batch's report of what is really on an open package, `left` in
+    `unit`, the one the page showed."""
+    return {"open_package_key": str(made.key), "left": left, "unit": unit}
 
 
 def report(

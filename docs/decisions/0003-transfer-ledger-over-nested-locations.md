@@ -271,7 +271,8 @@ exactly when its first saves may still be on their way, such as a phone's
 outbox holding a receipt of 50 m of a new cable when an administrator
 switches it to ft. So every save says the units and package sizes it
 showed: each line of a scan page's batch its item's unit, as it already
-said its package's size; a count form the unit of every item and the size
+said its package's size, and so each of its reports of what is on an
+open package (inventory-tng-fs50); a count form the unit of every item and the size
 of every package it shows; an adjustment the unit of every item it offers;
 an open package's count confirmed its item's unit. The save compares them
 with the catalogue while holding the items and packages, as it does to

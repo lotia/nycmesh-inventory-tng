@@ -311,7 +311,7 @@ describe("turning a cart into a batch", () => {
     ).toMatchObject({
       draft: {
         kind: "move",
-        lengths: [{ open_package_key: key, left: "250" }],
+        lengths: [{ open_package_key: key, left: "250", unit: "m" }],
       },
       what: "Move: 1 item from Hub to Van (what is on 1 open package said)",
     });
@@ -323,7 +323,7 @@ describe("turning a cart into a batch", () => {
         volunteer_id: 1,
         from_location_id: 10,
         lines: [],
-        lengths: [{ open_package_key: key, left: "12.5" }],
+        lengths: [{ open_package_key: key, left: "12.5", unit: "m" }],
       },
       what: "What's on it: 1 open package at Hub",
     });
@@ -618,6 +618,37 @@ describe("turning a cart into a batch", () => {
     });
     expect(toBatch(again, inFeet)).toMatchObject({
       draft: { lines: [{ item_id: 101, quantity: "40", unit: "ft" }] },
+    });
+  });
+
+  test("what is said on an open package says the unit it was typed in, else the one shown now (inventory-tng-fs50)", () => {
+    const key = "11111111-1111-4111-8111-111111111111";
+    const said = (unit?: string) =>
+      cart({
+        lines: [
+          {
+            itemId: 101,
+            packages: {},
+            loose: "",
+            open: { [key]: { amount: "", whole: false, now: "50" } },
+            ...(unit === undefined ? {} : { unit }),
+          },
+        ],
+      });
+    const lengths = (batch: ReturnType<typeof toBatch>) =>
+      "draft" in batch ? batch.draft.lengths : undefined;
+    expect(lengths(toBatch(said("m"), CATALOGUE))).toEqual([
+      { open_package_key: key, left: "50", unit: "m" },
+    ]);
+    const inFeet = { ...CATALOGUE, items: [radio, { ...cable, unit: "ft" }] };
+    expect(lengths(toBatch(said(), inFeet))).toEqual([
+      { open_package_key: key, left: "50", unit: "ft" },
+    ]);
+    // Of an item the catalogue no longer has, there is no unit to say:
+    // only that it is gone.
+    const gone = { ...CATALOGUE, items: [radio] };
+    expect(saidAsText(toBatch(said("m"), gone))).toEqual({
+      problems: [say(ITEM_GONE)],
     });
   });
 

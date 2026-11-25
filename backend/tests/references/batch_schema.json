@@ -136,11 +136,17 @@
         "open_package_key": {
           "format": "uuid",
           "type": "string"
+        },
+        "unit": {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
         }
       },
       "required": [
         "left",
-        "open_package_key"
+        "open_package_key",
+        "unit"
       ],
       "type": "object"
     },

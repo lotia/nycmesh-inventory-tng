@@ -183,8 +183,14 @@ export function toBatch(
         );
       } else if (left >= MAX_AMOUNT) {
         problems.push(sayParts(TOO_MUCH, { name: named }));
-      } else {
-        lengths.push({ open_package_key: key, left: decimal(left) });
+      } else if (item !== undefined) {
+        // In the unit it was typed in, as its line's amounts are: one
+        // counted in another since is refused (inventory-tng-fs50).
+        lengths.push({
+          open_package_key: key,
+          left: decimal(left),
+          unit: line.unit ?? item.unit,
+        });
         boxes.push(here.get(key)?.package_name ?? null);
       }
     }

@@ -31,7 +31,7 @@ export const RecordedLine = v.object({
   package_size: v.nullable(v.string()),
   open_package_key: v.nullable(v.pipe(v.string(), v.uuid())),
   whole: v.nullable(v.boolean()),
-  /** Its item's unit, fixed once it moved. */
+  /** The unit it was recorded in. */
   unit: v.string(),
 });
 
@@ -50,6 +50,7 @@ export const RecordedBatch = v.object({
     v.object({
       open_package_key: v.pipe(v.string(), v.uuid()),
       left: v.string(),
+      unit: v.string(),
     }),
   ),
 });

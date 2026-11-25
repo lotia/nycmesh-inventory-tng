@@ -109,6 +109,9 @@ def test_a_volunteer_reports_what_is_on_it_and_nothing_moves(
     # Sent again with another figure: refused as the key reused.
     other = batch | {"lengths": [length(made, "200")]}
     assert registered_client.post(URL, json=other).status_code == 409
+    # Or in another unit (inventory-tng-fs50).
+    in_ft = batch | {"lengths": [length(made, "250.5", "ft")]}
+    assert registered_client.post(URL, json=in_ft).status_code == 409
 
 
 def test_a_report_rides_with_a_cut(
@@ -131,7 +134,7 @@ def test_a_report_that_cannot_be_is_refused(
         assert response.status_code == 422
         return [(p["loc"][1:], p["type"]) for p in response.json()["detail"]]
 
-    nobody = {"open_package_key": str(uuid.uuid4()), "left": "1"}
+    nobody = {"open_package_key": str(uuid.uuid4()), "left": "1", "unit": "m"}
     assert refused(report(spools, nobody)) == [
         (["lengths", 0, "open_package_key"], "not_found")
     ]
@@ -479,14 +482,16 @@ def test_what_is_in_an_open_box_of_pieces_is_whole(
     # scan page does. The spools' item made pieces, counted each.
     spools = Spools(session, cable_unit="each")
     made = spools.opened()
-    response = registered_client.post(URL, json=report(spools, length(made, "2.5")))
+    response = registered_client.post(
+        URL, json=report(spools, length(made, "2.5", "each"))
+    )
     assert response.status_code == 422
     assert [(p["loc"][1:], p["type"]) for p in response.json()["detail"]] == [
         (["lengths", 0, "left"], "not_whole")
     ]
     session.refresh(made)
     assert made.length_reported is None
-    said = registered_client.post(URL, json=report(spools, length(made, "300")))
+    said = registered_client.post(URL, json=report(spools, length(made, "300", "each")))
     assert said.status_code == 201
     # The check page words it for pieces too, with the number keypad.
     page = admin_client.get(LENGTHS)

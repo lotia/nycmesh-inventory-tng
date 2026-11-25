@@ -127,8 +127,18 @@ class LengthReport(BaseModel):
     administrator to check (docs/decisions/0020, 2026-11-12)."""
 
     open_package_key: uuid.UUID
-    # In the item's unit.
     left: Remaining
+    unit: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=UNIT_MAX,
+            description="The item's unit the page showed `left` in, from the "
+            "catalogue. A report on an open package of an item counted in "
+            "another unit since is refused (unit_changed), as a line is, never "
+            "kept in the new unit.",
+        ),
+    ]
 
 
 class Batch(BaseModel):
@@ -295,6 +305,8 @@ class RecordedLength(BaseModel):
 
     open_package_key: uuid.UUID
     left: Decimal
+    # The unit it was reported in.
+    unit: str
 
 
 class RecordedBatch(BaseModel):

@@ -230,11 +230,13 @@ def record(
     twice = repeated(length_keys)
     # What is said to be on one of an item counted each is whole, as the
     # scan page asks (Ali, 2026-11-23, inventory-tng-uwi3), and is kept in
-    # its item's unit (open_packages.report_length). Read without a lock:
-    # an open package exists only once stock moved in its item, which
-    # fixes it as counted each or a length for good
-    # (catalogue/items.unit_fixed); a change between lengths waits for the
-    # open packages this holds, then converts what this reports of them.
+    # the unit the page showed, its item's (open_packages.report_length).
+    # Read without a lock on the item: an open package exists only once
+    # stock moved in its item, which fixes it as counted each or a length
+    # for good (catalogue/items.unit_fixed); a change between lengths waits
+    # for the open packages this holds, then converts what this reports of
+    # them. One committed before is read here, so a report shown in the old
+    # unit is refused (unit_changed), as a line is (inventory-tng-fs50).
     units = values_by(
         session,
         Item.id,
@@ -254,7 +256,10 @@ def record(
             problems.append((at, "not_found"))
         elif opened.location_id != batch.from_location_id:
             problems.append((at, "open_package_elsewhere"))
-        elif not whole_enough(units[opened.item_id], each.left):
+        elif each.unit != units[opened.item_id]:
+            problems.append((("lengths", number, "unit"), "unit_changed"))
+            now.units[opened.item_id] = units[opened.item_id]
+        elif not whole_enough(each.unit, each.left):
             problems.append((("lengths", number, "left"), "not_whole"))
     if problems:
         if now:
@@ -293,7 +298,7 @@ def record(
     for each in lengths:
         row = rows[measured[each.open_package_key]]
         open_packages.report_length(
-            session, row, each.left, units[row.item_id], batch.volunteer_id, transaction
+            session, row, each.left, each.unit, batch.volunteer_id, transaction
         )
     for open_id, cut in cuts.items():
         open_packages.went_below_zero(
@@ -600,14 +605,18 @@ def _lengths_as_kept(
     """A batch's reports of what is on open packages, as its transaction
     keeps them."""
     return [
-        {"open_package_key": str(each.open_package_key), "left": str(each.left)}
+        {
+            "open_package_key": str(each.open_package_key),
+            "left": str(each.left),
+            "unit": each.unit,
+        }
         for each in lengths
     ]
 
 
-def _kept_as_sent(kept: Mapping[str, str]) -> tuple[uuid.UUID, Decimal]:
+def _kept_as_sent(kept: Mapping[str, str]) -> tuple[uuid.UUID, Decimal, str]:
     """One of those, as sent, compared whatever its decimal places."""
-    return uuid.UUID(kept["open_package_key"]), Decimal(kept["left"])
+    return uuid.UUID(kept["open_package_key"]), Decimal(kept["left"]), kept["unit"]
 
 
 def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction | None:
@@ -656,7 +665,10 @@ def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction |
         written == sent
         and Counter(transaction.used_up) == Counter(batch.used_up or [])
         and Counter(map(_kept_as_sent, transaction.lengths))
-        == Counter((each.open_package_key, each.left) for each in batch.lengths or [])
+        == Counter(
+            (each.open_package_key, each.left, each.unit)
+            for each in batch.lengths or []
+        )
         and same_header
     )
     if not same:
@@ -779,8 +791,8 @@ def _as_batch(
         lines=[line_of(line) for line in lines],
         used_up=list(transaction.used_up),
         lengths=[
-            batch_schemas.RecordedLength(open_package_key=key, left=left)
-            for key, left in map(_kept_as_sent, transaction.lengths)
+            batch_schemas.RecordedLength(open_package_key=key, left=left, unit=unit)
+            for key, left, unit in map(_kept_as_sent, transaction.lengths)
         ],
     )
 

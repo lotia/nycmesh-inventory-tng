@@ -416,7 +416,7 @@ describe("refusals", () => {
       kind: "report",
       to_location_id: null,
       lines: [],
-      lengths: [{ open_package_key: key, left: "250" }],
+      lengths: [{ open_package_key: key, left: "250", unit: "m" }],
     });
     const { api, sent } = answering(
       replies(() => new Response("", { status: 500 })),

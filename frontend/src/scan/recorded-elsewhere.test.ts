@@ -120,7 +120,7 @@ describe("what differs", () => {
     expect(
       shown(said, {
         ...said,
-        lengths: [{ open_package_key: OPEN, left: "12" }],
+        lengths: [{ open_package_key: OPEN, left: "12", unit: "m" }],
       }),
     ).toEqual([
       "What is on an open package, new / Can't add these items. Please rescan.",
@@ -128,7 +128,7 @@ describe("what differs", () => {
   });
 
   test("a length said again as it was is no change; a quantity it cannot read counts as none", () => {
-    const length = { open_package_key: OPEN, left: "12" };
+    const length = { open_package_key: OPEN, left: "12", unit: "m" };
     const said = move([], { kind: "report", lengths: [length] });
     expect(reportsAdded(said, { ...said, lengths: [length] })).toEqual([]);
     expect(recordedLines(recorded(said), CATALOGUE).map(wordsOf)).toEqual([

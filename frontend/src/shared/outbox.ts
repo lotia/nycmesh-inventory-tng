@@ -124,6 +124,8 @@ export const BatchBody = v.object({
         v.object({
           open_package_key: v.pipe(v.string(), v.uuid()),
           left: amount,
+          /** The item's unit `left` was typed in, as a line's. */
+          unit: v.string(),
         }),
       ),
     ),
