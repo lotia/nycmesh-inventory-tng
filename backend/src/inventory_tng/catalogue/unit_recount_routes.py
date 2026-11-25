@@ -113,7 +113,7 @@ def recount(
     if unit not in unit_recounts.units_open(session, found):
         return redirect(f"{ITEMS}/{item_id}")
     # The offers as now: one added or retired since is refused as changed.
-    offers = [each.offer.id for each in unit_recounts.planned(session, found).offers]
+    offers = [each.offer.id for each in unit_recounts.offers_of(session, item_id)]
     amounts, problems = forms.recount_amounts(
         form, offers, separator=decimal_separator(request)
     )
@@ -169,21 +169,23 @@ def recounted(
     if found is None:
         return not_found()
     ids = {each for part in places.split(",") if (each := row_id(part)) is not None}
+    # A retired one, holding nothing now, is counted no more.
+    current = [each for each in places_with_ids(session, ids) if not each.retired_at]
+    item_path = f"{ITEMS}/{item_id}"
     return admin_page(
         request,
         signed,
         "catalogue/unit_recounted.html",
         {
             "title": recounted_title(found.name_shown, found.unit),
-            "back_link": (f"{ITEMS}/{item_id}", found.name_shown),
+            "back_link": (item_path, found.name_shown),
             "item": found,
-            # A retired one, holding nothing now, is counted no more.
             "places": sorted(
-                (each for each in places_with_ids(session, ids) if not each.retired_at),
+                current,
                 key=lambda each: (each.name.lower(), each.id),
             ),
             "counts_path": COUNTS,
             "revoked": whole(labels, 0, INTEGER_MAX) or 0,
-            "item_path": f"{ITEMS}/{item_id}",
+            "item_path": item_path,
         },
     )

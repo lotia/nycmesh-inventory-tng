@@ -152,17 +152,23 @@ def convert(
     # Refused before it is asked: a line recorded with more than was
     # moved, waiting, is shown in the line's unit. One raised while this
     # runs is converted as it is corrected (stock/over_recorded.py).
-    waiting = (
-        OverRecorded.movement_id == Movement.id,
-        Movement.item_id == item.id,
-        OverRecorded.settled_at.is_(None),
-    )
-    if exists_where(session, *waiting):
+    if checks_waiting(session, item.id):
         _refused(item.id, "checks_waiting", UNIT_CHECKS_WAITING)
     if recorded_in != item.unit:
         log.info("unit change asked", item_id=item.id, reason=why)
         enforce(UNIT_UNCONFIRMED)
     return _converted(session, item, new, minimum, why)
+
+
+def checks_waiting(session: Session, item_id: int) -> bool:
+    """Whether a check of a line of the item, recorded with more than was
+    moved, waits: its unit may not change meanwhile (UNIT_CHECKS_WAITING)."""
+    return exists_where(
+        session,
+        OverRecorded.movement_id == Movement.id,
+        Movement.item_id == item_id,
+        OverRecorded.settled_at.is_(None),
+    )
 
 
 def _refused(item_id: int, reason: str, rule: str) -> None:

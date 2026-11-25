@@ -4,9 +4,10 @@ has moved in it, or while a label of it is printed and not revoked
 length, and asks "Were the recorded amounts really in m?" before it
 converts them (Ali, 2026-11-24, inventory-tng-y50b). Answered No, it
 links to the guided recount (unit_recount_routes), or, fixed only by
-labels, to the item's labels, to revoke them and correct a mistake. A package's size fixed only by labels says so too
-(items.sizes_fixed). A retired item with stock
-left may still be taken, never received (docs/decisions/0003)."""
+labels, to the item's labels, to revoke them and correct a mistake. A
+package's size fixed only by labels says so too (items.sizes_fixed). A
+retired item with stock left may still be taken, never received
+(docs/decisions/0003)."""
 
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence

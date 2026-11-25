@@ -48,14 +48,11 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import unit_changes, units
 from inventory_tng.catalogue.name_keys import name_key
-from inventory_tng.catalogue.unit_conversion import convertible
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import lock_catalogue, locked, relock
 from inventory_tng.core.db_once_committed import once_committed
-from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import (
-    UNITS,
     Item,
     ItemPackage,
     Vendor,
@@ -65,7 +62,7 @@ from inventory_tng.models.catalogue import (
 from inventory_tng.models.labels import Label
 from inventory_tng.models.names import unit_key
 from inventory_tng.models.places import Location
-from inventory_tng.models.stock import Movement, OpenPackage, OverRecorded
+from inventory_tng.models.stock import Movement, OpenPackage
 from inventory_tng.stock import adjustment_reasons, counts, open_packages
 from inventory_tng.stock.balance import by_form
 from inventory_tng.stock.ledger import LOOSE, Form, lock_places
@@ -90,7 +87,7 @@ def units_open(session: Session, item: Item) -> tuple[str, ...]:
         return ()
     if unit_changes.unit_fixed(session, item.id) != "moved":
         return ()
-    return tuple(each for each in UNITS if convertible(item.unit, each))
+    return unit_changes.units_open(item.unit, "moved")[1:]
 
 
 class Held(NamedTuple):
@@ -196,21 +193,8 @@ def planned(session: Session, item: Item) -> Planned:
     old = [package for package in every if package.unit == item.unit]
     renamed = _renamed(session, old, every, item.unit)
     printed = labels.current_of(session, Label.item_id == item.id)
-    offers = [
-        Offer(offer, vendor)
-        for offer, vendor in session.execute(
-            select(VendorOffer, Vendor.name)
-            .outerjoin(Vendor, Vendor.id == VendorOffer.vendor_id)
-            .where(VendorOffer.item_id == item.id, VendorOffer.retired_at.is_(None))
-            .order_by(VendorOffer.id)
-        )
-    ]
-    waiting = exists_where(
-        session,
-        OverRecorded.movement_id == Movement.id,
-        Movement.item_id == item.id,
-        OverRecorded.settled_at.is_(None),
-    )
+    offers = offers_of(session, item.id)
+    waiting = unit_changes.checks_waiting(session, item.id)
     last = _last_transaction(session, item.id)
     seen = "/".join(
         [
@@ -225,15 +209,21 @@ def planned(session: Session, item: Item) -> Planned:
             _ids(each.offer.id for each in offers),
         ]
     )
-    return Planned(
-        held,
-        opened,
-        renamed,
-        printed,
-        offers,
-        waiting,
-        seen,
-    )
+    return Planned(held, opened, renamed, printed, offers, waiting, seen)
+
+
+def offers_of(session: Session, item_id: int) -> list[Offer]:
+    """The item's current vendor offers, in order, each with its vendor's
+    name."""
+    return [
+        Offer(offer, vendor)
+        for offer, vendor in session.execute(
+            select(VendorOffer, Vendor.name)
+            .outerjoin(Vendor, Vendor.id == VendorOffer.vendor_id)
+            .where(VendorOffer.item_id == item_id, VendorOffer.retired_at.is_(None))
+            .order_by(VendorOffer.id)
+        )
+    ]
 
 
 def _ids(ids: Iterable[int]) -> str:
@@ -360,31 +350,15 @@ def _recounted(
     old = item.unit
     reason = adjustment_reasons.seeded(session, adjustment_reasons.RECORDS_WRONG).id
     for each in plan.held:
-        place_key = uuid.uuid5(key, str(each.place.id))
-        counts.write_off(
-            session,
-            place_key,
-            admin_id,
-            each.place.id,
-            item.id,
-            each.forms,
-            reason_id=reason,
-        )
+        sent = uuid.uuid5(key, str(each.place.id))
+        _write_off(session, each, sent, admin_id, item.id, reason)
     item.unit = unit
     session.flush()
     # Read in the new unit: a part of a thousandth left by lines converted
     # before (inventory-tng-8s2c), at any place it has been, all held.
     for each in _held(session, item.id):
-        place_key = uuid.uuid5(key, f"{each.place.id} {unit}")
-        counts.write_off(
-            session,
-            place_key,
-            admin_id,
-            each.place.id,
-            item.id,
-            each.forms,
-            reason_id=reason,
-        )
+        sent = uuid.uuid5(key, f"{each.place.id} {unit}")
+        _write_off(session, each, sent, admin_id, item.id, reason)
     for row in plan.opened:
         open_packages.close(
             session,
@@ -426,3 +400,24 @@ def _recounted(
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
     return Recounted(places, len(plan.labels))
+
+
+def _write_off(
+    session: Session,
+    held: Held,
+    key: uuid.UUID,
+    admin_id: int,
+    item_id: int,
+    reason_id: int,
+) -> None:
+    """What the records hold of the item at a place, as `held`, brought to
+    zero under `key` (counts.write_off)."""
+    counts.write_off(
+        session,
+        key,
+        admin_id,
+        held.place.id,
+        item_id,
+        held.forms,
+        reason_id=reason_id,
+    )

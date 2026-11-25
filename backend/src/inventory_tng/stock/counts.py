@@ -171,18 +171,22 @@ def _write_count(
     out: list[Entry],
     *,
     when_unchanged: bool = False,
+    kind: Literal["count", "adjustment"] = "count",
+    reason_id: int | None = None,
 ) -> list[Written]:
-    """A count's corrections written: what it found, into the place under
-    `key`, and what it lost, out of it under a key made from it (_lost_key).
+    """A count's corrections written, as transactions of `kind` for
+    `reason_id`, if any: what it found, into the place under `key`, and what
+    it lost, out of it under a key made from it (_lost_key).
     `when_unchanged`, a count that found nothing either way is written into
     the place all the same, so it still says when the place was counted."""
     written: list[Written] = []
+    why = {} if reason_id is None else {"reason_id": reason_id}
     if into or (when_unchanged and not out):
-        header = {"to_location_id": location_id}
-        written += _correct(session, key, "count", admin_id, header, into)
+        header = {**why, "to_location_id": location_id}
+        written += _correct(session, key, kind, admin_id, header, into)
     if out:
-        header = {"from_location_id": location_id}
-        written += _correct(session, _lost_key(key), "count", admin_id, header, out)
+        header = {**why, "from_location_id": location_id}
+        written += _correct(session, _lost_key(key), kind, admin_id, header, out)
     return written
 
 
@@ -409,21 +413,21 @@ def write_off(
     reason_id: int,
 ) -> list[Written]:
     """What the records `held` of an item at a place, by form, brought to
-    nothing by adjustments for a reason, in its item's unit: what it held
-    written off under `key`, and less than nothing found under a key made
-    from it, so sending it twice writes each once. Call it holding the
-    place (ledger.lock_place): no other save may write there meanwhile."""
+    nothing by adjustments for a reason, in its item's unit, as a count
+    of nothing writes it (_write_count). Call it holding the place
+    (ledger.lock_place): no other save may write there meanwhile."""
     zero = [(item_id, form, Decimal(0)) for form in held]
     found, lost = count_corrections(zero, {(item_id, f): n for f, n in held.items()})
-    written: list[Written] = []
-    for lines, side, sent in (
-        (lost, "from_location_id", key),
-        (found, "to_location_id", uuid.uuid5(key, "found")),
-    ):
-        if lines:
-            header = {"reason_id": reason_id, side: location_id}
-            written += _correct(session, sent, "adjustment", admin_id, header, lines)
-    return written
+    return _write_count(
+        session,
+        key,
+        admin_id,
+        location_id,
+        found,
+        lost,
+        kind="adjustment",
+        reason_id=reason_id,
+    )
 
 
 def record_adjustment(
