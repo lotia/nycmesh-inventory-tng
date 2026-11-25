@@ -23,7 +23,7 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
     {%- if plan.revoking %} {% trans count=plan.revoking | length %}revokes their printed label, as it shows the size as it was;{% pluralize %}revokes their {{ count }} printed labels, as they show the sizes as they were;{% endtrans %}{% endif %}</li>{% endif %}
   <li>{% trans new=unit %}changes its unit to {{ new }}, and keeps the amounts below in {{ new }}.{% endtrans %}</li>
 </ol>
-<p>{% trans new=unit %}Then count it at each place in {{ new }}, and add its packages in {{ new }}.{% endtrans %}</p>
+{% if not converted %}<p>{% trans new=unit %}Then count it at each place in {{ new }}, and add its packages in {{ new }}.{% endtrans %}</p>{% endif %}
 {% if plan.waiting %}
 <p class="problem" id="waiting">{{ waiting }}</p>
 {% else %}

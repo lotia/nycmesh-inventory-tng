@@ -398,7 +398,10 @@ def _recounted(
     """recount's writes, holding the places and the item."""
     if item.retired_at is not None:
         _refused(item.id, "retired", RETIRED)
-    if plan.seen != seen or unit not in units_open(session, item):
+    # A package asked again whose size was not sent: never left in the old
+    # unit, nor a server error.
+    unsized = {package.id for package in plan.resized} - amounts.sizes.keys()
+    if plan.seen != seen or unsized or unit not in units_open(session, item):
         _refused(item.id, "changed", CHANGED)
     if plan.waiting:
         _refused(item.id, "checks_waiting", unit_changes.UNIT_CHECKS_WAITING)

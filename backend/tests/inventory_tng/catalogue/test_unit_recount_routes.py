@@ -114,6 +114,7 @@ def test_the_page_says_beforehand_all_it_will_do(
     assert "Spool becomes Spool (m)" in said
     assert "revoke" not in said
     assert "changes its unit to ft" in said
+    assert "Then count it at each place in ft, and add its packages in ft." in said
     assert box_values(page.text, "minimum") == ["100"]
     assert box_values(page.text, "on_order") == ["50"]
     assert box_values(page.text, f"per_order_{_offer(session, cable.id).id}") == ["305"]
@@ -515,6 +516,8 @@ def test_a_converted_item_is_recounted_by_its_amounts_and_package_sizes(
     said = words_on(page.text)
     assert "writes off nothing" in said
     assert "becomes" not in said
+    # Nothing to count, and its packages kept (Ali, 2026-11-25).
+    assert "Then count it" not in said
     assert (
         "gives the size of each of its packages in ft again, below, in m, each "
         "keeping its name and links; revokes their printed label, as it shows "
@@ -561,6 +564,7 @@ def test_a_converted_item_is_recounted_by_its_amounts_and_package_sizes(
     )
     after = read(admin_client.get(done.headers["location"]).text)
     assert "nothing to count" in words_on(after)
+    assert "Add its packages" not in words_on(after)
     assert "Its package's printed label was revoked: print a new one." in words_on(
         after
     )
@@ -639,3 +643,19 @@ def test_a_label_printed_on_a_package_to_resize_since_shown_is_refused(
     assert refused.status_code == 409
     session.expire_all()
     assert (cable.unit, label.revoked_at) == ("ft", None)
+
+
+def test_a_converted_items_package_size_not_sent_is_refused(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A form without a package's size, as one sent by hand: refused as
+    changed, the package never left in the old unit."""
+    place, _, reel = converted_reel(session)
+    cable = place.cable
+    page = _page(admin_client, cable.id, "m")
+    form = _sent(page)
+    del form[f"size_{reel.id}"]
+    refused = admin_client.post(unit_recount(cable.id, "m"), data=form)
+    assert refused.status_code == 409
+    session.expire_all()
+    assert (cable.unit, reel.unit) == ("ft", "ft")

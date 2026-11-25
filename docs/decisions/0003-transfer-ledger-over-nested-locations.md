@@ -495,4 +495,6 @@ other unit, and retiring the item for a new one.
   says so beforehand, and the page after links to the item's labels to
   print new ones (Ali, 2026-11-25, inventory-tng-l26i).
 - The page after links to a count of the item at each place, in the new
-  unit.
+  unit, and to adding its packages in it. For an item converted before
+  whose stock never moved, neither page says to count it or add its
+  packages, as nothing is counted or retired.
