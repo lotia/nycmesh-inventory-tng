@@ -21,6 +21,8 @@
       {% endfor %}
     </select>
   </label>
+  <label><input type="checkbox" name="revoked" value="no"{% if view.filtered("revoked") == "no" %} checked{% endif %}>
+    {% trans %}Hide revoked labels{% endtrans %}</label>
 {% endcall %}
 <p class="hint">{% trans items=items_path, locations=locations_path %}Make labels from an <a href="{{ items }}">item's</a> or a
 <a href="{{ locations }}">location's</a> page. Each has one code, printed as
@@ -54,7 +56,7 @@ the list as shown, to come back to if printing is refused. #}
         {%- if label.revoked_at %} <span class="hint">{% trans when=label.revoked_at | when(zone) %}on {{ when }}{% endtrans %}</span>{% endif %}
         <span class="hint block sm:hidden">{% trans when=label.created_at | when(zone) %}made {{ when }}{% endtrans %}</span></td>
       <td class="hidden sm:table-cell">{{ label.created_at | when(zone) }}</td>
-      <td>{% if not label.revoked_at %}<a href="{{ here }}/{{ label.id }}/revoke">{% trans %}Revoke{% endtrans %}<span class="sr-only"> {{ label.code }}</span></a>{% endif %}</td>
+      <td>{% if not label.revoked_at %}<a href="{{ here }}/{{ label.id }}/revoke{{ view.query_string }}">{% trans %}Revoke{% endtrans %}<span class="sr-only"> {{ label.code }}</span></a>{% endif %}</td>
     </tr>
     {% else %}
     {{ empty(listing, 5, _("None yet: make one from an item's or a place's page.")) }}

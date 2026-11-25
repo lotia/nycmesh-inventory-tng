@@ -1732,6 +1732,10 @@ msgstr ""
 msgid "Here"
 msgstr ""
 
+#: src/inventory_tng/templates/labels/labels.html
+msgid "Hide revoked labels"
+msgstr ""
+
 #: src/inventory_tng/templates/volunteers/volunteer.html
 msgid "Holding stock"
 msgstr ""

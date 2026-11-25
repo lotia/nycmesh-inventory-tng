@@ -45,7 +45,10 @@ prefilled Google Form links, which the new app cannot read.
   again and revoked on the labels page (inventory-tng-8i4.16); revoking
   asks to confirm first, as it can't be undone (8i4.88). Any label not
   yet revoked may be, an inactive one too, as a retired package's label
-  still fixes its item's unit (Ali, 2026-11-23, inventory-tng-x30g). The
+  still fixes its item's unit (Ali, 2026-11-23, inventory-tng-x30g). An
+  item's page links to its labels not yet revoked, and revoking or
+  keeping one goes back to the list as it was (Ali, 2026-11-24,
+  inventory-tng-9t9y). The
   labels page is one of 0019's long lists, "Current · Inactive · All";
   the labels picked to print are those on the page shown, so a search
   brings the ones wanted onto one page (8i4.60.23). Each printed label

@@ -90,6 +90,9 @@ SORTING = Sorting(
 
 # What the kind filter offers: labels of items, or of places.
 KINDS = {"item": Label.item_id.is_not(None), "place": Label.location_id.is_not(None)}
+# What the revoked filter offers: labels not revoked, current or inactive,
+# as an item page's link to revoke its labels asks (labels.paths.item_labels).
+REVOKED = {"no": Label.revoked_at.is_(None)}
 
 # How the labels list finds one: by its whole code, or the words naming it,
 # reading each label with what it names.
@@ -120,9 +123,11 @@ def _listed(
     pick: str = "",
     kind: str = "",
     item: str = "",
+    revoked: str = "",
 ) -> Listing[Label]:
     """The labels list as its query string asks for it, with its filters
-    (Ali, 2026-11-15): items' or places' labels, and one item's; a kind not
+    (Ali, 2026-11-15): items' or places' labels, one item's, and those not
+    revoked (Ali, 2026-11-24, inventory-tng-9t9y); a kind or revoked not
     offered, or an item not a number, is no filter."""
     item_id = whole(item, 1, INTEGER_MAX)
     filters: dict[str, str] = {}
@@ -130,6 +135,9 @@ def _listed(
     if kind in KINDS:
         filters["kind"] = kind
         where.append(KINDS[kind])
+    if revoked in REVOKED:
+        filters["revoked"] = revoked
+        where.append(REVOKED[revoked])
     if item_id is not None:
         filters["item"] = str(item_id)
         where.append(Label.item_id == item_id)
@@ -243,9 +251,15 @@ def print_labels(
 
 @router.get(f"{LABELS}/{{label_id}}/revoke")
 def confirm_revoke(
-    request: Request, signed: AdminSignedIn, session: DbSession, label_id: int
+    request: Request,
+    signed: AdminSignedIn,
+    session: DbSession,
+    listing: Listed,
+    label_id: int,
 ) -> Response:
-    """Revoking can't be undone and voids every printed copy: say so first."""
+    """Revoking can't be undone and voids every printed copy: say so first.
+    Kept or revoked, it goes back to the list as it was, its view carried
+    in the address (Ali, 2026-11-24, inventory-tng-9t9y)."""
     found = session.get(Label, label_id)
     if found is None or found.revoked_at is not None:
         return not_found()
@@ -256,16 +270,16 @@ def confirm_revoke(
         "labels/label_revoke.html",
         {
             "title": revoke_title(found.code),
-            "here": f"{LABELS}/{label_id}/revoke",
-            "keep": LABELS,
+            "here": f"{LABELS}/{label_id}/revoke{listing.view.query_string}",
+            "keep": listing.link(),
             "named": named,
         },
     )
 
 
 @router.post(f"{LABELS}/{{label_id}}/revoke")
-def revoke_label(session: DbSession, label_id: int) -> Response:
+def revoke_label(session: DbSession, listing: Listed, label_id: int) -> Response:
     if not labels.revoke(session, label_id, now()):
         return not_found()
     session.commit()
-    return redirect(LABELS, notice="label_revoked")
+    return redirect(listing.link(), notice="label_revoked")

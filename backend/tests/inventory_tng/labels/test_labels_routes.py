@@ -3,7 +3,7 @@ revoked from the labels page (labels/labels_routes.py)."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 import segno
@@ -33,6 +33,7 @@ from inventory_tng.web.qr_codes import qr_svg
 from helpers.items import shown_item_form
 from helpers.markup import (
     button,
+    checked,
     forms,
     hidden_fields,
     links,
@@ -376,7 +377,8 @@ def test_inactive_labels_say_why_and_agree_with_the_scan_page(
         # 2026-11-23, inventory-tng-x30g).
         assert not row.all("input", type="checkbox")
         revoking = [to for _, to in links(row) + forms(row) if "/revoke" in to]
-        offered = [] if why == "revoked" else [f"{LABELS}/{label.id}/revoke"]
+        confirm = f"{LABELS}/{label.id}/revoke?show=inactive"
+        offered = [] if why == "revoked" else [confirm]
         assert revoking == offered, why
     assert "4 inactive labels" in page
 
@@ -555,7 +557,8 @@ def test_an_items_labels_its_packages_too_are_each_offered_to_revoke(
     reels = add(session, Label(item_id=cable.id, package_id=reel.id))
     page = read(admin_client.get(item_labels(cable.id)).text)
     for label in (own, reels):
-        page.one("a", f"Revoke {label.code}", href=f"{LABELS}/{label.id}/revoke")
+        (link,) = page.all("a", f"Revoke {label.code}")
+        assert address(link.attrs["href"])[0] == f"{LABELS}/{label.id}/revoke"
 
 
 def test_a_retired_packages_label_is_revoked_from_its_items_labels(
@@ -570,21 +573,114 @@ def test_a_retired_packages_label_is_revoked_from_its_items_labels(
     (to_labels,) = item_page.all("a", "Revoke its labels")
     assert to_labels.attrs["href"] == item_labels(cable.id)
     listed = read(admin_client.get(item_labels(cable.id)).text)
-    revoke = f"{LABELS}/{label.id}/revoke"
-    listed.one("a", f"Revoke {label.code}", href=revoke)
+    (link,) = listed.all("a", f"Revoke {label.code}")
+    revoke = link.attrs["href"]
     asked = words_on(admin_client.get(revoke).text)
     assert "Its printed copies don't scan now" in asked
-    assert admin_client.post(revoke).headers["location"] == (
-        f"{LABELS}?notice=label_revoked"
-    )
+    assert admin_client.post(revoke).status_code == 303
     assert label.revoked_at is not None
     form = shown_item_form(cable, unit="ft")
     assert admin_client.post(f"{ITEMS}/{cable.id}", data=form).status_code == 303
     assert cable.unit == "ft"
-    # Revoked, it is offered to revoke no more.
+    # Revoked, it is offered to revoke no more, nor listed there.
     assert admin_client.get(revoke).status_code == 404
-    listed = read(admin_client.get(item_labels(cable.id)).text)
-    assert not listed.all("a", f"Revoke {label.code}")
+    assert codes_listed(admin_client.get(item_labels(cable.id)).text) == []
+
+
+def address(link: str) -> tuple[str, dict[str, list[str]]]:
+    """A link's path and query, its names in any order."""
+    split = urlsplit(link)
+    return split.path, parse_qs(split.query)
+
+
+def test_revoking_an_items_labels_goes_back_to_its_labels_each_time(
+    admin_client: TestClient, session: Session, cable: Item, reel: ItemPackage
+) -> None:
+    """Two labels fix the item's unit, one a retired package's: the item's
+    list shows both and no revoked one, and revoking or keeping each goes
+    back to that list, not the whole one (Ali, 2026-11-24,
+    inventory-tng-9t9y)."""
+    old = add(session, Label(item_id=cable.id, revoked_at=datetime.now(UTC)))
+    own = add(session, Label(item_id=cable.id))
+    reels = add(session, Label(item_id=cable.id, package_id=reel.id))
+    retire(session, reel)
+    its_labels = address(item_labels(cable.id))
+    query = its_labels[1]
+    assert query == {"item": [str(cable.id)], "show": ["all"], "revoked": ["no"]}
+    listed = admin_client.get(item_labels(cable.id)).text
+    assert sorted(codes_listed(listed)) == sorted([own.code, reels.code])
+    assert old.code not in listed
+    # The filter is said, and kept by printing.
+    assert checked(listed, "revoked") == ["no"]
+    assert ("revoked", "no") in hidden_fields(listed)
+    form = shown_item_form(cable, unit="ft")
+    for label, left in ((own, [reels.code]), (reels, [])):
+        (link,) = read(listed).all("a", f"Revoke {label.code}")
+        confirm = link.attrs["href"]
+        assert address(confirm) == (f"{LABELS}/{label.id}/revoke", query)
+        asked = read(admin_client.get(confirm).text)
+        (keep,) = [to for words, to in links(asked) if words == "Keep it"]
+        assert address(keep) == its_labels
+        assert ("post", confirm) in forms(asked)
+        done = admin_client.post(confirm)
+        assert address(done.headers["location"]) == (
+            LABELS,
+            query | {"notice": ["label_revoked"]},
+        )
+        listed = admin_client.get(done.headers["location"]).text
+        assert codes_listed(listed) == left
+        changed = admin_client.post(f"{ITEMS}/{cable.id}", data=form)
+        assert changed.status_code == (303 if not left else 400)
+    assert cable.unit == "ft"
+
+
+def test_an_items_revoked_labels_never_push_its_others_off_the_first_page(
+    admin_client: TestClient, session: Session, cable: Item
+) -> None:
+    gone = datetime.now(UTC)
+    for _ in range(PER_PAGE + 1):
+        add(session, Label(item_id=cable.id, revoked_at=gone))
+    own = add(session, Label(item_id=cable.id))
+    every = {"item": str(cable.id), "show": "all"}
+    assert own.code not in codes_listed(admin_client.get(LABELS, params=every).text)
+    page = admin_client.get(item_labels(cable.id)).text
+    assert codes_listed(page) == [own.code]
+    assert "Page 1 of" not in words_on(page)
+
+
+def test_revoking_keeps_the_lists_page_and_drops_what_it_does_not_know(
+    admin_client: TestClient, session: Session, shelf: Location
+) -> None:
+    """The view comes back as the list reads it: its search, size and page,
+    and nothing else sent, so no address of another site's."""
+    mark = tag()
+    for number in range(27):
+        area = add(
+            session,
+            Location(name=f"Paged {mark} {number:03}", kind="area", parent_id=shelf.id),
+        )
+        add(session, Label(location_id=area.id))
+    view = {"q": f"Paged {mark}", "per": "25", "page": "2"}
+    page = admin_client.get(LABELS, params=view).text
+    first, *_ = codes_listed(page)
+    (label,) = labels_of(session, code=first)
+    (link,) = read(page).all("a", f"Revoke {label.code}")
+    confirm = link.attrs["href"]
+    expected = {name: [value] for name, value in view.items()}
+    assert address(confirm) == (f"{LABELS}/{label.id}/revoke", expected)
+    odd = {"next": "https://example.com/", "kind": "box", "show": "x"}
+    oddly = f"{confirm}&{urlencode(odd)}"
+    asked = admin_client.get(oddly).text
+    (keep,) = [to for words, to in links(asked) if words == "Keep it"]
+    assert address(keep) == (LABELS, expected)
+    done = admin_client.post(oddly)
+    assert address(done.headers["location"]) == (
+        LABELS,
+        expected | {"notice": ["label_revoked"]},
+    )
+    after = admin_client.get(done.headers["location"]).text
+    assert label.code not in codes_listed(after)
+    assert "Page 2 of 2" in words_on(after)
 
 
 def test_labels_filter_by_kind_and_item(
