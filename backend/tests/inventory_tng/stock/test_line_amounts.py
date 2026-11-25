@@ -9,15 +9,18 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import exc, select, true
+from sqlalchemy import exc, func, select, true
 from sqlalchemy.orm import Session
 
+from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.models.stock import Movement
-from inventory_tng.stock import moments, queries
+from inventory_tng.stock import counts, moments, open_packages, queries
+from inventory_tng.stock.balance import balance, by_form
 from inventory_tng.stock.ledger import LOOSE, Entry, Form
 from inventory_tng.stock.moved_out import moved_out
 
-from helpers.sign_in import new_admin
+from helpers.rows import add
+from helpers.sign_in import new_admin, new_admin_id
 from helpers.stock import Place, Spools, held_by_form, received, write
 
 # Each reader of the ledger's sums, of the place's store, after its cable
@@ -180,3 +183,109 @@ def test_an_open_package_opened_before_reads_converted(
         session, [spools.store.id], [spools.cable.id], 0, latest
     )
     assert opened == Decimal("1000.656")
+
+
+def _opened_and_cut(spools: Spools, package: ItemPackage, how_many: int) -> None:
+    """`how_many` of `package`, sealed at the store, each opened there and
+    cut whole, in the cable's unit, to the van's loose stock."""
+    whole = Decimal(package.size)
+    sealed = Form(package_id=package.id)
+    for _ in range(how_many):
+        made = open_packages.make(
+            spools.session, uuid.uuid4(), package.id, spools.store.id
+        )
+        opened = Form(open_package_id=made.id)
+        spools.write(
+            {
+                "kind": "open",
+                "from_location_id": spools.store.id,
+                "to_location_id": spools.store.id,
+            },
+            Entry(spools.cable.id, whole, sealed, opened),
+        )
+        spools.move(Entry(spools.cable.id, whole, opened, LOOSE))
+
+
+def _metres_to_feet(session: Session) -> tuple[Spools, str]:
+    """The bead's example (inventory-tng-8s2c): six spools of 305 m opened
+    at the store and cut whole to the van, then the cable in ft. Each
+    opening gives its open spool 1000.656 ft, by its package; each cut
+    takes 1000.65617 ft from it, exactly. The van holds 1830 m loose:
+    6003.937 ft (6003.93701...)."""
+    spools = Spools(session)
+    spools.receive(uuid.uuid4(), spools=4)
+    _opened_and_cut(spools, spools.spool, 6)
+    spools.cable.unit = "ft"
+    session.flush()
+    return spools, "6003.937"
+
+
+def _feet_to_metres(session: Session) -> tuple[Spools, str]:
+    """The other way: six drums of 1001 ft, each 305.105 m as kept
+    (305.1048), opened and cut whole, then the cable in m. The two spools
+    of 305 ft it starts with leave sealed first. The van holds 6006 ft
+    loose: 1830.629 m (1830.6288), and the two spools, 185.928 m."""
+    spools = Spools(session, cable_unit="ft")
+    spools.move(Entry(spools.cable.id, Decimal(610), spools.sealed, spools.sealed))
+    drum = add(session, ItemPackage(item_id=spools.cable.id, name="Drum", size=1001))
+    spools.write(
+        {"kind": "receipt", "to_location_id": spools.store.id},
+        Entry(spools.cable.id, Decimal(6006), LOOSE, Form(package_id=drum.id)),
+    )
+    _opened_and_cut(spools, drum, 6)
+    spools.cable.unit = "m"
+    session.flush()
+    return spools, "2016.557"
+
+
+CHANGES = {"m to ft": _metres_to_feet, "ft to m": _feet_to_metres}
+
+
+@pytest.mark.parametrize("change", CHANGES.values(), ids=CHANGES.keys())
+def test_a_place_holds_the_sum_of_its_forms_after_a_change(
+    session: Session, change: Callable[[Session], tuple[Spools, str]]
+) -> None:
+    """Each open package nets a part of a thousandth after the change, as
+    its opening converts by its package and its cuts exactly. Each form is
+    rounded as kept, so each reads 0.000, and a place reads the sum of its
+    forms: the store nothing, not less than nothing; the van all of it."""
+    spools, at_van = change(session)
+    store, van, cable = spools.store.id, spools.van.id, spools.cable.id
+    latest = queries.latest_transaction_id(session)
+    assert held_by_form(session, store, cable) == {}
+    assert moments.expected(session, store) == {}
+    assert moments.expected_at(session, [store], latest) == {}
+    assert moments.expected(session, van) == {cable: Decimal(at_van)}
+    assert moments.expected_at(session, [van], latest) == {
+        van: {cable: Decimal(at_van)}
+    }
+    assert queries.item_total(session, cable) == Decimal(at_van)
+    forms = (
+        select(by_form.c.location_id, func.sum(by_form.c.quantity))
+        .where(by_form.c.item_id == cable)
+        .group_by(by_form.c.location_id)
+    )
+    totals = select(balance.c.location_id, balance.c.quantity).where(
+        balance.c.item_id == cable
+    )
+    assert dict(session.execute(totals).all()) == dict(session.execute(forms).all())
+
+
+@pytest.mark.parametrize("change", CHANGES.values(), ids=CHANGES.keys())
+def test_a_count_of_nothing_where_nothing_is_held_writes_nothing(
+    session: Session, change: Callable[[Session], tuple[Spools, str]]
+) -> None:
+    """A count of the store after the change, of none of the cable, finds
+    the records right: it writes no part of a thousandth to make up the
+    open packages' residue."""
+    spools, _ = change(session)
+    store, cable = spools.store.id, spools.cable.id
+    done = counts.record_count(
+        session,
+        uuid.uuid4(),
+        new_admin_id(session),
+        store,
+        [(cable, Decimal(0))],
+        moments.moment(session, store),
+    )
+    assert not done.differed

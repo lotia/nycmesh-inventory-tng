@@ -282,9 +282,7 @@ def expected_forms_at(
     moment `as_of`, by place, item and form, of `items`. One query."""
     if not items:
         return {}
-    rows = _netted_at(
-        session, location_ids, as_of, items, "package_id", "open_package_id"
-    )
+    rows = _netted_at(session, location_ids, as_of, items, by_form=True)
     found: dict[int, dict[tuple[int, Form], Decimal]] = {}
     for place_id, item, package_id, open_id, amount in rows:
         found.setdefault(place_id, {})[(item, Form(package_id, open_id))] = amount
@@ -296,17 +294,28 @@ def _netted_at(
     location_ids: Collection[int],
     as_of: int,
     items: Collection[int] | None,
-    *columns: str,
+    *,
+    by_form: bool = False,
 ) -> Result[*tuple[Any, ...]]:
-    """_signed_at summed by place, item and `columns`, of `items` only if
-    given: each row's place, item, columns and amount, where not zero."""
-    place, item_id, *forms, quantity = _signed_at(location_ids, as_of, *columns)
-    total = at_scale_sql(func.sum(quantity))
-    query = (
-        select(place, item_id, *forms, total)
-        .group_by(place, item_id, *forms)
-        .having(total != 0)
+    """_signed_at summed by place, item and form, each form rounded once,
+    of `items` only if given: each row's place, item, package_id,
+    open_package_id and amount, where not zero. Not `by_form`, its forms
+    summed, as balance.balance sums balance.by_form (inventory-tng-8s2c):
+    each row's place, item and amount."""
+    place, item_id, *form, quantity = _signed_at(
+        location_ids, as_of, "package_id", "open_package_id"
     )
+    by = (place, item_id, *form)
+    total = at_scale_sql(func.sum(quantity))
+    query = select(*by, total.label("quantity")).group_by(*by)
     if items is not None:
         query = query.where(item_id.in_(list(items)))
-    return session.execute(query)
+    if by_form:
+        return session.execute(query.having(total != 0))
+    forms = query.subquery("form")
+    summed = func.sum(forms.c.quantity)
+    return session.execute(
+        select(forms.c.place, forms.c.item_id, summed)
+        .group_by(forms.c.place, forms.c.item_id)
+        .having(summed != 0)
+    )

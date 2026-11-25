@@ -13,6 +13,9 @@ A line of sealed packages converts by its packages instead: so many, each
 its size in its item's unit as kept
 (models.catalogue.ItemPackage.size_in_items_unit), as the ledger takes
 them since, so packages received before a change leave whole after it.
+So an open package's lines may net a part of a thousandth, which its form
+rounds away: a place's total sums its forms as kept, not its lines
+(balance.balance; inventory-tng-8s2c).
 An amount said of a line, as a correction undoing some of it is written,
 is read by the same expression (said_in_items_unit; inventory-tng-4fjq).
 """

@@ -54,23 +54,40 @@ def _sides() -> Subquery:
     return union_all(into, out).subquery("side")
 
 
-def _summed(name: str, *by: str) -> Subquery:
+def _by_form() -> Subquery:
+    """In minus out of each item at each place, in each form there, each
+    rounded once, as kept (unit_conversion.at_scale_sql)."""
     side = _sides()
-    columns = [side.c[column] for column in ("item_id", "location_id", *by)]
+    columns = [
+        side.c[column]
+        for column in ("item_id", "location_id", "package_id", "open_package_id")
+    ]
     return (
         select(*columns, at_scale_sql(func.sum(side.c.quantity)).label("quantity"))
         .group_by(*columns)
-        .subquery(name)
+        .subquery("by_form")
     )
 
 
-# In minus out, for every item and place stock has been at, whatever its
-# form: a place whose stock all left keeps its row, at zero. Read as a
-# table: select(balance.c.quantity).where(balance.c.item_id == ...).
-balance = _summed("balance")
-# The same, by form too: package_id for sealed packages, open_package_id
-# for an open one, neither for loose units (ledger.Form).
-by_form = _summed("by_form", "package_id", "open_package_id")
+# In minus out, for every item and place stock has been at, by form:
+# package_id for sealed packages, open_package_id for an open one, neither
+# for loose units (ledger.Form).
+by_form = _by_form()
+# The same, whatever its form: a place whose stock all left keeps its row,
+# at zero. Read as a table: select(balance.c.quantity).where(
+# balance.c.item_id == ...). The sum of its forms as by_form keeps them,
+# not of every line: after a change between m and ft an open package's
+# opening converts by its package, its cuts exactly, so its lines net a
+# part of a thousandth that its form rounds away (inventory-tng-8s2c).
+balance = (
+    select(
+        by_form.c.item_id,
+        by_form.c.location_id,
+        func.sum(by_form.c.quantity).label("quantity"),
+    )
+    .group_by(by_form.c.item_id, by_form.c.location_id)
+    .subquery("balance")
+)
 
 
 # Less than nothing at a place: the records are wrong there until it is

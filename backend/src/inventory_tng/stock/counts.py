@@ -287,19 +287,34 @@ def record_count(
         "changed_since_shown",
         when=moments.seen_up_to(session, places, as_of) != shown.seen,
     )
-    moved, flows = moments.flows(
-        session, location_id, after, LedgerTransaction.id <= as_of, items=counted_at
+    then_window = LedgerTransaction.id <= as_of
+    moved, flowed = moments.flows(
+        session, location_id, after, then_window, items=counted_at
     )
+    form_items = {item_id for item_id, _ in forms_counted}
+    form_moved, form_flowed = moments.form_flows(
+        session, location_id, (after, then_window), form_items
+    )
+    # What the records said then of what moved there by then, its forms
+    # summed as kept, as the form showed it (moments.expected_at), less
+    # what came from areas gone: not the sum of its lines, which may differ
+    # by parts of a thousandth after a change between m and ft
+    # (inventory-tng-8s2c).
     aside = aside or {}
     aside_total = by_item(aside)
-    then = {
-        item_id: came - went - aside_total.get(item_id, Decimal(0))
-        for item_id, (came, went) in flows.items()
-    }
-    form_items = {item_id for item_id, _ in forms_counted}
-    form_moved, form_then = moments.form_flows(
-        session, location_id, (after, LedgerTransaction.id <= as_of), form_items
+    place = [location_id]
+    held = moments.expected_at(session, place, as_of, flowed).get(location_id, {})
+    held_forms = moments.expected_forms_at(session, place, as_of, form_items).get(
+        location_id, {}
     )
+    then = {
+        item_id: held.get(item_id, Decimal(0)) - aside_total.get(item_id, Decimal(0))
+        for item_id in flowed
+    }
+    form_then = {
+        form: held_forms.get(form, Decimal(0)) - aside.get(form, Decimal(0))
+        for form in form_flowed
+    }
     for item_id, _ in form_moved:
         came, went = moved.get(item_id, (Decimal(0), Decimal(0)))
         flow = form_moved[(item_id, _)]
@@ -309,11 +324,7 @@ def record_count(
     # Counted by total, loose; never also by form (movement_item_once).
     into, out = count_corrections(
         [(item_id, LOOSE, counted_at[item_id]) for item_id in kept] + kept_forms,
-        {(item_id, LOOSE): amount for item_id, amount in then.items()}
-        | {
-            form: came - went - aside.get(form, Decimal(0))
-            for form, (came, went) in form_then.items()
-        },
+        {(item_id, LOOSE): amount for item_id, amount in then.items()} | form_then,
     )
     # A count of nothing at all still says when the place was counted.
     anything = counted_at or by_form

@@ -414,6 +414,10 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   Python and SQL alike). A line converts exactly and a sum is rounded
   once, as amounts are kept (`QUANTITY_SCALE`), so 305 m on a shelf
   reads 1000.656 ft and a sum does not drift by its lines' roundings.
+  A place's total, and what a count compares with, is the sum of its
+  forms, each rounded once: an open package's opening converts by its
+  package and its cuts exactly, so one emptied before the change reads
+  nothing, not a part of a thousandth (2026-11-25, inventory-tng-8s2c).
   Each and a length never convert: such a line is still refused as it
   is read.
 - A package keeps its size and too-short length in its own unit, so a

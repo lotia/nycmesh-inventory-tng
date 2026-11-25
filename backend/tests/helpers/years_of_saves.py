@@ -81,19 +81,21 @@ INSERT INTO ledger_transaction (created_at, idempotency_key, kind,
 CREATE TEMPORARY TABLE tx AS
   SELECT row_number() OVER (ORDER BY id) - 1 AS g, id FROM ledger_transaction;
 INSERT INTO movement (transaction_id, item_id, quantity, from_package_id,
-  from_open_package_id, to_package_id, to_open_package_id)
+  from_open_package_id, to_package_id, to_open_package_id, unit)
   SELECT tx.id, item_id,
     CASE WHEN what IN ('receipt', 'move', 'open') THEN size
       WHEN what = 'cut' THEN 12 ELSE 3 END,
     CASE WHEN what IN ('move', 'open') THEN package_id END,
     CASE WHEN what = 'cut' THEN open_id END,
     CASE WHEN what IN ('receipt', 'move') THEN package_id END,
-    CASE WHEN what = 'open' THEN open_id END
+    CASE WHEN what = 'open' THEN open_id END,
+    (SELECT unit FROM item WHERE item.id = block.item_id)
   FROM plan JOIN block USING (block) JOIN tx USING (g)
     LEFT JOIN opened USING (block)
   WHERE what NOT IN ('loose', 'install')
   UNION ALL
-  SELECT tx.id, loose_item, 2, NULL, NULL, NULL, NULL
+  SELECT tx.id, loose_item, 2, NULL, NULL, NULL, NULL,
+    (SELECT unit FROM item WHERE item.id = loose_item)
   FROM plan JOIN block USING (block) JOIN tx USING (g)
   WHERE what <> 'open';
 """
