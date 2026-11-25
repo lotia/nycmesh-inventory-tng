@@ -601,6 +601,7 @@ def suggest_items(session: DbSession, listing: Listed) -> JSONResponse:
 def add_item(
     request: Request, signed: AdminSignedIn, session: DbSession, form: TextForm
 ) -> Response:
+    form = forms.add_form(form)
     fields, problems, typed = forms.item_fields(
         session, form, separator=decimal_separator(request)
     )

@@ -34,7 +34,7 @@ log = structlog.get_logger(__name__)
 
 TEXT_FIELDS = ("manufacturer", "part_number", "old_code", "notes", "ordering_notes")
 # The fields of the add form on the items list (templates/catalogue/
-# items.html), besides what its name field adds as it asks (_add_form):
+# items.html), besides what its name field adds as it asks (add_form):
 # an add reads only these, so a new item's others are left as Fields.new
 # leaves them, whatever is sent (Ali, 2026-11-24, inventory-tng-iibw).
 # The item page's form has every field.
@@ -329,7 +329,7 @@ def short_to_set(package: ItemPackage) -> str:
     )
 
 
-def _add_form(form: Mapping[str, str]) -> dict[str, str]:
+def add_form(form: Mapping[str, str]) -> dict[str, str]:
     """Of `form`, only what the add form sends: ADD_FIELDS, and what its
     name field adds as it asks: the answers saying how the units in the
     name are read (READING), and the name confirmed (DIFFERENT)."""
@@ -352,12 +352,10 @@ def item_fields(
     separator: Separator,
 ) -> tuple[items.Fields | None, dict[str, Words], Typed]:
     """What to set, unless something is wrong, what is, and the name as
-    typed; for `item`'s form, if given, else the add form's, reading only
-    its fields (ADD_FIELDS). Its minimum is in the decimal `separator` of
-    the page's boxes."""
+    typed; for `item`'s form, if given, else the add form's, as add_form
+    keeps it. Its minimum is in the decimal `separator` of the page's
+    boxes."""
     item_id = item.id if item is not None else None
-    if item is None:
-        form = _add_form(form)
     typed = typed_name(session, form.get("name", ""), form)
     name = typed.name
     problems: dict[str, Words] = {}
