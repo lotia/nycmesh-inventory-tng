@@ -387,6 +387,36 @@ def openings_at(
     ).all()
 
 
+def loosened_at(
+    session: Session,
+    place_ids: Collection[int],
+    item_ids: Collection[int],
+    after: int,
+    up_to: int,
+) -> Sequence[Row[int | None, int, int | None, Decimal]]:
+    """What was left on open packages of `item_ids` made loose units at
+    the places (open_packages.close_unfollowed) in the ledger transactions
+    after `after` up to `up_to`: each line's place, item, open package
+    and amount. Never one left below zero, which took from loose units."""
+    return session.execute(
+        select(
+            LedgerTransaction.to_location_id,
+            Movement.item_id,
+            Movement.from_open_package_id,
+            Movement.quantity,
+        )
+        .join(LedgerTransaction, LedgerTransaction.id == Movement.transaction_id)
+        .where(
+            LedgerTransaction.kind == "loosen",
+            LedgerTransaction.to_location_id.in_(list(place_ids)),
+            LedgerTransaction.id > after,
+            LedgerTransaction.id <= up_to,
+            Movement.item_id.in_(list(item_ids)),
+            Movement.from_open_package_id.is_not(None),
+        )
+    ).all()
+
+
 def last_taken_from(
     session: Session,
     place_ids: Collection[int],

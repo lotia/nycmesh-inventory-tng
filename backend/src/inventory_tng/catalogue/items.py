@@ -690,11 +690,17 @@ def package_settings(
     package: ItemPackage,
     short_below: Decimal | None,
     minimum_sealed: int | None,
+    *,
+    keep_short: bool = False,
 ) -> None:
     """A package's too-short-to-use length and minimum sealed in the
-    stores (docs/decisions/0020), each optional. Gone for a retired one."""
+    stores (docs/decisions/0020), each optional; with `keep_short`, the
+    length as it is once locked, whatever `short_below` says, for a page
+    that showed no box for it. Gone for a retired one."""
     relock(session, package, current=True)
     _item_current(session, package)
+    if keep_short:
+        short_below = package.short_below
     _whole_for_its_item(session, package.item_id, short_below)
     package.short_below, package.minimum_sealed = short_below, minimum_sealed
     once_committed(

@@ -109,6 +109,27 @@ def test_what_arrived_is_set_aside_as_held_and_never_beyond() -> None:
     ] == Held(SEALED, Decimal(10), Decimal(0))
 
 
+def test_what_arrived_in_an_open_package_since_loosened_is_set_aside_loose() -> None:
+    """An open package moved whole to the place, and a spool opened there
+    into another, each since made loose units as following was turned off
+    (open_packages.close_unfollowed): set aside from those loose units,
+    as much as each loosening made, never beyond what the place holds
+    loose; one cut before it was loosened stands for all that arrived in
+    it, as an open package cut does (Ali, 2026-11-23, inventory-tng-j89e)."""
+    moved, opened = Form(open_package_id=1), Form(open_package_id=2)
+    aside = {(5, moved): Decimal(250), (5, SEALED): Decimal(10)}
+    held = {(5, LOOSE): Decimal(258)}
+    openings = [Opening(5, 7, opened, Decimal(10))]
+    loosened = {(5, 1): Decimal(250), (5, 2): Decimal(8)}
+    assert as_held_at(aside, held, openings, loosened) == {
+        (5, moved): [Held(LOOSE, Decimal(250), Decimal(250))],
+        (5, SEALED): [Held(LOOSE, Decimal(10), Decimal(8))],
+    }
+    # Less loose there than was loosened: only what is there.
+    fewer = as_held_at(aside, {(5, LOOSE): Decimal(100)}, openings, loosened)
+    assert fewer[(5, moved)] == [Held(LOOSE, Decimal(250), Decimal(100))]
+
+
 def test_a_fix_of_less_is_lost_from_the_forms_it_is_held_in() -> None:
     """Two spools arrived at place 2, one still sealed and one opened and
     cut to 4: a spool fixed less from each of two areas comes off the

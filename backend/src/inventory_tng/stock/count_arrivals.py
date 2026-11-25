@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.stock import queries
 from inventory_tng.stock.count_forms import Gone
-from inventory_tng.stock.ledger import Form, by_item
+from inventory_tng.stock.ledger import LOOSE, Form, by_item
 from inventory_tng.stock.moments import expected_forms_at
 from inventory_tng.stock.moved_out import MovedOut
 
@@ -82,10 +82,20 @@ def as_held(
     place held sealed was opened there since, or has left: it is set
     aside from what each sealed package of it opened there since made, an
     open package or loose units, the newest first, a package's worth
-    each."""
+    each. What is set aside in an open package beyond what is left on it
+    was loosened there since, or has left: it is set aside from the loose
+    units the loosening made (open_packages.close_unfollowed)."""
     aside = set_aside(moves)
     items = {item_id for here in aside.values() for item_id, _ in here}
     held = expected_forms_at(session, aside.keys(), as_of, items)
+    loosened: dict[int | None, dict[tuple[int, int], Decimal]] = {}
+    for place_id, item_id, open_id, quantity in queries.loosened_at(
+        session, aside.keys(), items, gone.since, as_of
+    ):
+        # From an open package, as the query asks (queries.loosened_at).
+        assert open_id is not None
+        here = loosened.setdefault(place_id, {})
+        here[(item_id, open_id)] = here.get((item_id, open_id), Decimal(0)) + quantity
     sealed = {
         item_id
         for here in aside.values()
@@ -100,7 +110,12 @@ def as_held(
                 Opening(item_id, package_id, Form(open_package_id=open_id), quantity)
             )
     return {
-        place_id: as_held_at(here, held.get(place_id, {}), openings.get(place_id, []))
+        place_id: as_held_at(
+            here,
+            held.get(place_id, {}),
+            openings.get(place_id, []),
+            loosened.get(place_id, {}),
+        )
         for place_id, here in aside.items()
     }
 
@@ -109,25 +124,42 @@ def as_held_at(
     aside: Aside,
     held: Mapping[tuple[int, Form], Decimal],
     openings: Sequence[Opening],
+    loosened: Mapping[tuple[int, int], Decimal] | None = None,
 ) -> Arrivals:
     """as_held at one place, from what it read: `held` there at the form's
-    moment, and `openings` there since, the newest first. What arrived
-    loose or in an open package first, then what arrived sealed."""
+    moment, `openings` there since, the newest first, and how much each
+    open package `loosened` there since into loose units, by item and
+    open package. What arrived loose or in an open package first, then
+    what arrived sealed."""
     left = {line: max(n, Decimal(0)) for line, n in held.items()}
+    unclaimed = dict(loosened or {})
 
-    def part(item_id: int, form: Form, arrived: Decimal) -> Held:
+    def held_in(item_id: int, form: Form, arrived: Decimal) -> Held:
         there = min(arrived, left.get((item_id, form), Decimal(0)))
         left[(item_id, form)] = left.get((item_id, form), Decimal(0)) - there
         return Held(form, arrived, there)
+
+    def parts_of(item_id: int, form: Form, arrived: Decimal) -> list[Held]:
+        """What arrived in `form`, held in it; in an open package loosened
+        since, what is left on it, none, and the rest held in the loose
+        units the loosening made, as much as it made."""
+        first = held_in(item_id, form, arrived)
+        key = (item_id, form.open_package_id or 0)
+        made = min(arrived - first.there, unclaimed.get(key, Decimal(0)))
+        if not made:
+            return [first]
+        unclaimed[key] -= made
+        loose = held_in(item_id, LOOSE, made)._replace(arrived=arrived - first.there)
+        return [*([first._replace(arrived=first.there)] if first.there else []), loose]
 
     kept: Arrivals = {}
     for (item_id, form), n in sorted(
         aside.items(), key=lambda line: line[0][1].package_id is not None
     ):
-        first = part(item_id, form, n)
         if form.package_id is None:
-            kept[(item_id, form)] = [first]
+            kept[(item_id, form)] = parts_of(item_id, form, n)
             continue
+        first = held_in(item_id, form, n)
         # Sealed: what the place still held sealed stands for as much.
         parts = [Held(form, first.there, first.there)] if first.there else []
         rest = n - first.there
@@ -135,8 +167,9 @@ def as_held_at(
             if not rest:
                 break
             if (opening.item_id, opening.package_id) == (item_id, form.package_id):
-                parts.append(part(item_id, opening.form, min(rest, opening.quantity)))
-                rest -= parts[-1].arrived
+                made = parts_of(item_id, opening.form, min(rest, opening.quantity))
+                parts += made
+                rest -= sum(each.arrived for each in made)
         if rest:
             parts.append(Held(form, rest, Decimal(0)))
         kept[(item_id, form)] = parts

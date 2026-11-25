@@ -627,7 +627,8 @@ inventory-tng-j89e):
 - **Too short to use is shown only for a package whose opened ones are
   followed**, by its own setting or its item's. A hidden one keeps its
   value, and comes back with the box. A box to be set whole for an item
-  counted each (above) is shown however its package is set.
+  counted each (above), or one a resize was refused for, at or below
+  it, is shown however its package is set.
 - **Turning following off closes the open packages no longer followed**,
   in the same save, whether set on the item, on a package or for the items
   ticked. What is left on each becomes loose units at its place, by a
@@ -636,10 +637,12 @@ inventory-tng-j89e):
   zero takes as much from loose units. The open package is marked closed,
   never deleted, and its history says so. Nothing is written off, so a
   loosening puts no end of an opening recorded more than moved right.
+  A count of a store whose areas are gone sets aside what arrived in an
+  open package since loosened from the loose units the loosening made.
 - **Locks**: the change takes its open packages' places first, as a count
   does, so a cut saved at the same moment is counted before the close or
-  refused after it. One moved whole to another place meanwhile refuses the
-  change as made since the page was shown.
+  refused after it. One moved whole to another place, or opened at
+  another, meanwhile refuses the change as made since the page was shown.
 - **The page says how many closed**, after its own notice: "2 open
   packages closed; what was left is now loose."
 

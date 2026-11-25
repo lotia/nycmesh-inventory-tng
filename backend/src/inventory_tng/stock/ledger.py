@@ -331,8 +331,9 @@ def lock_places(session: Session, location_ids: Iterable[int]) -> None:
 #
 # A change to whether an item's or package's opened ones are followed
 # (open_packages.unfollowing) takes the places of their open packages FOR
-# UPDATE (lock_places) before the item or package FOR UPDATE, then closes
-# those no longer followed in this order.
+# UPDATE (lock_places) before the item or package FOR UPDATE, and before
+# the reading rules its answers write, which lock items FOR UPDATE too
+# (items.reread); then closes those no longer followed in this order.
 
 
 def _hold_places(

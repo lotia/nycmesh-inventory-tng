@@ -400,8 +400,9 @@ def close_unfollowed(
 
     Call it holding `places` (ledger.lock_places) from before the setting
     was changed, as unfollowing does. One at a place not held, as moved
-    whole there meanwhile, is refused as changed (CHANGED_SINCE_SHOWN):
-    its place could only be locked now out of the ledger's order."""
+    whole there or opened there meanwhile, is refused as changed
+    (CHANGED_SINCE_SHOWN): its place could only be locked now out of the
+    ledger's order."""
     followed = func.coalesce(ItemPackage.track_opened, Item.track_opened)
     query = (
         select(OpenPackage)

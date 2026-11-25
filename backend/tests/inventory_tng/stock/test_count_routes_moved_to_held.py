@@ -8,6 +8,7 @@ nothing; and a move fixed is written in the forms it is held in."""
 
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -15,6 +16,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue import items
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.stock import open_packages
@@ -30,6 +32,7 @@ from inventory_tng.stock.paths import COUNTS
 
 from helpers.markup import read, text
 from helpers.rows import add
+from helpers.sign_in import new_admin_id
 from helpers.stock import Spools, count_form, held_by_form, retire
 from helpers.store_areas import area, field
 
@@ -557,3 +560,37 @@ def test_a_box_opened_loose_where_it_went_and_all_used_says_used_up(
         session, admin_client, tracked=False, own=in_each, then=open_and_cut(305)
     )
     assert opened_since(moved) == [str(OPENED_THEN_USED_UP)]
+
+
+def open_cut_and_loosen(moved: Arrived) -> None:
+    """The spool that came opened at Shelf B, 55 m cut from it, then its
+    opened spools no longer followed: the 250 m left made loose there
+    (open_packages.close_unfollowed)."""
+    open_and_cut(55)(moved)
+    session = moved.made.session
+    spool = moved.made.spool
+    open_packages.unfollowing(
+        session,
+        new_admin_id(session),
+        datetime.now(UTC),
+        lambda: items.track_package(session, spool, False),
+        package_ids=[spool.id],
+    )
+
+
+def test_a_spool_opened_where_it_went_then_loosened_is_set_aside_loose(
+    session: Session, admin_client: TestClient
+) -> None:
+    """Shelf B, holding 2 m of its own, its line says the 2 m by its
+    total, as what was left on the spool that came is set aside from the
+    loose units its loosening made; saved so, nothing is written there.
+    Under Moved to, it says the 250 m left (Ali, 2026-11-23,
+    inventory-tng-j89e)."""
+    moved = Arrived(session, admin_client, own=own_metres, then=open_cut_and_loosen)
+    assert moved.shows(moved.counted) == "2"
+    assert opened_since(moved) == [opened_here_since(Decimal(250), "m")]
+    before = moved.at_shelf(session)
+    assert before == {(moved.cable, LOOSE): Decimal(252)}
+    moved.save({moved.counted: "2"})
+    assert moved.found_or_lost(session) == []
+    assert moved.at_shelf(session) == before

@@ -214,14 +214,19 @@ def closed_loose(closed: int) -> str:
     )
 
 
+# The notices of the changes that may close open packages (_closed_said).
+CLOSING = ("saved", "item_renamed", "package_tracking", "tracking_off")
+
+
 def _closed_said(request: Request) -> dict[str, str]:
     """The page's notice and, after it, closed_loose for the open packages
-    its address says a change closed; nothing to add if none."""
-    notice = NOTICES.get(request.query_params.get("notice", ""))
+    its address says a change closed; nothing to add if none, or if no
+    such change says so."""
+    said = request.query_params.get("notice", "")
     closed = whole(request.query_params.get("closed", ""), 1, INTEGER_MAX)
-    if notice is None or closed is None:
+    if said not in CLOSING or closed is None:
         return {}
-    return {"notice": f"{notice} {closed_loose(closed)}"}
+    return {"notice": f"{NOTICES[said]} {closed_loose(closed)}"}
 
 
 def _closed_query(closed: int) -> dict[str, str]:
@@ -359,20 +364,29 @@ def _short_fraction(
 
 
 def _short_shown(
-    item: Item, packages: Sequence[ItemPackage], short_fraction: int | None
+    item: Item,
+    packages: Sequence[ItemPackage],
+    short_fraction: int | None,
+    problems: Mapping[str, Words] | None,
+    values: Mapping[str, str] | None,
 ) -> set[int]:
     """The packages whose Too short to use box the item page shows: those
     whose opened ones are followed, as it only says when an open package is
-    a short end (Ali, 2026-11-23, inventory-tng-j89e); and one whose box is
-    to be set whole, outlined, so it can be (inventory-tng-fa5i). The
-    value of one hidden is kept."""
+    a short end (Ali, 2026-11-23, inventory-tng-j89e); one whose box is
+    to be set whole, outlined, so it can be (inventory-tng-fa5i); and one
+    a resize was refused for, at or below its length, so it can be
+    changed first. The value of one hidden is kept."""
     each = counted_whole(item.unit)
+    resized = None
+    if (problems or {}).get("size") is RULES[SHORT_UNDER_SIZE]:
+        resized = (values or {}).get("package_id")
     return {
         package.id
         for package in packages
         if tracks_opened(item.track_opened, package.track_opened)
         or package.id == short_fraction
         or (each and forms.short_has_fraction(package))
+        or str(package.id) == resized
     }
 
 
@@ -439,7 +453,9 @@ def _item_page(
             "held_back": held_back,
             "short_to_set": short_to_set,
             "set_whole": short_to_set and forms.short_to_set(short_to_set),
-            "short_shown": _short_shown(item, packages, short_fraction),
+            "short_shown": _short_shown(
+                item, packages, short_fraction, problems, values
+            ),
             **_name_field(session, similar),
             **_closed_said(request),
         },
@@ -577,7 +593,8 @@ def track_items(
         return redirect(back, notice="tracking_changed")
     changed, closed = done
     session.commit()
-    if not changed:
+    # Ticked items set so already may still have had open packages closed.
+    if not changed and not closed:
         return redirect(back, notice="tracking_same")
     return redirect(back, notice=f"tracking_{track}", **_closed_query(closed))
 
@@ -647,18 +664,25 @@ def save_item(
         asked = None if same else []
         closed: list[int] = []
 
-        def save() -> items.Renamed | None:
+        def saving() -> items.Renamed | None:
+            # The places first: the answers' reading rules lock the items
+            # they read again FOR UPDATE, which a save at those places
+            # holds after them (open_packages.unfollowing).
             renamed, count = open_packages.unfollowing(
                 session,
                 signed.admin.id,
                 now(),
-                lambda: items.save(session, found, fields, seen=seen),
+                _deciding(
+                    session,
+                    typed,
+                    signed,
+                    lambda: items.save(session, found, fields, seen=seen),
+                ),
                 item_ids=() if fields.track_opened else [item_id],
             )
             closed[:] = [count]
             return renamed
 
-        saving = _deciding(session, typed, signed, save)
         renamed, broken = _change_or_note(
             session, saving, problems, fields, typed, item_id, asked=asked
         )
@@ -969,16 +993,19 @@ def package_settings(
     # Beside the fields of the package it was sent for.
     values = {
         "package_id": str(package_id),
-        "short_below": short_below or "",
         "minimum_sealed": minimum_sealed,
     }
+    if short_below is not None:
+        values["short_below"] = short_below
     if problems:
         return _item_page(
             request, session, signed, found, problems=problems, values=values
         )
     _, broken = refusal(
         session,
-        lambda: items.package_settings(session, package, short, minimum),
+        lambda: items.package_settings(
+            session, package, short, minimum, keep_short=short_below is None
+        ),
         RETIRED,
         SHORT_UNDER_SIZE,
         items.PACKAGE_WHOLE,

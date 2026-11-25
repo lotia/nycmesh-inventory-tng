@@ -361,7 +361,7 @@ def test_a_too_short_length_refused_as_resized_meanwhile_says_so_beside_it(
     item.track_opened = True
     box = add(session, ItemPackage(item_id=item.id, name="Box", size=Decimal(10)))
 
-    def resized_meanwhile(*_: object) -> None:
+    def resized_meanwhile(*_: object, **__: object) -> None:
         raise RuleBroken("ck_item_package_short_below_under_size")
 
     monkeypatch.setattr(items, "package_settings", resized_meanwhile)
