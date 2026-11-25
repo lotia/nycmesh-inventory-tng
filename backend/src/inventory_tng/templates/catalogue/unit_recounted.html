@@ -14,5 +14,5 @@ do, in its unit now (Ali, 2026-11-25). -#}
 {#- Those of the packages it gave a new size (catalogue/unit_recounts.py);
 a retired one's is printed only once it is brought back. #}
 {% if revoked %}<p>{% trans count=revoked, link=item_path ~ "#labels" %}Its package's printed label was revoked: <a href="{{ link }}">print a new one</a>.{% pluralize %}Its packages' {{ count }} printed labels were revoked: <a href="{{ link }}">print new ones</a>.{% endtrans %}</p>{% endif %}
-{% if revoked_retired %}<p>{% trans count=revoked_retired %}Its retired package's printed label was revoked too: print a new one if it is brought back.{% pluralize %}Its retired packages' {{ count }} printed labels were revoked too: print new ones if they are brought back.{% endtrans %}</p>{% endif %}
+{% if revoked_retired %}<p>{% trans count=revoked_retired %}Its retired package's printed label was revoked: print a new one if it is brought back.{% pluralize %}Its retired packages' {{ count }} printed labels were revoked: print new ones if they are brought back.{% endtrans %}</p>{% endif %}
 {% endblock %}

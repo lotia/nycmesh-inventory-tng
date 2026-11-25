@@ -2066,11 +2066,11 @@ msgstr ""
 #: src/inventory_tng/templates/catalogue/unit_recounted.html
 #, python-format
 msgid ""
-"Its retired package's printed label was revoked too: print a new one if "
-"it is brought back."
+"Its retired package's printed label was revoked: print a new one if it is"
+" brought back."
 msgid_plural ""
-"Its retired packages' %(count)s printed labels were revoked too: print "
-"new ones if they are brought back."
+"Its retired packages' %(count)s printed labels were revoked: print new "
+"ones if they are brought back."
 msgstr[0] ""
 msgstr[1] ""
 

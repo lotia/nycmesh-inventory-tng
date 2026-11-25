@@ -712,13 +712,59 @@ def test_a_converted_items_retired_package_is_resized_and_stays_retired(
     after = words_on(admin_client.get(done.headers["location"]).text)
     assert "Its package's printed label was revoked: print a new one." in after
     assert (
-        "Its retired package's printed label was revoked too: print a new one "
-        "if it is brought back."
+        "Its retired package's printed label was revoked: print a new one if "
+        "it is brought back."
     ) in after
     items.restore_package(session, box)
     session.flush()
     session.expire_all()
     assert (box.size, box.unit, box.retired_at) == (Decimal("304.8"), "m", None)
+
+
+@pytest.mark.parametrize(
+    ("more", "said"),
+    [
+        (
+            0,
+            (
+                "Its retired package's printed label was revoked: print a new "
+                "one if it is brought back."
+            ),
+        ),
+        (
+            1,
+            (
+                "Its retired packages' 2 printed labels were revoked: print "
+                "new ones if they are brought back."
+            ),
+        ),
+    ],
+)
+def test_only_a_retired_packages_labels_revoked_are_said_alone(
+    admin_client: TestClient, session: Session, more: int, said: str
+) -> None:
+    """With the current Reel unlabelled, the page after says only that
+    the retired packages' labels were revoked, not as more than others,
+    and asks to print none now. A package has one label at most
+    (labels.make_for_item), so as many labels as packages."""
+    cable, reel, box, _ = _retired_box(session)
+    sizes = {f"size_{reel.id}": "300", f"size_{box.id}": "304.8"}
+    for n in range(more):
+        spool = items.add_package(
+            session, cable, f"Spool {n}", Decimal(500), shown_unit="ft"
+        )
+        assert labels.make_for_item(session, cable.id, spool.id) is not None
+        items.retire_package(session, spool, datetime.now(UTC))
+        sizes[f"size_{spool.id}"] = "152.4"
+    session.flush()
+    page = _page(admin_client, cable.id, "m")
+    done = admin_client.post(unit_recount(cable.id, "m"), data=_sent(page, **sizes))
+    assert done.status_code == 303
+    after = words_on(admin_client.get(done.headers["location"]).text)
+    assert said in after
+    assert "revoked too" not in after
+    assert "print new ones." not in after
+    assert "print a new one." not in after
 
 
 @pytest.mark.parametrize("bringing_back", [False, True])
