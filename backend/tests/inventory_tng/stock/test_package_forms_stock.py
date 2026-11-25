@@ -211,7 +211,9 @@ def test_a_packages_settings_are_set_on_its_items_page(
     spools: Spools,
 ) -> None:
     path = f"/admin/items/{spools.cable.id}/packages/{spools.spool.id}/settings"
-    done = admin_client.post(path, data={"short_below": "15", "minimum_sealed": "2"})
+    done = admin_client.post(
+        path, data={"short_below": "15", "minimum_sealed": "2", "unit_shown": "m"}
+    )
     assert done.headers["location"].endswith(
         "notice=package_settings&section=packages#packages"
     )

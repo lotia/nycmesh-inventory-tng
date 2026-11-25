@@ -79,7 +79,7 @@ def test_an_unchanged_box_posts_back_valid_in_a_comma_locale(
     assert item.minimum == Decimal("2.5")
     settings = admin_client.post(
         f"{path}/packages/{package.id}/settings",
-        data={"short_below": "10,25", "minimum_sealed": ""},
+        data={"short_below": "10,25", "minimum_sealed": "", "unit_shown": "m"},
         headers=GERMAN,
     )
     assert settings.status_code == 303

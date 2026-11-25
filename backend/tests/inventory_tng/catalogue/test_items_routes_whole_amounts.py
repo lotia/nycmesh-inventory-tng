@@ -241,7 +241,9 @@ def test_a_fraction_on_a_package_meanwhile_refuses_a_change_to_each(
     cable, reel = _packaged(session, radios)
 
     def short(s: Session) -> None:
-        items.package_settings(s, s.get_one(ItemPackage, reel.id), Decimal("1.5"), None)
+        items.package_settings(
+            s, s.get_one(ItemPackage, reel.id), Decimal("1.5"), None, shown_unit=None
+        )
 
     _first(monkeypatch, "save", short)
     form = shown_item_form(cable, unit="each")
@@ -286,7 +288,7 @@ def test_a_package_fraction_is_refused_once_its_item_is_each_meanwhile(
         items.save(s, item, item_fields(item, unit="each"), seen=None)
 
     _first(monkeypatch, name, to_each)
-    data = sent | {"package_version": shown(reel)}
+    data = sent | {"package_version": shown(reel), "unit_shown": "m"}
     refused = admin_client.post(
         f"{ITEMS}/{cable.id}/" + path.format(id=reel.id), data=data
     )

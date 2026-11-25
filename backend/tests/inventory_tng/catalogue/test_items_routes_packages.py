@@ -32,12 +32,16 @@ from helpers.stock import Spools, retire
 def test_packages(admin_client: TestClient, session: Session, radios: Category) -> None:
     item = new_item(session, radios)
     path = f"{ITEMS}/{item.id}/packages"
-    done = admin_client.post(path, data={"package_name": "Box", "size": "4"})
+    done = admin_client.post(
+        path, data={"package_name": "Box", "size": "4", "unit_shown": "each"}
+    )
     assert done.status_code == 303
     (box,) = session.scalars(select(ItemPackage)).all()
     assert (box.name, box.size) == ("Box", Decimal(4))
     assert "4 each" in text(admin_client.get(f"{ITEMS}/{item.id}"))
-    taken = admin_client.post(path, data={"package_name": "box", "size": "2"})
+    taken = admin_client.post(
+        path, data={"package_name": "box", "size": "2", "unit_shown": "each"}
+    )
     assert str(PACKAGE_TAKEN) in text(taken)
     for size in ("0", "-1", "lots", "1.2345", ""):
         refused = admin_client.post(path, data={"package_name": "Bag", "size": size})

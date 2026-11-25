@@ -185,6 +185,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
           {#- Only where opened ones are followed, as it only says when an
           open package is a short end; one hidden keeps its value. #}
           {% if package.id in short_shown %}
+          <input type="hidden" name="unit_shown" value="{{ package.unit }}">
           <label>{% trans %}Too short to use{% endtrans %} <span class="hint">{% trans unit=package.unit %}below, in {{ unit }}; blank: none{% endtrans %}</span>
             {#- A switch to each refused for its fraction outlines it, as
             does the package brought back with one, to be set whole. #}
@@ -218,6 +219,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   {% set adding = 'package_id' not in values %}
   {% set new = values if adding else {} %}
   <form method="post" action="{{ here }}/packages" class="actions" id="add-package">
+    <input type="hidden" name="unit_shown" value="{{ item.unit }}">
     <label>{% trans %}Package{% endtrans %} <input name="package_name" inputmode="text" value="{{ new.get('package_name', '') }}" placeholder="{% trans %}Box{% endtrans %}" required>
       {% if adding %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>

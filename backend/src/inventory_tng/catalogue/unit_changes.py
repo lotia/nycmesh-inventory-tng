@@ -4,7 +4,9 @@ does to what is recorded in it. While nothing fixes it, its packages and
 vendor offers follow it, their numbers as typed (follow). Once fixed, it
 changes only between lengths, converting what is recorded once an
 administrator confirms it was in the old unit (convert; Ali, 2026-11-24,
-inventory-tng-y50b); never between each and a length.
+inventory-tng-y50b); never between each and a length. A package form
+drawn before a change, its amount typed in the unit it showed, is refused
+(require_unit_shown), never kept in the new one.
 
 The arithmetic of converting is unit_conversion's; the ledger's lines keep
 their unit and convert as they are read (stock/line_amounts.py)."""
@@ -44,6 +46,13 @@ unit_changes_converted = meter.create_counter(
     "unit it was in and the one it is in now",
 )
 
+stale_forms = meter.create_counter(
+    "inventory.unit_changes.stale_forms",
+    unit="{form}",
+    description="Package forms refused as their amount was typed in a unit "
+    "the item or package has left since the form was shown, by the form",
+)
+
 # Why an item's unit is fixed, and the rule each refuses a change by.
 UnitFixed = Literal["moved", "labelled"]
 UNIT_FIXED_RULES: dict[UnitFixed, str] = {
@@ -62,6 +71,31 @@ UNIT_CHECKS_WAITING = "item_unit_checks_waiting"
 # unit, or a package's size or too-short length too small or no longer
 # below its size there (QUANTITY_MAX, QUANTITY_STEP).
 UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
+
+# Refused: a package's amount typed in the unit its form showed, which its
+# item or package has left since (require_unit_shown).
+UNIT_CHANGED = "unit_changed"
+# The package forms that say the unit they showed: the counter's attribute.
+PackageForm = Literal["add_package", "package_settings"]
+
+
+def require_unit_shown(
+    row: Item | ItemPackage, shown: str | None, form: PackageForm
+) -> None:
+    """RuleBroken (UNIT_CHANGED) unless `row`, held as the save locked it,
+    is in `shown`, the unit `form` showed the amount typed in: a unit
+    changed since would keep the number in the new unit (inventory-tng-74f3).
+    None for no form, as a command's, which means its unit as held."""
+    if shown is None or row.unit == shown:
+        return
+    log.info(
+        "package form refused: unit changed since shown",
+        form=form,
+        table=row.__tablename__,
+        row_id=row.id,
+    )
+    stale_forms.add(1, {"form": form})
+    enforce(UNIT_CHANGED)
 
 
 def unit_fixed(session: Session, item_id: int) -> UnitFixed | None:

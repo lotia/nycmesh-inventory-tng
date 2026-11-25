@@ -129,7 +129,7 @@ def test_a_name_of_signs_beyond_ascii_needs_a_letter_or_digit(
         assert str(NO_LETTERS) in text(refused)
     assert (
         admin_client.post(
-            path, data={"package_name": "\u00b2", "size": "1"}
+            path, data={"package_name": "\u00b2", "size": "1", "unit_shown": "each"}
         ).status_code
         == 303
     )
@@ -284,7 +284,9 @@ def test_a_package_name_is_checked_in_canonical_spelling(
     """As stored: \u2103 alone is stored \u00b0C, which has a letter."""
     item = new_item(session, radios, "Probe")
     path = f"{ITEMS}/{item.id}/packages"
-    added = admin_client.post(path, data={"package_name": "\u2103", "size": "1"})
+    added = admin_client.post(
+        path, data={"package_name": "\u2103", "size": "1", "unit_shown": "each"}
+    )
     assert added.status_code == 303
     package = named(session, ItemPackage, "\u00b0C")
     resent = admin_client.post(

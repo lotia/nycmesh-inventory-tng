@@ -564,11 +564,16 @@ def restore(session: Session, item: Item) -> None:
     once_committed(session, log.info, "item restored", item_id=item.id)
 
 
-def add_package(session: Session, item: Item, name: str, size: Decimal) -> ItemPackage:
+def add_package(
+    session: Session, item: Item, name: str, size: Decimal, *, shown_unit: str | None
+) -> ItemPackage:
+    """A package of the item, holding `size` in its unit, the one its form
+    showed (`shown_unit`; unit_changes.require_unit_shown)."""
     relock(session, item)
     enforce("retired_read_only", when=item.retired_at is not None)
     # Its unit as locked: the form checked the size against the one before.
     enforce(PACKAGE_WHOLE, when=not whole_enough(item.unit, size))
+    unit_changes.require_unit_shown(item, shown_unit, "add_package")
     package = ItemPackage(item_id=item.id, name=name, size=size)
     session.add(package)
     session.flush()
@@ -679,17 +684,22 @@ def package_settings(
     short_below: Decimal | None,
     minimum_sealed: int | None,
     *,
+    shown_unit: str | None,
     keep_short: bool = False,
 ) -> None:
     """A package's too-short-to-use length and minimum sealed in the
-    stores (docs/decisions/0020), each optional; with `keep_short`, the
-    length as it is once locked, whatever `short_below` says, for a page
-    that showed no box for it. Gone for a retired one."""
+    stores (docs/decisions/0020), each optional, a length in the
+    package's unit, the one its form showed (`shown_unit`;
+    unit_changes.require_unit_shown); with `keep_short`, the length as it
+    is once locked, whatever `short_below` says, for a page that showed no
+    box for it. Gone for a retired one."""
     relock(session, package, current=True)
     _item_current(session, package)
     if keep_short:
         short_below = package.short_below
     _whole_for_its_item(session, package.item_id, short_below)
+    if not keep_short and short_below is not None:
+        unit_changes.require_unit_shown(package, shown_unit, "package_settings")
     package.short_below, package.minimum_sealed = short_below, minimum_sealed
     once_committed(
         session,

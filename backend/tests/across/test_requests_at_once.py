@@ -38,7 +38,13 @@ from inventory_tng.admins import (
     paths,
 )
 from inventory_tng.admins.paths import ADMINS
-from inventory_tng.catalogue import categories, items, reading_rules, units
+from inventory_tng.catalogue import (
+    categories,
+    items,
+    reading_rules,
+    unit_changes,
+    units,
+)
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_locking import locked, locked_row
@@ -1376,9 +1382,51 @@ def test_a_change_to_each_and_a_fraction_on_its_package_go_one_at_a_time(
     short = doing(
         ItemPackage,
         reel.id,
-        lambda s, package: items.package_settings(s, package, Decimal("1.5"), None),
+        lambda s, package: items.package_settings(
+            s, package, Decimal("1.5"), None, shown_unit=None
+        ),
     )
     assert either_first(committed, to_each, short, swapped=swapped) == refused
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("swapped", "refused"), [(False, unit_changes.UNIT_CHANGED), (True, None)]
+)
+@pytest.mark.parametrize("form", ["add_package", "package_settings"])
+def test_a_package_amount_and_a_unit_switch_go_one_at_a_time(
+    committed: Committed, swapped: bool, refused: str | None, form: str
+) -> None:
+    """Both take the catalogue lock, and the amount's save reads the unit
+    afresh under it: second, typed in m, it is refused, as the cable is in
+    ft now; first, it is kept, and the switch takes it into ft as typed,
+    nothing fixing the unit (unit_changes.follow; inventory-tng-74f3)."""
+    place = committed_place(committed)
+    reel = ItemPackage(item_id=place.cable.id, name="Reel", size=Decimal(305))
+    made(committed, reel)
+    to_ft = doing(
+        Item,
+        place.cable.id,
+        lambda s, item: items.save(s, item, item_fields(item, unit="ft"), seen=None),
+    )
+    amount = (
+        doing(
+            Item,
+            place.cable.id,
+            lambda s, item: items.add_package(
+                s, item, "Drum", Decimal(300), shown_unit="m"
+            ),
+        )
+        if form == "add_package"
+        else doing(
+            ItemPackage,
+            reel.id,
+            lambda s, package: items.package_settings(
+                s, package, Decimal(5), None, shown_unit="m"
+            ),
+        )
+    )
+    assert either_first(committed, to_ft, amount, swapped=swapped) == refused
 
 
 @pytest.mark.concurrency

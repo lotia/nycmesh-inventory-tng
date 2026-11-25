@@ -112,7 +112,7 @@ def _catalogue(session: Session) -> None:
         for name, category, unit, maker, part in ITEMS
     }
     item, package, size = PACKAGE
-    box = items.add_package(session, things[item], package, size)
+    box = items.add_package(session, things[item], package, size, shown_unit=None)
     places: dict[str, Location] = {}
     for name, kind, parent in LOCATIONS:
         parent_id = places[parent].id if parent else None

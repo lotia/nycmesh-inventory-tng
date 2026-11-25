@@ -117,7 +117,8 @@ def test_the_form_edits_the_name_as_typed_and_says_how_it_is_shown(
     # A package and an alias, added on its page, alike.
     path = f"{ITEMS}/{item.id}"
     admin_client.post(
-        f"{path}/packages", data={"package_name": "Reel 1,000ft", "size": "1"}
+        f"{path}/packages",
+        data={"package_name": "Reel 1,000ft", "size": "1", "unit_shown": "each"},
     )
     admin_client.post(f"{path}/aliases", data={"alias_name": f"Spool {mark} 305M"})
     response = admin_client.get(path)

@@ -49,6 +49,7 @@ from inventory_tng.models.labels import Label
 from inventory_tng.models.names import canonical
 from inventory_tng.models.stock import OpenPackage
 from inventory_tng.stock import open_packages
+from inventory_tng.stock.forms import now_counted_in
 from inventory_tng.stock.ledger import tracks_opened
 from inventory_tng.stock.open_packages_listing import (
     BY_OPENED,
@@ -846,6 +847,10 @@ def _package(session: Session, item_id: int, package_id: int) -> ItemPackage | N
 
 # A size at or below its too-short length (models.catalogue.ItemPackage).
 SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
+# The unit a package form showed its amount in, the item's to add one or
+# the package's for its too-short length, compared as it is saved
+# (unit_changes.require_unit_shown).
+UNIT_SHOWN = "unit_shown"
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages")
@@ -873,12 +878,15 @@ def add_package(
                 session,
                 typed,
                 signed,
-                lambda: items.add_package(session, found, name, parsed),
+                lambda: items.add_package(
+                    session, found, name, parsed, shown_unit=form.get(UNIT_SHOWN, "")
+                ),
             ),
             "unique",
             RETIRED,
             items.READ_ALIKE,
             items.PACKAGE_WHOLE,
+            unit_changes.UNIT_CHANGED,
         )
         if broken == RETIRED:
             return _item_page(request, session, signed, found, alert=RULES[RETIRED])
@@ -890,6 +898,8 @@ def add_package(
             )
         if broken == items.PACKAGE_WHOLE:  # Its item made each meanwhile.
             problems["size"] = WHOLE_UNITS
+        elif broken == unit_changes.UNIT_CHANGED:  # Asked again in its unit now.
+            problems["size"] = now_counted_in(found.unit)
         else:
             problems["package_name"] = (
                 forms.read_alike(session, typed)
@@ -1106,20 +1116,27 @@ def package_settings(
     _, broken = refusal(
         session,
         lambda: items.package_settings(
-            session, package, short, minimum, keep_short=short_below is None
+            session,
+            package,
+            short,
+            minimum,
+            shown_unit=form.get(UNIT_SHOWN, ""),
+            keep_short=short_below is None,
         ),
         RETIRED,
         SHORT_UNDER_SIZE,
         items.PACKAGE_WHOLE,
+        unit_changes.UNIT_CHANGED,
     )
     if broken == RETIRED:
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
     if broken:
-        # Resized meanwhile to no more than it, or its item made each: said
-        # beside it, as above.
-        words = (
-            WHOLE_UNITS if broken == items.PACKAGE_WHOLE else forms.SHORTER_THAN_WHOLE
-        )
+        # Resized meanwhile to no more than it, its item made each, or its
+        # unit changed: said beside it, as above.
+        words = {
+            items.PACKAGE_WHOLE: WHOLE_UNITS,
+            unit_changes.UNIT_CHANGED: now_counted_in(package.unit),
+        }.get(broken, forms.SHORTER_THAN_WHOLE)
         problems = {"short_below": words}
         return _item_page(
             request, session, signed, found, problems=problems, values=values

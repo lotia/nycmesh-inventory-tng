@@ -1170,6 +1170,31 @@ def test_counts_unit_changes_converted_by_unit(
     ]
 
 
+def test_counts_package_forms_refused_as_shown_in_a_unit_left_by_form(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Counted at once, as a refusal writes nothing to commit: a package
+    added, or its too-short length set, typed in m, the cable in ft now
+    (inventory-tng-74f3). One in its unit, or a command's, is not."""
+    _, _, reader, _ = rolled_back
+    name = "inventory.unit_changes.stale_forms"
+    before = counted(reader, name)
+    cable = Place(session).cable
+    reel = add(session, ItemPackage(item_id=cable.id, name="Reel", size=305))
+    items.save(session, cable, item_fields(cable, unit="ft"), seen=None)
+    rule = unit_changes.UNIT_CHANGED
+    with breaks(session, rule):
+        items.add_package(session, cable, "Drum", Decimal(300), shown_unit="m")
+    with breaks(session, rule):
+        items.package_settings(session, reel, Decimal(5), None, shown_unit="m")
+    items.add_package(session, cable, "Box", Decimal(300), shown_unit="ft")
+    items.package_settings(session, reel, Decimal(5), None, shown_unit=None)
+    assert added(reader, name, before) == {
+        (("form", "add_package"),): 1,
+        (("form", "package_settings"),): 1,
+    }
+
+
 def test_a_write_rolled_back_is_neither_counted_nor_logged(
     rolled_back: Recorded, session: Session
 ) -> None:

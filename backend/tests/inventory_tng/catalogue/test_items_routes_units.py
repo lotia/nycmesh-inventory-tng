@@ -261,7 +261,12 @@ def test_a_package_name_reads_units_too(
     assert added.status_code == 400
     assert "mg" in box_values(added.text, "unit:MG")
     assert "Mg" not in checked(added.text, "unit:MG")
-    chosen = {"package_name": "Bag 5 MG", "size": "2", "unit:MG": "Mg"}
+    chosen = {
+        "package_name": "Bag 5 MG",
+        "size": "2",
+        "unit:MG": "Mg",
+        "unit_shown": "each",
+    }
     assert admin_client.post(path, data=chosen).status_code == 303
     package = named(session, ItemPackage, "Bag 5 MG")
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
@@ -273,7 +278,7 @@ def test_a_package_name_reads_units_too(
     assert resent.status_code == 303
     assert package.name == "Spool 1000 FT"
     # MG after any number is settled now, by the answer kept as a rule.
-    settled = {"package_name": "Bag 7 MG", "size": "2"}
+    settled = {"package_name": "Bag 7 MG", "size": "2", "unit_shown": "each"}
     assert admin_client.post(path, data=settled).status_code == 303
     page = text(admin_client.get(f"{ITEMS}/{item.id}"))
     assert "Read as 7Mg · mass." in page

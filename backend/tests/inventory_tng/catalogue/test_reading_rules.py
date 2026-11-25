@@ -184,11 +184,13 @@ def test_a_name_reading_as_another_is_refused_naming_it(
     refused = admin_client.post(ITEMS, data=form | {"name": "Link 1Gbit/s"})
     assert TAKEN_FIELDS["alias"]("Rocket") in text(refused)
     package = admin_client.post(
-        f"{ITEMS}/{rocket.id}/packages", data={"package_name": "Box 1 kg", "size": "1"}
+        f"{ITEMS}/{rocket.id}/packages",
+        data={"package_name": "Box 1 kg", "size": "1", "unit_shown": "each"},
     )
     assert package.status_code == 303
     again = admin_client.post(
-        f"{ITEMS}/{rocket.id}/packages", data={"package_name": "Box 1kg", "size": "2"}
+        f"{ITEMS}/{rocket.id}/packages",
+        data={"package_name": "Box 1kg", "size": "2", "unit_shown": "each"},
     )
     assert str(PACKAGE_TAKEN) in text(again)
 
