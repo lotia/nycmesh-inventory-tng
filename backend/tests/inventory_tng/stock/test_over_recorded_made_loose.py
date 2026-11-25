@@ -5,14 +5,15 @@ inventory-tng-n7dj). The bead's example: a Spool 305 m of outdoor Cat6
 cable opened at Shelf B that was never there, here the spools' store."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items
 from inventory_tng.core.local_time import show_day, site_zone
-from inventory_tng.models.stock import OpenPackage
-from inventory_tng.stock import open_packages, over_recorded
+from inventory_tng.models.stock import LedgerTransaction, OpenPackage
+from inventory_tng.stock import ledger, open_packages, over_recorded
 from inventory_tng.stock.over_recorded_queries import within
 from inventory_tng.stock.paths import COUNTS
 
@@ -184,4 +185,33 @@ def test_made_loose_with_its_end_counted_before_reads_as_counted(
     assert row.settled_at is None
     said = words_on(page_of(admin_client, spools))
     assert "became loose units" not in said
-    assert "Sealed spool still to put right." in said
+    # Named as what was counted then, not what it became after.
+    day = show_day(
+        session.get_one(LedgerTransaction, row.arrived_count_id).created_at,
+        site_zone(session),
+    )
+    assert f"Open spool counted {day}. Sealed spool still to put right." in said
+
+
+def test_made_loose_after_it_moved_away_is_not_loose_here(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Moved whole to the van, then made loose there: the opening's place
+    holds none of it, so the check neither asks for a count there, nor
+    does one put it right, nor does Correct write loose units off there."""
+    spools = Spools(session)
+    check = opening_raised(registered_client, spools)
+    on_it = ledger.Form(open_package_id=opened_into(session, check).open_package_id)
+    spools.move(ledger.Entry(spools.cable.id, Decimal(305), on_it, on_it))
+    session.commit()
+    made_loose(session, spools)
+    assert "became loose units" not in words_on(page_of(admin_client, spools))
+    count_at(admin_client, spools.store.id, {f"loose_{spools.cable.id}": "305"})
+    (row,) = checks(session)
+    assert row.arrived_count_id is None
+    correct(admin_client, session)
+    written = {
+        (line.from_package_id, line.from_open_package_id, line.to_package_id)
+        for line in reason_adjustments(session, over_recorded.REASON)
+    }
+    assert (None, None, None) not in written

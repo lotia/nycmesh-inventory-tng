@@ -672,8 +672,11 @@ inventory-tng-j89e):
   write-off (used up, lost) says "closed" and puts the end right. The app
   tells the two apart by the loosening transaction; one made loose with
   nothing left on it has none, so reads as closed, as nothing became
-  loose. Ali rejected "Loose at Shelf B since 24 Nov. Count Shelf B to
-  put this right.", and treating a package made loose as put right.
+  loose. One moved whole elsewhere first was made loose there, out of
+  reach of a count or Correct at the opening's place, so it reads as an
+  open package moved away still does. Ali rejected "Loose at Shelf B
+  since 24 Nov. Count Shelf B to put this right.", and treating a
+  package made loose as put right.
 
 We rejected leaving both as they were, and only showing "2 open packages
 still followed". For the words, Ali rejected saying nothing before the

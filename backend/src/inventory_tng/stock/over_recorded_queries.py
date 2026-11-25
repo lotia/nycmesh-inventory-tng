@@ -35,6 +35,7 @@ from inventory_tng.models.stock import (
 from inventory_tng.stock import balance
 from inventory_tng.stock.over_recorded import (
     CHECKED_REASONS,
+    MADE_LOOSE_IN,
     MADE_LOOSE_ON,
     OPENED_INTO,
     WAITING,
@@ -198,6 +199,15 @@ def loose(item: str) -> str:
     return gettext("Loose %(item)s", item=within(item))
 
 
+def _loose_end(made_loose_in: int | None, put_right_in: int | None) -> bool:
+    """Whether an opening's open end is named as what it became, loose
+    units: its open package made loose there (MADE_LOOSE_IN), and that end
+    put right after, by the transaction `put_right_in`, or not yet."""
+    return made_loose_in is not None and (
+        put_right_in is None or put_right_in > made_loose_in
+    )
+
+
 def _end_names(
     kind: str,
     item: str,
@@ -280,6 +290,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
             ARRIVED_COUNT.created_at,
             WRITTEN_OFF_ON,
             MADE_LOOSE_ON,
+            MADE_LOOSE_IN,
         )
         .where(WAITING, *where)
         .order_by(func.lower(Item.name), Item.id, OverRecorded.id)
@@ -291,7 +302,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         session,
         {
             to_id if left_on else from_id
-            for *_, from_id, to_id, left_on, arrived_on, closed_on, loose_on in found
+            for *_, from_id, to_id, left_on, arrived_on, closed_on, loose_on, _ in found
             if (left_on is None) != (arrived_on is None and closed_on is None)
             or (loose_on is not None and arrived_on is None)
         },
@@ -318,6 +329,7 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         arrived_on,
         closed_on,
         loose_on,
+        loose_in,
     ) in found:
         words = _amount(row.quantity, unit, package, size, from_open, kind)
         whole = moved_whole(from_open, to_open)
@@ -339,7 +351,13 @@ def shown(session: Session, *where: ColumnElement[bool]) -> list[Shown]:
         # Moved whole, it has one end only: where it arrived.
         two = from_id is not None and to_id is not None and not whole
         left, arrived = _end_names(
-            kind, item, package, to_open, from_place, to_place, loose_on is not None
+            kind,
+            item,
+            package,
+            to_open,
+            from_place,
+            to_place,
+            _loose_end(loose_in, row.arrived_count_id),
         )
         # Within a sentence: a form's name lower-cased ("open spool"), a
         # place's as named.
@@ -543,7 +561,7 @@ def settled(
             LEFT_COUNT.created_at,
             ARRIVED_COUNT.created_at,
             WRITTEN_OFF_ON,
-            MADE_LOOSE_ON,
+            MADE_LOOSE_IN,
             Admin.username,
         )
         .join(Admin, Admin.id == OverRecorded.settled_by_admin_id)
@@ -552,30 +570,31 @@ def settled(
         .limit(limit)
         .offset(offset)
     ).all()
-    # An opening corrected, its open package closed by a write-off (one made
-    # loose Correct writes off the loose units): whether Correct wrote
-    # its open end off, or found it closed and skipped it, by the key it
-    # writes under, as no time tells (a close's is the server's clock as it
-    # began, perhaps before Correct's, and waited for its place).
+    # An opening corrected, its open package closed since by a write-off or
+    # made loose: by the key Correct writes its open end off under, whether
+    # it did, or found it written off and skipped it, and if it wrote, which
+    # transaction, to tell if it wrote off the open package or what became
+    # loose. No time tells (a close's is the server's clock as it began,
+    # perhaps before Correct's, and waited for its place).
     off = {
         correction_key(each.idempotency_key, check, found=False): check.id
         for each in found
-        # written_off_on: an opening's only (OPENED_INTO).
+        # Each NULL but for an opening's (OPENED_INTO).
         if (check := each.OverRecorded).settled_how == "corrected"
         and check.arrived_count_id is None
-        and each.written_off_on is not None
+        and (each.written_off_on is not None or each.made_loose_in is not None)
     }
-    written_off = (
+    wrote_in = (
         {
-            off[key]
-            for key in session.scalars(
-                select(LedgerTransaction.idempotency_key).where(
+            off[key]: transaction_id
+            for key, transaction_id in session.execute(
+                select(LedgerTransaction.idempotency_key, LedgerTransaction.id).where(
                     LedgerTransaction.idempotency_key.in_(off)
                 )
             )
         }
         if off
-        else set()
+        else {}
     )
     # Each place a link to count its item there, if it may be counted.
     countable = _countable(
@@ -606,12 +625,18 @@ def settled(
         left_on,
         arrived_on,
         closed_on,
-        loose_on,
+        loose_in,
         by,
     ) in found:
         whole = moved_whole(from_open, to_open)
         left, arrived = _end_names(
-            kind, item, package, to_open, from_place, to_place, loose_on is not None
+            kind,
+            item,
+            package,
+            to_open,
+            from_place,
+            to_place,
+            _loose_end(loose_in, row.arrived_count_id or wrote_in.get(row.id)),
         )
         at, how, reason = row.settled_at, row.settled_how, row.checked_reason
         # Settled: the CHECK sets all three or none.
@@ -639,7 +664,7 @@ def settled(
                         arrived,
                         to_id is not None
                         and row.arrived_count_id is None
-                        and (closed_on is None or row.id in written_off),
+                        and (closed_on is None or row.id in wrote_in),
                     ),
                 )
                 if there
