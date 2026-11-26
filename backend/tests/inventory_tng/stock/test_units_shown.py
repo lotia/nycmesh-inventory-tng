@@ -474,6 +474,7 @@ def test_a_count_of_a_package_closed_meanwhile_and_one_resized_says_both(
     if closed:
         shut = at | {f"opened_{made.id}": "", f"state_{made.id}": "used_up"}
         assert admin_client.post(f"{COUNTS}/{store}", data=shut).status_code == 303
+    written = counts_written(session)
     form = at | {"key": str(uuid.uuid4()), f"opened_{made.id}": "300"}
     if resized:
         form |= {
@@ -488,6 +489,7 @@ def test_a_count_of_a_package_closed_meanwhile_and_one_resized_says_both(
         == [str(RULES[CLOSED_MEANWHILE])] * closed
         + [now_holds(Decimal(12), "each")] * resized
     )
+    assert counts_written(session) == written
 
 
 def test_a_count_closed_meanwhile_switched_and_listed_says_all_three(

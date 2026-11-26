@@ -2,7 +2,9 @@
 {% from "_table.html" import table %}
 {% block main %}
 {#- Under the alert, more: areas emptied and others retired at once
-(stock/count_gone_areas.py), or something else here listed already. #}
+(stock/count_gone_areas.py), or a refused count's unit or size changed
+since and something else here listed already, in the order
+stock/count_routes.py count says them. #}
 {% for words in more_alerts %}<p role="alert">{{ words }}</p>{% endfor %}
 {% if caution %}<p class="warning" role="status">{{ caution }}</p>{% endif %}
 {% if place.retired_at %}
