@@ -142,10 +142,11 @@ test("opening, an item fills its package sealed where it is opened", async ({
   await where.selectOption({ label: SHELF });
   await expect(box).toHaveValue("1");
   // With no place, its one package, then none where none is sealed.
-  // Each focus the page moves, after painting, waited for: one landing
-  // between pick's fill focusing the search box and typing into it
-  // loses the cable's name (inventory-tng-7bq4). Remove focuses Undo;
-  // the change takes Undo, so the Cart heading.
+  // The page moves focus after painting, so each move is waited for: one
+  // that lands between pick's fill focusing the search box and typing
+  // into it loses the cable's name (inventory-tng-7bq4). Remove focuses
+  // Undo. selectOption leaves focus on Undo, and choosing 'Pick a place'
+  // takes Undo away, so the page focuses the Cart heading.
   await page.getByRole("button", { name: "Remove" }).click();
   await expect(page.getByRole("button", { name: "Undo" })).toBeFocused();
   await where.selectOption({ label: "Pick a place" });
