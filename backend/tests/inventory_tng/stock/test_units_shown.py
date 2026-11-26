@@ -20,6 +20,7 @@ from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.stock import count_routes, counts_routes
 from inventory_tng.stock.count_forms import (
+    CLOSED_MEANWHILE,
     NO_SUCH_OPEN_PACKAGE,
     NO_SUCH_PACKAGE,
     ON_THE_FORM_TWICE,
@@ -419,6 +420,105 @@ def test_a_count_listed_elsewhere_after_a_switch_says_both_alerts(
     alerts = [each.text for each in read(response.text).all("p", role="alert")]
     assert alerts == [now_counted_in("ft")] * switched + [where] * listed
     assert counts_written(session) == []
+
+
+def alerts_of(response: Response) -> list[str]:
+    """The alerts above a count form, in order."""
+    return [each.text for each in read(response.text).all("p", role="alert")]
+
+
+@pytest.mark.parametrize(
+    ("twice", "switched"),
+    [(True, True), (True, False), (False, True)],
+    ids=["both", "twice", "switched"],
+)
+def test_a_count_named_twice_after_a_switch_says_both_alerts(
+    admin_client: TestClient, session: Session, twice: bool, switched: bool
+) -> None:
+    """Cable named twice, and switched to ft meanwhile: above the form,
+    that it is named twice, then the new unit, each once (Ali, 2026-11-25,
+    inventory-tng-32t7). Each alone is said alone, as before."""
+    place_id, cable, form, _, _ = _named_twice(admin_client, session)
+    if not twice:
+        del form[f"counted_0{cable}"]
+    if switched:
+        to_feet(session, session.get_one(Item, cable))
+    response = admin_client.post(f"{COUNTS}/{place_id}", data=form)
+    assert response.status_code == 400
+    assert (
+        alerts_of(response)
+        == [str(count_routes.TWICE)] * twice + [now_counted_in("ft")] * switched
+    )
+    assert counts_written(session) == []
+
+
+@pytest.mark.parametrize(
+    ("closed", "resized"),
+    [(True, True), (True, False), (False, True)],
+    ids=["both", "closed", "resized"],
+)
+def test_a_count_of_a_package_closed_meanwhile_and_one_resized_says_both(
+    admin_client: TestClient, session: Session, closed: bool, resized: bool
+) -> None:
+    """An open spool counted though closed meanwhile, and a box of radios
+    held nowhere counted sealed though it holds twelve now: above the form,
+    that the spool was closed, then the box's new size, each once (Ali,
+    2026-11-25, inventory-tng-32t7). The box has no row to say its size
+    beside, so above the form is the only place it is said. Each alone is
+    said alone, as before."""
+    spools = Spools(session)
+    store = spools.store.id
+    made = spools.opened()
+    box = box_of_ten(session, spools.place)
+    at = count_form_at(admin_client, store)
+    if closed:
+        shut = at | {f"opened_{made.id}": "", f"state_{made.id}": "used_up"}
+        assert admin_client.post(f"{COUNTS}/{store}", data=shut).status_code == 303
+    form = at | {"key": str(uuid.uuid4()), f"opened_{made.id}": "300"}
+    if resized:
+        form |= {
+            "sizes": f"{at['sizes']} {box.id}:10",
+            f"sealed_{spools.place.item.id}_{box.id}": "3",
+        }
+        resized_to_twelve(session, box)
+    response = admin_client.post(f"{COUNTS}/{store}", data=form)
+    assert response.status_code == 400
+    assert (
+        alerts_of(response)
+        == [str(RULES[CLOSED_MEANWHILE])] * closed
+        + [now_holds(Decimal(12), "each")] * resized
+    )
+
+
+def test_a_count_closed_meanwhile_switched_and_listed_says_all_three(
+    admin_client: TestClient, session: Session
+) -> None:
+    """An open spool counted though closed meanwhile, the cable switched to
+    ft, and picked as something else here though the store lists it: the
+    three alerts, in that order, each once (Ali, 2026-11-25,
+    inventory-tng-32t7 and inventory-tng-zoyw)."""
+    spools = Spools(session)
+    cable, store = spools.cable.id, spools.store.id
+    made = spools.opened()
+    at = count_form_at(admin_client, store)
+    shut = at | {f"opened_{made.id}": "", f"state_{made.id}": "used_up"}
+    assert admin_client.post(f"{COUNTS}/{store}", data=shut).status_code == 303
+    form = at | {
+        "key": str(uuid.uuid4()),
+        f"opened_{made.id}": "300",
+        f"loose_{cable}": "0",
+        "extra_item_id": str(cable),
+        "extra_quantity": "3",
+    }
+    to_feet(session, spools.cable)
+    response = admin_client.post(f"{COUNTS}/{store}", data=form)
+    assert response.status_code == 400
+    where = count_routes.already_listed(spools.cable.name_shown, spools.store.name)
+    assert alerts_of(response) == [
+        str(RULES[CLOSED_MEANWHILE]),
+        now_counted_in("ft"),
+        where,
+    ]
 
 
 def test_a_count_shows_the_units_and_sizes_it_shows(

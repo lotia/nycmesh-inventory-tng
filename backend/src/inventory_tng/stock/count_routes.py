@@ -791,10 +791,14 @@ def count(
         others=sent.problems,
     )
     problems |= words
-    alert = alert or said
+    # Every alert is said above the form, each in its own words: why it was
+    # refused, then a unit or size changed since, then where an item is
+    # listed, so words beside a box have their reason above. A sealed row
+    # of a package held nowhere has no box to say its new size beside (Ali,
+    # 2026-11-25, inventory-tng-32t7 and inventory-tng-zoyw).
+    alerts = [each for each in (alert, said) if each]
     tree = None
     off_form = None
-    more_alerts: list[Words] = []
     if sent.listed is not None:
         log.info(
             "count refused: something else here listed there",
@@ -805,20 +809,15 @@ def count(
         tree = queries.place_tree(session, place)
         listed_alert, beside = _listed_words(session, tree, sent.listed)
         problems |= beside
-        # Said under any other alert, so the words beside its line have
-        # their reason above (Ali, 2026-11-25, inventory-tng-zoyw).
-        if alert:
-            more_alerts.append(listed_alert)
-        else:
-            alert = listed_alert
+        alerts.append(listed_alert)
         off_form = None if sent.listed.on_form else sent.listed
     if problems:
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.
         return as_sent(
             problems=problems,
-            alert=alert,
-            more_alerts=more_alerts,
+            alert=alerts[0] if alerts else None,
+            more_alerts=alerts[1:],
             tree=tree,
             left=left(),
             off_form=off_form,
