@@ -14,11 +14,12 @@ from inventory_tng.catalogue import categories, queries
 from inventory_tng.catalogue.forms import CATEGORY_TAKEN
 from inventory_tng.catalogue.paths import CATEGORIES
 from inventory_tng.core.db_errors import refusal
+from inventory_tng.core.db_locking import stale_since
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.phrases import Words
 from inventory_tng.models.catalogue import Category
 from inventory_tng.web.admin_pages import admin_page, now, retirement, undo_retire
-from inventory_tng.web.forms import ALERTS, RULES, form_version, name_problem
+from inventory_tng.web.forms import ALERTS, CHANGED, RULES, form_version, name_problem
 from inventory_tng.web.listing import AskedView, Sort, Sorting, View, arranged
 from inventory_tng.web.navigation import SECTION_CATEGORIES
 from inventory_tng.web.pages import not_found, redirect
@@ -154,10 +155,14 @@ def rename_category(
     found = session.get(Category, category_id)
     if found is None:
         return not_found()
+    seen = form_version(version)
+    # Changed since it was shown: said before what is wrong with the name
+    # (inventory-tng-ryjv).
+    if stale_since(session, found, seen):
+        return _category_page(request, session, signed, found, alert=RULES[CHANGED])
     name = name.strip()
     problem = name_problem(name)
     if problem is None:
-        seen = form_version(version)
         _, broken = refusal(
             session,
             lambda: categories.rename(session, found, name, seen=seen),

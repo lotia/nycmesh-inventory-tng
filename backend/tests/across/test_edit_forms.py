@@ -10,7 +10,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue.paths import CATEGORIES, ITEMS
+from inventory_tng.catalogue import reading_rules, units
+from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
 from inventory_tng.core.db_base import Base
 from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.models.places import Location
@@ -92,11 +93,17 @@ def _site(session: Session) -> Form:
     return Form(f"{SETTINGS}/site", {"time_zone": "Europe/London"}, row, "site_version")
 
 
+def _reading(session: Session) -> Form:
+    (rule,) = reading_rules.decide(session, {"G": units.Rule(None)}, None)
+    return Form(f"{READINGS}/{rule.id}", {"reading": "none"}, rule)
+
+
 # Each form, and a change another administrator saves meanwhile.
 FORMS: dict[str, tuple[Callable[[Session], Form], str, object]] = {
     "item": (_item, "notes", "Outdoor only"),
     "category": (_category, "name", "Wireless"),
     "location": (_location, "name", "Depot"),
+    "reading": (_reading, "reading", "g"),
     "volunteer": (_volunteer, "email", "ada@example.org"),
     "reason": (_reason, "name", "Soaked"),
     "scan": (_scan, "name_check_minutes", 20),
@@ -127,6 +134,8 @@ def test_a_save_after_another_since_the_form_was_shown_is_refused(
 # A field of each form, sent wrong.
 WRONG: dict[str, dict[str, str]] = {
     "item": {"minimum": "-1"},
+    "category": {"name": ""},
+    "reading": {"reading": "xx"},
 }
 
 

@@ -26,6 +26,7 @@ from inventory_tng.catalogue.reading_rules import (
     read_alike_words,
 )
 from inventory_tng.core.db_errors import refusal
+from inventory_tng.core.db_locking import stale_since
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
@@ -33,7 +34,7 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import ReadingRule, reading_rules_held
 from inventory_tng.web.admin_pages import TextForm, admin_page
-from inventory_tng.web.forms import ALERTS, RULES, form_version
+from inventory_tng.web.forms import ALERTS, CHANGED, RULES, form_version
 from inventory_tng.web.listing import (
     AskedView,
     Sort,
@@ -227,11 +228,15 @@ def save_reading(
     found = session.get(ReadingRule, rule_id)
     if found is None:
         return not_found()
+    seen = form_version(version)
+    # Changed since it was shown: said before that no reading was chosen
+    # (inventory-tng-ryjv). What is offered is read as locked.
+    if stale_since(session, found, seen):
+        return _rule_page(request, signed, found, alert=RULES[CHANGED])
     offers = offered(found.token, found.rule)
     change = chosen_rule(reading, offers, respell=respell == "on")
     if change is None:
         return _rule_page(request, signed, found, problem=CHOOSE_ONE)
-    seen = form_version(version)
     _, broken = refusal(
         session,
         lambda: reading_rules.change(
