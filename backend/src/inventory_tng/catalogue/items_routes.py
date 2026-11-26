@@ -34,7 +34,7 @@ from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS, unit_reco
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
 from inventory_tng.catalogue.unit_conversion import convertible
 from inventory_tng.core.db_errors import refusal, refusal_naming_index
-from inventory_tng.core.db_locking import relock
+from inventory_tng.core.db_locking import stale_since
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
@@ -1067,15 +1067,11 @@ def save_package(
     # Changed since it was shown: said before what is wrong with what was
     # typed, so the admin learns it once (inventory-tng-hnta). Not found
     # if retired, as the save would be; checked again as it saves.
-    _, stale = refusal(
-        session, lambda: relock(session, package, current=True, seen=seen), CHANGED
-    )
-    if stale and (
-        form.get(UNIT_SHOWN, package.unit) == package.unit
-        or not unit_changes.only_unit_changed(session, package, seen)
-    ):
-        return _item_page(request, session, signed, found, alert=RULES[CHANGED])
-    if stale:
+    if stale_since(session, package, seen, current=True):
+        if form.get(UNIT_SHOWN, package.unit) == package.unit or (
+            not unit_changes.only_unit_changed(session, package, seen)
+        ):
+            return _item_page(request, session, signed, found, alert=RULES[CHANGED])
         # Only its item's unit switched, which moves its packages' versions
         # (inventory-tng-74f3): asked again in the new unit, as the other
         # package forms ask, keeping what was typed, at the version as
@@ -1089,14 +1085,13 @@ def save_package(
             required=forms.SIZE_REQUIRED,
             separator=separator,
         )
-        values["package_version"] = str(package.edit_version)
         return _item_page(
             request,
             session,
             signed,
             found,
             problems=problems,
-            values=values,
+            values=values | {"package_version": str(package.edit_version)},
             status_code=409,
         )
     if parsed is not None and not problems:

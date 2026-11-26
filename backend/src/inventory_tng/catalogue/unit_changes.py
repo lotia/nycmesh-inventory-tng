@@ -104,17 +104,16 @@ def only_unit_changed(session: Session, package: ItemPackage, seen: int) -> bool
     keep what was typed, at its version now, and undo no one's change
     unseen; a rename or resize since without a unit change cannot
     (inventory-tng-hnta)."""
-    history = CatalogueHistory
-    old, new = history.old_row, history.new_row
-    other = (
-        history.table_name == ItemPackage.__tablename__,
-        history.row_id == package.id,
-        history.action == "update",
+    old, new = CatalogueHistory.old_row, CatalogueHistory.new_row
+    return not exists_where(
+        session,
+        CatalogueHistory.table_name == ItemPackage.__tablename__,
+        CatalogueHistory.row_id == package.id,
+        CatalogueHistory.action == "update",
         new["edit_version"].as_integer() > seen,
         old["edit_version"] != new["edit_version"],
         old["unit"] == new["unit"],
     )
-    return not exists_where(session, *other)
 
 
 def unit_fixed(session: Session, item: Item) -> UnitFixed | None:

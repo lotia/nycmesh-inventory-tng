@@ -16,7 +16,7 @@ from sqlalchemy.orm import (
 )
 
 from inventory_tng.core.db_base import Base
-from inventory_tng.core.db_errors import Gone, RuleBroken, enforce
+from inventory_tng.core.db_errors import Gone, RuleBroken, enforce, refusal
 from inventory_tng.core.db_protection import (
     Action,
     Lock,
@@ -352,3 +352,18 @@ def relock(
     if current is not None and (retirable.retired_at is None) != current:
         raise Gone
     unchanged(row, seen)
+
+
+def stale_since(
+    session: Session, row: Base, seen: Seen, *, current: bool | None = None
+) -> bool:
+    """relock, for a form checked before its fields: whether the row
+    changed since version `seen`, so a stale form says so before what is
+    wrong with what was typed (inventory-tng-hnta). Not stale, the locks
+    are kept for the save, whose own check then passes."""
+    _, broken = refusal(
+        session,
+        lambda: relock(session, row, current=current, seen=seen),
+        "changed_since_shown",
+    )
+    return broken is not None
