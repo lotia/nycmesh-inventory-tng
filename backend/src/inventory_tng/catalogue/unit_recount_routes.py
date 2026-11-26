@@ -22,6 +22,7 @@ from inventory_tng.catalogue import (
     unit_recounts,
 )
 from inventory_tng.catalogue.paths import ITEMS, UNIT_RECOUNT, UNIT_RECOUNTED
+from inventory_tng.catalogue.unit_conversion import convertible
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.phrases import Words, gettext
@@ -159,15 +160,12 @@ def recount(
         )
     assert done is not None  # Refused, or done.
     session.commit()
-    after = {"labels": _listed(done.revoked)} if done.revoked else {}
+    after = {"unit": unit, "places": _listed(done.places)}
+    if done.revoked:
+        after["labels"] = _listed(done.revoked)
     if done.add_packages:
         after["packages"] = RETIRED_PACKAGES
-    return redirect(
-        UNIT_RECOUNTED.format(item_id=item_id),
-        unit=unit,
-        places=_listed(done.places),
-        **after,
-    )
+    return redirect(UNIT_RECOUNTED.format(item_id=item_id), **after)
 
 
 def _listed(ids: list[int]) -> str:
@@ -203,7 +201,7 @@ def recounted(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
-    if unit not in unit_changes.units_open(found.unit, "moved"):
+    if not convertible(found.unit, unit):
         unit = found.unit
     log.debug("unit recounted shown", item_id=item_id, changed_since=unit != found.unit)
     # A retired one, holding nothing now, is counted no more.

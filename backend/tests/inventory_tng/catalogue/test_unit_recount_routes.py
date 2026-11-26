@@ -748,25 +748,23 @@ def test_an_edited_or_missing_unit_in_the_address_is_the_unit_now(
     admin_client: TestClient, session: Session
 ) -> None:
     """Another of the item's lengths is taken as recounted into; a unit
-    not one of them (each, for an item in m), or none, is its unit now."""
+    not one of them (each, for an item in m), one outside the app's
+    units, or none, is its unit now."""
     cable = Spools(session).cable
     taken = _after(admin_client, cable.id, "unit=ft")
     _recounted_into(taken, cable, "ft")
     taken.one("p", "Its unit has since changed to m.")
-    for query in ("unit=each", "unit=", "places=", "unit=%3Cb%3E&unit=each"):
+    for query in (
+        "unit=each",
+        "unit=",
+        "places=",
+        "unit=%3Cb%3E&unit=each",
+        "unit=furlong",
+        "unit=M",
+        "unit=ft%20",
+        "unit=%3Cb%3E",
+    ):
         after = _after(admin_client, cable.id, query)
-        _recounted_into(after, cable, "m")
-        assert "since changed" not in words_on(after)
-
-
-def test_an_unknown_unit_in_the_address_is_the_unit_now(
-    admin_client: TestClient, session: Session
-) -> None:
-    """Nothing outside the app's units is shown: the item's unit now."""
-    cable = Spools(session).cable
-    _recounted_into(_after(admin_client, cable.id, "unit=ft"), cable, "ft")
-    for unknown in ("furlong", "M", "ft%20", "%3Cb%3E"):
-        after = _after(admin_client, cable.id, f"unit={unknown}")
         _recounted_into(after, cable, "m")
         assert "since changed" not in words_on(after)
 
