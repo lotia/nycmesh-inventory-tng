@@ -118,6 +118,10 @@ export function followTyped(document: Document): void {
  * words are the element with its id and `-was`, named in its
  * aria-describedby only while shown (inventory-tng-suqp). Without this,
  * they show only on a page sent back with another count.
+ *
+ * Checked at once and on pageshow too, not only as it is typed in: a
+ * count the browser puts back by itself, on Back or in a restored tab,
+ * fires no input (inventory-tng-2t5h).
  */
 export function followWas(document: Document): void {
   for (const field of document.querySelectorAll<HTMLInputElement>(
@@ -127,8 +131,11 @@ export function followWas(document: Document): void {
     if (was === null) {
       continue;
     }
-    field.addEventListener("input", () => {
+    const show = () => {
       showDescribing(field, was, field.value !== field.dataset.was);
-    });
+    };
+    field.addEventListener("input", show);
+    document.defaultView?.addEventListener("pageshow", show);
+    show();
   }
 }

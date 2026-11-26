@@ -149,6 +149,43 @@ test("a field sent back changed loses its was words once put back", () => {
   );
 });
 
+test("a count the browser put back changed shows its was words at once", () => {
+  document.body.innerHTML = `
+    <input id="count-3" value="305" data-was="305" aria-describedby="unit-count-3">
+    <span id="unit-count-3">m</span>
+    <p id="count-3-was" hidden>Was 305 m</p>`;
+  const field = document.getElementById("count-3") as HTMLInputElement;
+  const was = document.getElementById("count-3-was") as HTMLElement;
+  // As a browser restoring a form does: the value, with no input event.
+  field.value = "300";
+  followWas(document);
+  expect(was.hidden).toBe(false);
+  expect(field.getAttribute("aria-describedby")).toBe(
+    "unit-count-3 count-3-was",
+  );
+});
+
+test("a count put back on Back from a kept page is checked again", () => {
+  document.body.innerHTML = `
+    <input id="count-3" value="305" data-was="305" aria-describedby="unit-count-3">
+    <span id="unit-count-3">m</span>
+    <p id="count-3-was" hidden>Was 305 m</p>`;
+  followWas(document);
+  const field = document.getElementById("count-3") as HTMLInputElement;
+  const was = document.getElementById("count-3-was") as HTMLElement;
+  expect(was.hidden).toBe(true);
+  field.value = "300";
+  window.dispatchEvent(new Event("pageshow"));
+  expect(was.hidden).toBe(false);
+  expect(field.getAttribute("aria-describedby")).toBe(
+    "unit-count-3 count-3-was",
+  );
+  field.value = "305";
+  window.dispatchEvent(new Event("pageshow"));
+  expect(was.hidden).toBe(true);
+  expect(field.getAttribute("aria-describedby")).toBe("unit-count-3");
+});
+
 test("with nothing typed, the words the page sent", () => {
   // The server says "it" in the page's language (stock/length_checks.html).
   document.body.innerHTML = `
