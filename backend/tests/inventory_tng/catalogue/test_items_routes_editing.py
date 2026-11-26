@@ -588,7 +588,7 @@ def test_an_edit_with_a_problem_changes_nothing(
     item = new_item(session, radios)
     refused = admin_client.post(
         f"{ITEMS}/{item.id}",
-        data=item_form(radios, name=""),
+        data=shown_item_form(item, name=""),
     )
     assert refused.status_code == 400
     session.refresh(item)

@@ -367,3 +367,17 @@ def stale_since(
         "changed_since_shown",
     )
     return broken is not None
+
+
+def stale_as_read(row: Base, seen: Seen) -> bool:
+    """stale_since, unlocked, for a form whose save locks other rows before
+    this one (locked_row's order), so it may not lock the row first: an
+    item's save locks its open packages' places first, a volunteer's their
+    custody location. The row as this request read it: changed then, it
+    stays changed, as versions only grow; read unchanged, the save checks
+    it again under its lock, so a change in between is refused then."""
+    try:
+        unchanged(row, seen)
+    except RuleBroken:
+        return True
+    return False

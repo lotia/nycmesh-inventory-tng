@@ -34,7 +34,7 @@ from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS, unit_reco
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
 from inventory_tng.catalogue.unit_conversion import convertible
 from inventory_tng.core.db_errors import refusal, refusal_naming_index
-from inventory_tng.core.db_locking import stale_since
+from inventory_tng.core.db_locking import stale_as_read, stale_since
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
@@ -788,10 +788,17 @@ def save_item(
     )
     renamed = None
     answer = form.get(RECORDED)
+    # No saves nothing, and is answered from a page drawn before a change
+    # too (_unit_declined).
     if fields is not None and answer == "no":
         return _unit_declined(request, session, signed, found, form, fields.unit)
+    seen = form_version(form.get("version", ""))
+    # Changed since it was shown: said before what is wrong with what was
+    # typed (inventory-tng-ryjv). Not locked: the save locks the places of
+    # its open packages first (open_packages.unfollowing).
+    if stale_as_read(found, seen):
+        return _item_page(request, session, signed, found, alert=RULES[CHANGED])
     if fields is not None:
-        seen = form_version(form.get("version", ""))
         recorded_in = form.get(RECORDED_IN) if answer == "yes" else None
         same = forms.same_name(session, found, form, fields, typed)
         asked = None if same else []

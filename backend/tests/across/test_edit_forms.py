@@ -124,6 +124,28 @@ def test_a_save_after_another_since_the_form_was_shown_is_refused(
     assert admin_client.post(path, data=form).status_code == 303
 
 
+# A field of each form, sent wrong.
+WRONG: dict[str, dict[str, str]] = {
+    "item": {"minimum": "-1"},
+}
+
+
+@pytest.mark.parametrize("name", WRONG)
+def test_a_stale_form_says_so_before_its_fields_problems(
+    admin_client: TestClient, session: Session, name: str
+) -> None:
+    """At once, so the admin does not fix a field only to be told the row
+    changed, losing what they typed (inventory-tng-ryjv)."""
+    make, column, meanwhile = FORMS[name]
+    path, sends, row, field = make(session)
+    form = sends | WRONG[name] | {field: shown(row)}
+    setattr(row, column, meanwhile)
+    session.flush()
+    refused = admin_client.post(path, data=form)
+    assert refused.status_code == 409
+    assert str(RULES[CHANGED]) in text(refused)
+
+
 @pytest.mark.parametrize("version", ["", "0", "x"])
 def test_a_form_without_its_version_is_refused(
     admin_client: TestClient, session: Session, version: str
