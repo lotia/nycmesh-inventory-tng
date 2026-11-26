@@ -205,6 +205,7 @@ def recounted(
         return not_found()
     if unit not in unit_changes.units_open(found.unit, "moved"):
         unit = found.unit
+    log.debug("unit recounted shown", item_id=item_id, changed_since=unit != found.unit)
     # A retired one, holding nothing now, is counted no more.
     current = [
         each

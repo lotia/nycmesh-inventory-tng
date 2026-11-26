@@ -717,7 +717,10 @@ def test_the_page_after_names_the_unit_recounted_into_once_changed_since(
     session.expire_all()
     cable.unit = "m"
     session.flush()
-    after = read(admin_client.get(done.headers["location"]).text)
+    with capture_logs() as logs:
+        after = read(admin_client.get(done.headers["location"]).text)
+    (logged,) = [each for each in logs if each["event"] == "unit recounted shown"]
+    assert (logged["item_id"], logged["changed_since"]) == (cable.id, True)
     _recounted_into(after, cable, "ft")
     after.one("p", "Its unit has since changed to m.")
     assert "Count it at each, in m:" in words_on(after)
@@ -747,8 +750,10 @@ def test_an_edited_or_missing_unit_in_the_address_is_the_unit_now(
     """Another of the item's lengths is taken as recounted into; a unit
     not one of them (each, for an item in m), or none, is its unit now."""
     cable = Spools(session).cable
-    _recounted_into(_after(admin_client, cable.id, "unit=ft"), cable, "ft")
-    for query in ("unit=each", "unit=", "places="):
+    taken = _after(admin_client, cable.id, "unit=ft")
+    _recounted_into(taken, cable, "ft")
+    taken.one("p", "Its unit has since changed to m.")
+    for query in ("unit=each", "unit=", "places=", "unit=%3Cb%3E&unit=each"):
         after = _after(admin_client, cable.id, query)
         _recounted_into(after, cable, "m")
         assert "since changed" not in words_on(after)

@@ -533,4 +533,6 @@ other unit, and retiring the item for a new one.
   now: reloaded once such an item's stock has moved, it still offers no
   packages to add (inventory-tng-mu57). Its title names the unit
   recounted into, also from its address, and a line says if the item's
-  unit has changed since (Ali, 2026-11-25, inventory-tng-9yg2).
+  unit has changed since. The counts and packages it links to stay in
+  its unit now, as a count today is (Ali, 2026-11-25,
+  inventory-tng-9yg2).
