@@ -487,8 +487,8 @@ with `web/forms.form_version` and shows a refusal as `RULES[CHANGED]`'s
 alert, which `admin_page` answers 409. It compares the version before
 checking what was typed, so a stale form says so first, not after its other
 problems are fixed (`db_locking.stale_since`; `stale_as_read` where the save
-locks other rows first). An administrator's own account is not versioned:
-only they edit it.
+locks other rows first, or locks the row other than as a catalogue row). An
+administrator's own account is not versioned: only they edit it.
 
 A request's session comes from the app's request pool; a write in a
 transaction of its own, or work after the reply, takes the side pool, and an

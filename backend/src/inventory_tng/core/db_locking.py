@@ -370,13 +370,14 @@ def stale_since(
 
 
 def stale_as_read(row: Base, seen: Seen) -> bool:
-    """stale_since, taking no lock: for a row already locked, or one whose
+    """stale_since, taking no lock: for a row already locked, one whose
     save locks other rows before it (locked_row's order), so it may not be
     locked first, as an item's save locks its open packages' places first
-    and a volunteer's their custody location. The row as this request
-    read it: changed then, it stays changed, as versions only grow; read
-    unchanged, the save checks it again under its lock, so a change in
-    between is refused then."""
+    and a volunteer's their custody location, or one not locked as a
+    catalogue row, as a device is. The row as this request read it:
+    changed then, it stays changed, as versions only grow; read unchanged,
+    the save checks it again under its lock, so a change in between is
+    refused then."""
     try:
         unchanged(row, seen)
     except RuleBroken:
