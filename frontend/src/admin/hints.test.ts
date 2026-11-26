@@ -149,13 +149,20 @@ test("a field sent back changed loses its was words once put back", () => {
   );
 });
 
-test("a count the browser put back changed shows its was words at once", () => {
+/** A count of 305 m as the page sends it, its was words hidden. */
+function sentCount() {
   document.body.innerHTML = `
     <input id="count-3" value="305" data-was="305" aria-describedby="unit-count-3">
     <span id="unit-count-3">m</span>
     <p id="count-3-was" hidden>Was 305 m</p>`;
-  const field = document.getElementById("count-3") as HTMLInputElement;
-  const was = document.getElementById("count-3-was") as HTMLElement;
+  return {
+    field: document.getElementById("count-3") as HTMLInputElement,
+    was: document.getElementById("count-3-was") as HTMLElement,
+  };
+}
+
+test("a count the browser put back changed shows its was words at once", () => {
+  const { field, was } = sentCount();
   // As a browser restoring a form does: the value, with no input event.
   field.value = "300";
   followWas(document);
@@ -166,13 +173,8 @@ test("a count the browser put back changed shows its was words at once", () => {
 });
 
 test("a count put back on Back from a kept page is checked again", () => {
-  document.body.innerHTML = `
-    <input id="count-3" value="305" data-was="305" aria-describedby="unit-count-3">
-    <span id="unit-count-3">m</span>
-    <p id="count-3-was" hidden>Was 305 m</p>`;
+  const { field, was } = sentCount();
   followWas(document);
-  const field = document.getElementById("count-3") as HTMLInputElement;
-  const was = document.getElementById("count-3-was") as HTMLElement;
   expect(was.hidden).toBe(true);
   field.value = "300";
   window.dispatchEvent(new Event("pageshow"));
