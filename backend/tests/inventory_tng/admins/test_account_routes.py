@@ -194,6 +194,30 @@ def test_an_authenticator_keeps_a_name_of_its_own(
     assert str(NAME_TAKEN) in text(refused)
 
 
+def test_a_refused_authenticator_rename_is_tied_to_its_problem(
+    client: TestClient,
+    session: Session,
+    ada: tuple[Admin, str],
+) -> None:
+    """Its problem follows its form, so its box is described by it and
+    marked invalid; as first shown, neither (Ali, 2026-11-26,
+    inventory-tng-l361)."""
+    (authenticator,) = accounts.authenticators(session, ada[0].id)
+    path = f"{ACCOUNT}/authenticators/{authenticator.id}/name"
+
+    def tied(page: str) -> tuple[str | None, str | None]:
+        box = read(page).one("form", action=path).one("input")
+        return box.attrs.get("aria-describedby"), box.attrs.get("aria-invalid")
+
+    assert tied(client.get(ACCOUNT).text) == (None, None)
+    refused = client.post(path, data={"authenticator_name": " "})
+    assert refused.status_code == 400
+    problem = f"authenticator_{authenticator.id}-problem"
+    assert tied(refused.text) == (problem, "true")
+    said = read(refused.text).one("*", id=problem).text
+    assert said == str(accounts.authenticator_name_problem(""))
+
+
 def test_recovery_codes_need_an_authenticator(
     client: TestClient, session: Session
 ) -> None:

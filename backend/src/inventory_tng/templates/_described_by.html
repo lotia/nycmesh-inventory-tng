@@ -1,8 +1,10 @@
 {#- A box's aria-describedby, the ids in `described`, and, refused, its
 problem (_field_problem.html) first, so a screen reader hears why it was
-refused, and aria-invalid (inventory-tng-h3tw). A box whose problem sits
-inside its label (`labelled`) hears it in its name already, so is only
-marked invalid. Imported with context, for `problems`. -#}
+refused, and aria-invalid (inventory-tng-h3tw, inventory-tng-l361). A box
+whose problem sits inside its label (`labelled`) hears it in its name
+already, so is only marked invalid (Ali, 2026-11-26). `name` is the
+problem's, which may differ from the box's own name. Imported with
+context, for `problems`. -#}
 {% macro described_by(name, described=[], labelled=false) -%}
 {%- set refused = problems.get(name) -%}
 {%- set ids = ([name ~ "-problem"] if refused and not labelled else []) + described -%}

@@ -15,13 +15,14 @@ from inventory_tng.models.site_settings import (
     SignInSettings,
     SiteSettings,
 )
-from inventory_tng.site_settings.forms import whole_minutes
+from inventory_tng.models.stock import AdjustmentReason
+from inventory_tng.site_settings.forms import REASON_TAKEN, whole_minutes
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.web.forms import PICK_A_ZONE
 
 from helpers.mail import SentMail
-from helpers.markup import box_values, hidden_fields, options, read, text
-from helpers.rows import history, shown
+from helpers.markup import Element, box_values, hidden_fields, options, read, text
+from helpers.rows import add, history, shown
 from helpers.sign_in import confirmed_long_ago, new_admin, sign_in_with, with_code
 
 
@@ -132,6 +133,53 @@ def test_sign_in_settings_refuse_what_cannot_be(
     refused = admin_client.post(f"{SETTINGS}/sign-in", data=form)
     assert refused.status_code == 400
     assert session.get_one(SignInSettings, 1).totp_policy == "required"
+
+
+def _tied(box: Element) -> tuple[str | None, str | None]:
+    """The box's aria-describedby and aria-invalid, None where unset."""
+    return box.attrs.get("aria-describedby"), box.attrs.get("aria-invalid")
+
+
+def test_refused_totp_policy_radios_are_tied_to_their_problem(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Its problem follows the radios' labels, so each radio is described
+    by it and marked invalid; unrefused, neither (Ali, 2026-11-26,
+    inventory-tng-l361)."""
+    radios = read(admin_client.get(SETTINGS).text).all("input", name="totp_policy")
+    assert radios
+    assert [_tied(each) for each in radios] == [(None, None)] * len(radios)
+    version = shown(session.get_one(SignInSettings, 1))
+    form = SIGN_IN_FORM | {"totp_policy": "sometimes", "sign_in_version": version}
+    refused = read(admin_client.post(f"{SETTINGS}/sign-in", data=form).text)
+    radios = refused.all("input", name="totp_policy")
+    assert [_tied(each) for each in radios] == [("totp_policy-problem", "true")] * len(
+        radios
+    )
+    assert refused.one("*", id="totp_policy-problem").text
+
+
+def test_a_refused_reason_rename_is_tied_to_its_problem(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Its problem follows its form, so only that reason's box is described
+    by it and marked invalid (Ali, 2026-11-26, inventory-tng-l361)."""
+    given = add(session, AdjustmentReason(name="Given away"))
+    other = add(session, AdjustmentReason(name="Donated"))
+    form = {"name": "Donated", "version": shown(given), "action": "rename"}
+    refused = admin_client.post(f"{SETTINGS}/reasons/{given.id}", data=form)
+    assert refused.status_code == 400
+    page = read(refused.text)
+
+    def box(reason: AdjustmentReason) -> Element:
+        return page.one("form", action=f"{SETTINGS}/reasons/{reason.id}").one(
+            "input", name="name"
+        )
+
+    problem = f"reason_{given.id}-problem"
+    assert _tied(box(given)) == (problem, "true")
+    assert page.one("*", id=problem).text == str(REASON_TAKEN)
+    assert _tied(box(other)) == (None, None)
 
 
 def test_sign_in_settings_ask_for_a_fresh_code(

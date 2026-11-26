@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 <section id="sign-in">
   <h2>{% trans %}Signing in{% endtrans %}</h2>
@@ -10,8 +11,9 @@
     <input type="hidden" name="sign_in_version" value="{{ values.sign_in_version }}">
     <fieldset>
       <legend>{% trans %}Authenticator app (TOTP){% endtrans %}</legend>
+      {#- Its problem follows the labels, so each radio points at it. #}
       {% for policy in policies %}
-      <label><input type="radio" name="totp_policy" value="{{ policy }}" {% if values.totp_policy == policy %}checked{% endif %} required>
+      <label><input type="radio" name="totp_policy" value="{{ policy }}" {% if values.totp_policy == policy %}checked{% endif %} required{{ described_by("totp_policy") }}>
         {{ _("Required of every administrator") if policy == "required" else _("Optional: each administrator chooses") }}</label>
       {% endfor %}
       {% with name = "totp_policy" %}{% include "_field_problem.html" %}{% endwith %}
@@ -67,7 +69,8 @@
       <td>
         <form method="post" action="{{ here }}/reasons/{{ reason.id }}" class="actions">
           <input type="hidden" name="version" value="{{ reason.edit_version }}">
-          <input name="name" inputmode="text" value="{{ reason.name }}" maxlength="{{ name_max }}" aria-label="{% trans %}Reason{% endtrans %}" required>
+          {#- Its problem follows the form, so the box points at it. #}
+          <input name="name" inputmode="text" value="{{ reason.name }}" maxlength="{{ name_max }}" aria-label="{% trans %}Reason{% endtrans %}" required{{ described_by(field) }}>
           {% if reason.retired_at %}<span class="tag">{% trans %}Retired{% endtrans %}</span>{% endif %}
           <button name="action" value="rename">{% trans %}Rename{% endtrans %}<span class="sr-only"> {{ reason.name }}</span></button>
           {% if reason.retired_at %}

@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 <nav aria-label="{% trans %}On this page{% endtrans %}">
   <ul class="actions list-none pl-0">
@@ -50,7 +51,8 @@
     <tr>
       <td>
         <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/name" class="actions">
-          <input name="authenticator_name" inputmode="text" value="{{ authenticator.name }}" maxlength="{{ limits.authenticator_name_max }}" aria-label="{% trans %}Name{% endtrans %}" required>
+          {#- Its problem follows the form, so the box points at it. #}
+          <input name="authenticator_name" inputmode="text" value="{{ authenticator.name }}" maxlength="{{ limits.authenticator_name_max }}" aria-label="{% trans %}Name{% endtrans %}" required{{ described_by("authenticator_" ~ authenticator.id) }}>
           <button>{% trans %}Rename{% endtrans %}<span class="sr-only"> {{ authenticator.name }}</span></button>
         </form>
         {% with name = "authenticator_" ~ authenticator.id %}{% include "_field_problem.html" %}{% endwith %}
