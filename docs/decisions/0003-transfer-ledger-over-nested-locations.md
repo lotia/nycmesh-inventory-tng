@@ -287,12 +287,12 @@ for anything else while keeping what was typed (Bring it back on a count,
 a save refused by another rule) is shown in the units and sizes now
 too, so it says the same beside each box of one changed since
 (inventory-tng-dcqp), a box it could not read too. The item page's
-package forms say after it what is wrong with the number in any unit,
-such as "Use a number above 0.", so both are fixed at once, but not what
-depends on the unit, as the number is typed again in the new one
-(inventory-tng-hhlr). Bring it back that
-brings the area back answers 200 even so, as it saved no amount for the
-words to refuse (Ali, 2026-11-23, inventory-tng-itfm). We rejected converting
+package forms say after those words what is wrong with the number in
+any unit, such as "Use a number above 0.", so both are fixed at once,
+but not what depends on the unit, as the number is typed again in the
+new one (inventory-tng-hhlr). Bring it back that brings the area back
+answers 200 even so, as it saved no amount for the words to refuse (Ali,
+2026-11-23, inventory-tng-itfm). We rejected converting
 what was shown into what is now: a unit switched because it was wrong may
 mean the volunteer's number was right in the new one, so asking again is
 safer.
@@ -524,5 +524,5 @@ other unit, and retiring the item for a new one.
   whose stock never moved, neither page says to count it or add its
   packages, as nothing is counted or retired. The page after takes all
   this from its address, set by the recount, not from the item as it is
-  now, so reloaded once stock has moved it still offers no packages to
-  add (inventory-tng-mu57).
+  now: reloaded once such an item's stock has moved, it still offers no
+  packages to add (inventory-tng-mu57).
