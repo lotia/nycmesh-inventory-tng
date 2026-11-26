@@ -233,31 +233,20 @@ def planned(session: Session, item: Item) -> Planned:
     )
 
 
-def stale_as_read(session: Session, item: Item, seen: str) -> bool:
-    """Whether a recount of the item, as the records are read now, does
-    otherwise than its page said (`seen`, Planned.seen), so a stale form
-    says so before what is wrong with its amounts (inventory-tng-0w7o).
-    Read without locks, as its page is: recount takes them in the
-    ledger's order, which a lock taken first here could break, and holds
-    none while a page of problems is shown. Safe: read changed, the
-    records changed after the page showed `seen` (or no page did); read
-    unchanged, recount reads the plan again under its locks, so a change
-    in between is refused then."""
-    if planned(session, item).seen == seen:
+def stale_as_read(item_id: int, plan: Planned, seen: str) -> bool:
+    """Whether a recount of the item, as `plan` (planned) reads the
+    records now, does otherwise than its page said (`seen`,
+    Planned.seen), so a stale form says so before what is wrong with its
+    amounts (inventory-tng-0w7o). `plan` is read without locks, as its
+    page is: recount takes them in the ledger's order, which a lock taken
+    first could break, and holds none while a page of problems is shown.
+    Safe: read changed, the records changed after the page showed `seen`
+    (or no page did); read unchanged, recount reads the plan again under
+    its locks, so a change in between is refused then."""
+    if plan.seen == seen:
         return False
-    log.info("unit recount refused", item_id=item.id, reason="changed")
+    log.info("unit recount refused", item_id=item_id, reason="changed")
     return True
-
-
-def resized_of(session: Session, item: Item) -> list[ItemPackage]:
-    """The packages a recount of the item asks the size of again, in
-    order (Planned.resized): if a conversion before, and no stock moved,
-    fixes its unit, those in its unit, retired ones too; else none, as it
-    retires those instead."""
-    if unit_changes.unit_fixed(session, item) != "converted":
-        return []
-    every = select(ItemPackage).where(ItemPackage.item_id == item.id)
-    return _asked_again(session.scalars(every.order_by(ItemPackage.id)), item.unit)
 
 
 def _asked_again(packages: Iterable[ItemPackage], unit: str) -> list[ItemPackage]:

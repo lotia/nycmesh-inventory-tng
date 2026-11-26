@@ -11,7 +11,6 @@ from collections.abc import Mapping
 import structlog
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue import (
@@ -23,6 +22,7 @@ from inventory_tng.catalogue import (
 )
 from inventory_tng.catalogue.paths import ITEMS, UNIT_RECOUNT, UNIT_RECOUNTED
 from inventory_tng.catalogue.unit_conversion import convertible
+from inventory_tng.catalogue.unit_recounts import Planned
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.phrases import Words, gettext
@@ -54,18 +54,18 @@ def recounted_title(item: str, unit: str) -> str:
 
 def _page(
     request: Request,
-    session: Session,
     signed: SignedIn,
     item: Item,
     unit: str,
+    plan: Planned,
     *,
     values: Mapping[str, str] | None = None,
     problems: Mapping[str, Words] | None = None,
     alert: Words | None = None,
 ) -> HTMLResponse:
-    """The recount's page, as the records are now: what it will do, and
-    the amounts to give again, as they are, or as `values` typed them."""
-    plan = unit_recounts.planned(session, item)
+    """The recount's page, as `plan` reads the records now: what it will
+    do, and the amounts to give again, as they are, or as `values` typed
+    them."""
     here = UNIT_RECOUNT.format(item_id=item.id)
     log.debug("unit recount shown", item_id=item.id, places=len(plan.held))
     return admin_page(
@@ -95,19 +95,19 @@ def _page(
 
 def _refused_page(
     request: Request,
-    session: Session,
     signed: SignedIn,
     item: Item,
     unit: str,
+    plan: Planned,
     rule: str,
 ) -> HTMLResponse:
-    """The recount's page as the records are now, refused by `rule`, with
-    nothing typed kept (inventory-tng-0w7o): its amounts were typed
-    against a plan since changed, as a package resized or the item's
-    Reorder at edited, and a box keeping them would be sent again
+    """The recount's page as `plan` reads the records now, refused by
+    `rule`, with nothing typed kept (inventory-tng-0w7o): its amounts
+    were typed against a plan since changed, as a package resized or the
+    item's Reorder at edited, and a box keeping them would be sent again
     against the new one, unseen. Its alert says to make the change
     again."""
-    return _page(request, session, signed, item, unit, alert=RULES[rule])
+    return _page(request, signed, item, unit, plan, alert=RULES[rule])
 
 
 @router.get(UNIT_RECOUNT)
@@ -124,7 +124,8 @@ def recount_page(
     # Not to be recounted into it, as after a recount sent twice: its page.
     if unit not in unit_recounts.units_open(session, found):
         return redirect(f"{ITEMS}/{item_id}")
-    return _page(request, session, signed, found, unit)
+    plan = unit_recounts.planned(session, found)
+    return _page(request, signed, found, unit, plan)
 
 
 @router.post(UNIT_RECOUNT)
@@ -144,20 +145,18 @@ def recount(
     # Changed since it was shown: said before what is wrong with the
     # amounts (unit_recounts.stale_as_read), the page as it is now with
     # nothing typed kept (_refused_page).
+    plan = unit_recounts.planned(session, found)
     seen = form.get("seen", "")
-    if unit_recounts.stale_as_read(session, found, seen):
-        return _refused_page(request, session, signed, found, unit, CHANGED)
+    if unit_recounts.stale_as_read(item_id, plan, seen):
+        return _refused_page(request, signed, found, unit, plan, CHANGED)
     # The offers and packages as now: one added or retired since is
     # refused as changed.
-    offers = [each.offer.id for each in queries.current_offers(session, item_id)]
-    packages = unit_recounts.resized_of(session, found)
+    offers = [each.offer.id for each in plan.offers]
     amounts, problems = unit_change_forms.recount_amounts(
-        form, offers, packages, separator=decimal_separator(request)
+        form, offers, plan.resized, separator=decimal_separator(request)
     )
     if amounts is None:
-        return _page(
-            request, session, signed, found, unit, values=form, problems=problems
-        )
+        return _page(request, signed, found, unit, plan, values=form, problems=problems)
     done, broken = refusal(
         session,
         lambda: unit_recounts.recount(
@@ -178,7 +177,8 @@ def recount(
         session.refresh(found)
         if unit not in unit_recounts.units_open(session, found):
             return redirect(f"{ITEMS}/{item_id}")
-        return _refused_page(request, session, signed, found, unit, broken)
+        plan = unit_recounts.planned(session, found)
+        return _refused_page(request, signed, found, unit, plan, broken)
     assert done is not None  # Refused, or done.
     session.commit()
     after = {"unit": unit, "places": _listed(done.places)}
