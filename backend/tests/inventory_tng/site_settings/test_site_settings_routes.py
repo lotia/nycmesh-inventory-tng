@@ -45,8 +45,14 @@ def test_shows_and_changes_the_name_check(
 
 
 @pytest.mark.parametrize("typed", ["", "-1", "soon", "1441"])
-def test_refuses_what_is_not_minutes(admin_client: TestClient, typed: str) -> None:
-    refused = admin_client.post(f"{SETTINGS}/scan", data={"name_check_minutes": typed})
+def test_refuses_what_is_not_minutes(
+    admin_client: TestClient, session: Session, typed: str
+) -> None:
+    form = {
+        "name_check_minutes": typed,
+        "scan_version": shown(session.get_one(ScanSettings, 1)),
+    }
+    refused = admin_client.post(f"{SETTINGS}/scan", data=form)
     assert refused.status_code == 400
     assert whole_minutes(*NAME_CHECK_MINUTES) in refused.text
 
@@ -121,9 +127,9 @@ def test_sign_in_settings_change_and_everyone_is_told(
 def test_sign_in_settings_refuse_what_cannot_be(
     admin_client: TestClient, session: Session, field: str, typed: str
 ) -> None:
-    refused = admin_client.post(
-        f"{SETTINGS}/sign-in", data=SIGN_IN_FORM | {field: typed}
-    )
+    version = shown(session.get_one(SignInSettings, 1))
+    form = SIGN_IN_FORM | {field: typed, "sign_in_version": version}
+    refused = admin_client.post(f"{SETTINGS}/sign-in", data=form)
     assert refused.status_code == 400
     assert session.get_one(SignInSettings, 1).totp_policy == "required"
 

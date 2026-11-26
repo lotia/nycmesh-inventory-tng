@@ -146,6 +146,10 @@ WRONG: dict[str, dict[str, str]] = {
     "location": {"name": ""},
     "volunteer": {"name": ""},
     "device": {"label": "x" * (NAME_MAX + 1)},
+    "reason": {"name": "x" * (NAME_MAX + 1)},
+    "scan": {"name_check_minutes": "-1"},
+    "sign_in": {"session_days": "0"},
+    "site": {"time_zone": "Mars/Olympus_Mons"},
     "reading": {"reading": "xx"},
 }
 

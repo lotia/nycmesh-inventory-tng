@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins import accounts, activity, mail_messages
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core.db_errors import RuleBroken, refusal
-from inventory_tng.core.db_locking import settings_row
+from inventory_tng.core.db_locking import settings_row, stale_as_read
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.mail import Notify
@@ -117,6 +117,13 @@ def save_scan_settings(
     name_check_minutes: Annotated[str, Form()] = "",
     scan_version: Annotated[str, Form()] = "",
 ) -> Response:
+    seen = form_version(scan_version)
+    # Changed since it was shown: said before what is wrong with what was
+    # typed (inventory-tng-ryjv), as each settings form does.
+    try:
+        settings_row(session, ScanSettings, seen=seen)
+    except RuleBroken:  # changed_since_shown, before anything is written.
+        return _changed(request, session, signed)
     minutes = forms.scan_minutes(name_check_minutes)
     if isinstance(minutes, str):
         return _page(
@@ -129,12 +136,7 @@ def save_scan_settings(
                 "scan_version": scan_version,
             },
         )
-    seen = form_version(scan_version)
-    _, broken = refusal(
-        session, lambda: scan_settings.change(session, minutes, seen=seen), CHANGED
-    )
-    if broken is not None:
-        return _changed(request, session, signed)
+    scan_settings.change(session, minutes, seen=seen)
     session.commit()
     return redirect(SETTINGS, notice="settings_saved", section="scan-page")
 
@@ -175,6 +177,11 @@ def change_reason(
     if reason is None:
         return not_found()
     action = action if action in {"retire", "restore"} else "rename"
+    seen = form_version(version)
+    # A rename changed since it was shown: said before what is wrong with
+    # the name (inventory-tng-ryjv). The reason is locked above.
+    if action == "rename" and stale_as_read(reason, seen):
+        return _changed(request, session, signed)
     name = name.strip() or reason.name
 
     def change() -> None:
@@ -183,13 +190,11 @@ def change_reason(
         elif action == "restore":
             adjustment_reasons.restore(session, reason)
         else:
-            adjustment_reasons.rename(session, reason, name, seen=form_version(version))
+            adjustment_reasons.rename(session, reason, name, seen=seen)
 
     problem = name_problem(name)
     if problem is None:
-        _, broken = refusal(session, change, "unique", CHANGED)
-        if broken == CHANGED:
-            return _changed(request, session, signed)
+        _, broken = refusal(session, change, "unique")
         problem = broken and forms.REASON_TAKEN
     if problem is not None:
         return _page(
@@ -211,14 +216,16 @@ def save_sign_in_settings(
     notify: Notify,
     form: TextForm,
 ) -> Response:
-    chosen, problems = forms.sign_in_fields(form)
-    if problems:
-        return _page(request, session, signed, problems=problems, values=form)
     try:
         seen = form_version(form.get("sign_in_version", ""))
         current = settings_row(session, SignInSettings, seen=seen)
     except RuleBroken:  # changed_since_shown, before anything is written.
         return _changed(request, session, signed)
+    # Checked once the version is: a stale form says so first
+    # (inventory-tng-ryjv).
+    chosen, problems = forms.sign_in_fields(form)
+    if problems:
+        return _page(request, session, signed, problems=problems, values=form)
     if all(getattr(current, field) == value for field, value in chosen.items()):
         # Nothing to record, and nobody to tell.
         return redirect(SETTINGS, notice="saved", section="sign-in")
