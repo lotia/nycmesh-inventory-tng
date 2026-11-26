@@ -37,7 +37,9 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
 {% set filtered = shown.only or shown.search %}
 {% set columns = 4 if recount else 3 %}
 {#- What follows a box: the item's unit, or, for sealed packages, that it
-counts them (inventory-tng-mdvz). #}
+counts them (inventory-tng-mdvz). A sealed box's label already says
+"sealed", so where it is used a screen reader isn't told it again: a
+row's box leaves it out of aria-describedby, an arrival's label hides it. #}
 {% macro counted_in(item, row) -%}
 {%- if row.sealed %}{#- Translators: follows the box where the number of an item's sealed packages is typed, as in "2 sealed". #}{% trans %}sealed{% endtrans %}{% else %}{{ item.unit }}{% endif -%}
 {%- endmacro %}
@@ -63,7 +65,7 @@ one by its size, an open package closed as none
       <td>{{ row.amount | amount }}{% if not row.sealed %} {{ item.unit }}{% endif %}</td>
       {% if recount %}<td></td>{% endif %}
       {%- set hint = item.unit | printed_length if row.open_id else "" %}
-      <td><span class="with-unit"><input name="{{ field }}" inputmode="{{ item.unit | keyboard(row.sealed) }}" value="{{ values.get(field, row.amount | box_amount(decimal) if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}" aria-describedby="unit-{{ field }}{% if hint %} hint-{{ field }}{% endif %}"
+      <td><span class="with-unit"><input name="{{ field }}" inputmode="{{ item.unit | keyboard(row.sealed) }}" value="{{ values.get(field, row.amount | box_amount(decimal) if row.amount > 0 else '0') }}" aria-label="{% if where %}{{ where }}, {% endif %}{{ item.name_shown }}, {{ row.words }}"{% if not row.sealed %} aria-describedby="unit-{{ field }}{% if hint %} hint-{{ field }}{% endif %}"{% endif %}
         {%- if adds %} data-adds-to="{{ adds }}" data-unset="{{ row.amount | plain_amount }}"{% if row.sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}{% if row.open_id %} data-state="{{ prefix ~ 'state_' ~ row.open_id }}"{% endif %}{% endif %}>
         <span id="unit-{{ field }}">{{ counted_in(item, row) }}</span></span>
         {% if row.open_id %}
@@ -151,7 +153,7 @@ one by its size, an open package closed as none
         {% set name = each.prefix ~ row.field %}
         <label>{% if each.worded %}{{ row.words }}{% else %}{% trans %}How many arrived?{% endtrans %}{{ said }}{% endif %}
           <span class="with-unit"><input name="{{ name }}" inputmode="{{ each.item.unit | keyboard(row.sealed) }}" value="{{ values.get(name, row.amount | box_amount(decimal)) }}" data-adds-to="{{ moved.adds_to(section.place.id, each.item.id) }}" data-unset="{{ row.amount | plain_amount }}"{% if row.sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}>
-          <span>{{ counted_in(each.item, row) }}</span></span>
+          <span{% if row.sealed %} aria-hidden="true"{% endif %}>{{ counted_in(each.item, row) }}</span></span>
         </label>
         {% include "_field_problem.html" %}
         {% endfor %}

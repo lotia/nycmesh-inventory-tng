@@ -58,13 +58,15 @@ def test_a_loose_box_says_its_item_s_unit(
 def test_a_box_of_sealed_packages_says_sealed_and_an_open_one_its_unit(
     admin_client: TestClient, session: Session, unit: str
 ) -> None:
-    """The open package's box keeps how to read a printed length, after
-    its unit."""
+    """A sealed box's label already says "sealed", so a screen reader
+    isn't told it again (Ali, 2026-11-25). The open package's box keeps
+    how to read a printed length, after its unit."""
     spools = Spools(session, cable_unit=unit)
     opened = spools.opened()
     page = page_at(admin_client, spools.store.id)
     sealed = f"sealed_{spools.cable.id}_{spools.spool.id}"
-    assert beside(page, sealed) == ("sealed", ["sealed"])
+    assert beside(page, sealed) == ("sealed", [])
+    assert "sealed" in page.one("input", name=sealed).attrs["aria-label"]
     assert beside(page, f"opened_{opened.id}") == (unit, [unit, str(PRINTED_LENGTH)])
 
 

@@ -87,6 +87,7 @@ def test_how_many_arrived_is_followed_by_its_unit(
     label = moved.page.one("input", name=moved.arrived()).find_parent("label")
     assert isinstance(label, Element)
     assert label.one("span", class_="with-unit").text == "each"
+    assert label.spoken.endswith("each")
 
 
 def test_fewer_arrived_is_lost_where_they_went(
@@ -295,6 +296,8 @@ def test_a_sealed_arrival_is_fixed_in_whole_packages(
     assert isinstance(label, Element)
     assert "Spool, sealed: how many" in label.text
     assert label.one("span", class_="with-unit").text == "sealed"
+    # Said once to a screen reader, by the label's words (Ali, 2026-11-25).
+    assert label.spoken.count("sealed") == 1
     assert moved.page.all("input", name=moved.loose) == []
     saved(admin_client, moved.path, moved.form | {moved.sealed: "1"})
     assert moved.at_shelf(session) == {(moved.cable, moved.spools.sealed): 305}

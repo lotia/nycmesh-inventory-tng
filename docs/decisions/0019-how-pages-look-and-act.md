@@ -2,7 +2,8 @@
 
 **Status:** accepted · 2026-11-10 · builds on 0014 (one stylesheet in NYC
 Mesh's look) · amended 2026-11-12 (packages renamed and brought back),
-2026-11-15 (lists sort, filter and choose their page size)
+2026-11-15 (lists sort, filter and choose their page size), 2026-11-25
+(amount boxes say their unit)
 
 ## Context
 
@@ -66,6 +67,14 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   the browser: retire anyway, or go back.
 - **Confirmation pages stay pages**: the danger button first, then a link
   to keep things as they are. No sticky footers.
+
+### Amounts
+
+- **Every box for an amount says its unit right after it**, on screen and
+  in its accessible description ("m", "ft", "each"); where the unit sits
+  inside the box's label, it is part of its accessible name instead. A box
+  counting sealed packages says "sealed", and a screen reader hears it
+  once, from the box's label (Ali, 2026-11-25, inventory-tng-mdvz).
 
 ### Lists and retired records
 
