@@ -138,6 +138,10 @@ test("a <select> is refused nothing, and keeps its ellipsis", async ({
   await expect
     .poll(() => answers)
     .toEqual(browserName === "webkit" ? [204] : []);
+  // The reports after ours, the screenshots' below, go to the backend
+  // unwatched: WebKit sends them late, and a handler still fetching one
+  // when the test ends fails it.
+  await page.unrouteAll({ behavior: "wait" });
   // Refused, WebKit's style takes the select's text-overflow with it.
   // Not hiding the caret, which Playwright does by a <style> of its own.
   const drawn = (id: string) =>
