@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db_errors import attempt
+from inventory_tng.core.db_locking import stale_as_read
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.places import Location
@@ -28,7 +29,7 @@ from inventory_tng.volunteers.forms import (
 )
 from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.admin_pages import admin_page, now, retirement, undo_retire
-from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
+from inventory_tng.web.forms import ALERTS, CHANGED, RULES, form_version, rule_words
 from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.web.navigation import SECTION_VOLUNTEERS
 from inventory_tng.web.pages import add_notices, not_found, redirect
@@ -248,10 +249,16 @@ def save_volunteer(
     found = session.get(Volunteer, volunteer_id)
     if found is None:
         return not_found()
+    seen = form_version(version)
+    # Changed since it was shown: said before what is wrong with what was
+    # typed (inventory-tng-ryjv). Not locked: the save locks their custody
+    # location first (volunteers._lock).
+    if stale_as_read(found, seen):
+        alert = RULES[CHANGED]
+        return _volunteer_page(request, session, signed, found, alert=alert)
     name, email = name.strip(), email.strip()
     problems = volunteer_problems(name, email)
     if not problems:
-        seen = form_version(version)
         _, broken = attempt(
             session,
             lambda: volunteers.save(session, found, name, email or None, seen=seen),

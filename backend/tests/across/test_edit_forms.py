@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue import reading_rules, units
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS
 from inventory_tng.core.db_base import Base
+from inventory_tng.devices.paths import DEVICES
 from inventory_tng.models.catalogue import Category, Item
 from inventory_tng.models.places import Location
 from inventory_tng.models.site_settings import (
@@ -25,8 +26,9 @@ from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.volunteers.paths import VOLUNTEERS
-from inventory_tng.web.forms import CHANGED, RULES
+from inventory_tng.web.forms import CHANGED, NAME_MAX, RULES
 
+from helpers.devices import new_device
 from helpers.items import item_form
 from helpers.markup import text
 from helpers.rows import add, shown
@@ -98,6 +100,11 @@ def _reading(session: Session) -> Form:
     return Form(f"{READINGS}/{rule.id}", {"reading": "none"}, rule)
 
 
+def _device(session: Session) -> Form:
+    device, _ = new_device(session)
+    return Form(f"{DEVICES}/{device.id}", {"label": "Store tablet"}, device)
+
+
 # Each form, and a change another administrator saves meanwhile.
 FORMS: dict[str, tuple[Callable[[Session], Form], str, object]] = {
     "item": (_item, "notes", "Outdoor only"),
@@ -105,6 +112,7 @@ FORMS: dict[str, tuple[Callable[[Session], Form], str, object]] = {
     "location": (_location, "name", "Depot"),
     "reading": (_reading, "reading", "g"),
     "volunteer": (_volunteer, "email", "ada@example.org"),
+    "device": (_device, "label", "Lost"),
     "reason": (_reason, "name", "Soaked"),
     "scan": (_scan, "name_check_minutes", 20),
     "sign_in": (_sign_in, "session_days", 5),
@@ -136,6 +144,8 @@ WRONG: dict[str, dict[str, str]] = {
     "item": {"minimum": "-1"},
     "category": {"name": ""},
     "location": {"name": ""},
+    "volunteer": {"name": ""},
+    "device": {"label": "x" * (NAME_MAX + 1)},
     "reading": {"reading": "xx"},
 }
 

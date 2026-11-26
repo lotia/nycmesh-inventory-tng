@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, ConfirmedAdmin, SignedIn, changed
 from inventory_tng.core.db_errors import attempt
+from inventory_tng.core.db_locking import stale_as_read
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import (
@@ -38,7 +39,7 @@ from inventory_tng.devices.paths import (
 )
 from inventory_tng.models.devices import Device, RegistrationCode
 from inventory_tng.web.admin_pages import admin_page, now, revoke_title, site_link
-from inventory_tng.web.forms import RULES, form_version
+from inventory_tng.web.forms import CHANGED, RULES, form_version
 from inventory_tng.web.listing import (
     Asked,
     AskedView,
@@ -364,6 +365,14 @@ def name_device(
     device = session.get(Device, device_id)
     if device is None:
         return not_found()
+    seen = form_version(version)
+    # Changed since it was shown: said before what is wrong with the label
+    # (inventory-tng-ryjv). Unlocked: stale_since locks as a catalogue
+    # row is locked; the save locks a device its own way and checks again
+    # (devices.name_device).
+    if stale_as_read(device, seen):
+        alert = RULES[CHANGED]
+        return _device_page(request, signed, session, device, alert=alert)
     label = label.strip()
     if (problem := forms.label_problem(label)) is not None:
         problems = {"label": problem}
@@ -371,7 +380,6 @@ def name_device(
         return _device_page(
             request, signed, session, device, problems=problems, values=values
         )
-    seen = form_version(version)
     _, broken = attempt(
         session, lambda: devices.name_device(session, device, label or None, seen=seen)
     )
