@@ -45,6 +45,7 @@ from inventory_tng.web.navigation import retired_holding
 
 from helpers.concurrency import Committed
 from helpers.markup import (
+    Element,
     addresses,
     button,
     hidden_fields,
@@ -117,6 +118,29 @@ def test_found_and_written_off(admin_client: TestClient, session: Session) -> No
     assert (written.kind, written.reason_id) == ("adjustment", int(form["reason_id"]))
     assert expected(session, place.store.id) == {place.item.id: Decimal(3)}
     assert "Damaged: -2 each" in words_on(admin_client.get(COUNTS).text)
+
+
+@pytest.mark.parametrize("unit", ["m", "ft"])
+def test_how_much_is_followed_by_the_unit_of_the_item_picked(
+    admin_client: TestClient, session: Session, unit: str
+) -> None:
+    """Each item offered carries its unit, which the browser shows right
+    after How much once it is picked, inside its label, so a screen reader
+    says it too (frontend/src/admin/hints.ts, followUnits;
+    inventory-tng-mdvz)."""
+    place = Place(session, cable_unit=unit)
+    page = read(admin_client.get(COUNTS).text)
+    units = {
+        option.attrs["value"]: option.attrs.get("data-unit")
+        for option in page.one("select", name="item_id").all("option")
+    }
+    assert units[str(place.cable.id)] == unit
+    assert units[str(place.item.id)] == "each"
+    after = page.one("input", name="amount").parent
+    assert isinstance(after, Element)
+    assert "with-unit" in after.classes
+    assert after.find_parent("label") is not None
+    assert after.one("span", data_unit_of="item_id").text == ""
 
 
 @pytest.mark.parametrize(

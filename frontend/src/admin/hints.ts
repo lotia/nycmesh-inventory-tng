@@ -47,6 +47,32 @@ export function followPicks(document: Document): void {
 }
 
 /**
+ * The unit of the item a select picks, right after the box its amount is
+ * typed in: "m" beside How much on the adjustment form, once a cable in m
+ * is picked (inventory-tng-mdvz). The words carry `data-unit-of`, the
+ * select's name; each option, `data-unit`. Without this, the unit shows
+ * only in the option's words, as "Cable (m)".
+ */
+export function followUnits(document: Document): void {
+  for (const words of document.querySelectorAll<HTMLElement>(
+    "[data-unit-of]",
+  )) {
+    const select = document.querySelector<HTMLSelectElement>(
+      `select[name="${words.dataset.unitOf}"]`,
+    );
+    if (select === null) {
+      continue;
+    }
+    const show = () => {
+      words.textContent =
+        select.options[select.selectedIndex]?.dataset.unit ?? "";
+    };
+    select.addEventListener("change", show);
+    show();
+  }
+}
+
+/**
  * A button's words that say what is typed in a field: "Set to 40 m" on the
  * length-checks page (inventory-tng-b1z). Without this, the page says
  * "Set to it", true whatever is typed. The words carry `data-follows`,

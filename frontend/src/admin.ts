@@ -4,7 +4,12 @@
  */
 import { copyButtons, printButtons } from "./admin/buttons";
 import { suggest } from "./admin/combobox";
-import { followPicks, followTyped, followWas } from "./admin/hints";
+import {
+  followPicks,
+  followTyped,
+  followUnits,
+  followWas,
+} from "./admin/hints";
 import { guardRetire } from "./admin/retire";
 import { followTotals } from "./admin/running-totals";
 import { sendOnce } from "./admin/single-use-forms";
@@ -18,6 +23,7 @@ printButtons(document);
 copyButtons(document);
 followPicks(document);
 followTyped(document);
+followUnits(document);
 followWas(document);
 followTotals(document);
 followWebSearch(document);

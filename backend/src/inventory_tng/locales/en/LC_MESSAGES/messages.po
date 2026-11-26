@@ -5623,6 +5623,12 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
+#. follows the box where the number of an item's sealed packages is typed, as
+#. in "2 sealed".
+#: src/inventory_tng/templates/stock/count.html
+msgid "sealed"
+msgstr ""
+
 #: src/inventory_tng/templates/catalogue/item.html
 msgid "set on this package"
 msgstr ""

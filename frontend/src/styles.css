@@ -257,8 +257,14 @@
     @apply pt-2;
   }
 
-  .admin label > :is(input, select, textarea) {
+  .admin label > :is(input, select, textarea, .with-unit) {
     @apply mt-1;
+  }
+
+  /* An amount's box with what it is counted in right after it: "m",
+     "each", or "sealed" for sealed packages (inventory-tng-mdvz). */
+  .with-unit {
+    @apply flex items-center gap-2;
   }
 
   .admin section {

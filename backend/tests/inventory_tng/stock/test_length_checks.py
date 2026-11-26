@@ -546,8 +546,12 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     # Each open package's, and under one nobody recorded (inventory-tng-lby).
     assert page.count(str(formatting.PRINTED_LENGTH)) == 3
     boxes = read(shown)
+    # Among what else describes the box, as its unit (inventory-tng-mdvz).
+    described = [
+        box.attrs.get("aria-describedby", "").split() for box in boxes.all("input")
+    ]
     for hint in (f"hint-opened_{made.id}", "hint-found_left"):
-        assert boxes.all("input", aria_describedby=hint), hint
+        assert any(hint in ids for ids in described), hint
     # Beside a box of plugs, counted each: only the spool's option is one
     # the hint fits, as the page follows what is picked.
     plugs = add(
@@ -562,7 +566,15 @@ def test_the_count_page_hints_at_the_printed_length_of_items_in_length(
     page = read(admin_client.get(f"/admin/counts/{store}").text)
     picker = page.one("select", name="found_package_id")
     assert "data-hinted" in picker.one("option", value=str(spools.spool.id)).attrs
-    assert picker.one("option", value=str(box.id)).attrs.keys() == {"value"}
+    assert "data-hinted" not in picker.one("option", value=str(box.id)).attrs
+    # Each says its item's unit, which follows Left on it once picked
+    # (frontend/src/admin/hints.ts, followUnits; inventory-tng-mdvz).
+    units = [
+        picker.one("option", value=str(each)).attrs["data-unit"]
+        for each in (spools.spool.id, box.id)
+    ]
+    assert units == ["m", "each"]
+    assert page.one("span", data_unit_of="found_package_id").text == ""
 
 
 def test_the_count_page_hints_at_no_printed_length_of_items_counted_each(

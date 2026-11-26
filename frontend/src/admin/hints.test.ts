@@ -1,6 +1,6 @@
 import { beforeEach, expect, test } from "vitest";
 import { takeSeparatorFrom } from "../shared/quantity";
-import { followPicks, followTyped, followWas } from "./hints";
+import { followPicks, followTyped, followUnits, followWas } from "./hints";
 
 beforeEach(() => {
   document.body.innerHTML = `
@@ -140,4 +140,36 @@ test("with nothing typed, the words the page sent", () => {
   expect((document.querySelector("button") as HTMLElement).textContent).toBe(
     "Régler sur ça",
   );
+});
+
+test("the unit of the item picked follows its box", () => {
+  document.body.innerHTML = `
+    <select name="item_id">
+      <option value="">Pick one</option>
+      <option value="1" data-unit="m">Cable (m)</option>
+      <option value="2" data-unit="each">Radio (each)</option>
+    </select>
+    <label>How much <input name="amount"><span data-unit-of="item_id"></span></label>
+    <span id="lonely" data-unit-of="nothing">kept</span>`;
+  followUnits(document);
+  const label = document.querySelector("label") as HTMLLabelElement;
+  expect(label.textContent).toBe("How much ");
+  pick("1");
+  expect(label.textContent).toBe("How much m");
+  pick("2");
+  expect(label.textContent).toBe("How much each");
+  pick("");
+  expect(label.textContent).toBe("How much ");
+  expect(document.getElementById("lonely")?.textContent).toBe("kept");
+});
+
+test("the unit of an item picked when the page is shown is there at once", () => {
+  document.body.innerHTML = `
+    <select name="item_id">
+      <option value="1" data-unit="m">Cable (m)</option>
+      <option value="2" data-unit="ft" selected>Cord (ft)</option>
+    </select>
+    <span data-unit-of="item_id"></span>`;
+  followUnits(document);
+  expect(document.querySelector("span")?.textContent).toBe("ft");
 });

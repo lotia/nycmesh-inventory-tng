@@ -17,7 +17,7 @@ from inventory_tng.stock.ledger import LOOSE, Entry, Form
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
 
-from helpers.markup import problem, read, text
+from helpers.markup import Element, problem, read, text
 from helpers.rows import add
 from helpers.stock import Spools, count_form, held_by_form, retire, write
 from helpers.store_areas import Store, area, counts_at, field
@@ -77,6 +77,16 @@ def test_a_move_left_alone_writes_nothing(
     ).all()
     assert lines == []
     assert counts_at(session, moved.gone) == []
+
+
+def test_how_many_arrived_is_followed_by_its_unit(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Inside its label, so a screen reader says it too (inventory-tng-mdvz)."""
+    moved = Moved(session, admin_client)
+    label = moved.page.one("input", name=moved.arrived()).find_parent("label")
+    assert isinstance(label, Element)
+    assert label.one("span", class_="with-unit").text == "each"
 
 
 def test_fewer_arrived_is_lost_where_they_went(
@@ -281,9 +291,10 @@ def test_a_sealed_arrival_is_fixed_in_whole_packages(
     box = moved.page.one("input", name=moved.sealed)
     assert (box.attrs["value"], box.attrs["inputmode"]) == ("2", "numeric")
     assert (box.attrs["data-per"], box.attrs["data-unset"]) == ("305", "2")
-    label = box.parent
-    assert label is not None
-    assert "Spool, sealed: how many" in label.get_text()
+    label = box.find_parent("label")
+    assert isinstance(label, Element)
+    assert "Spool, sealed: how many" in label.text
+    assert label.one("span", class_="with-unit").text == "sealed"
     assert moved.page.all("input", name=moved.loose) == []
     saved(admin_client, moved.path, moved.form | {moved.sealed: "1"})
     assert moved.at_shelf(session) == {(moved.cable, moved.spools.sealed): 305}
