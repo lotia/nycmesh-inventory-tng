@@ -619,6 +619,28 @@ def test_a_sealed_box_wrong_otherwise_says_so_after_its_new_size(
     assert counts_written(session) == []
 
 
+def test_a_sealed_box_of_another_items_package_is_not_said_resized(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A sealed box naming the cable and a box of radios, shown at another
+    size: refused as no such package, never said to hold a size, nor
+    refused as shown otherwise (inventory-tng-ehfu)."""
+    spools = Spools(session)
+    box = box_of_ten(session, spools.place)
+    store = spools.store.id
+    form = count_form_at(admin_client, store)
+    form |= {
+        "sizes": f"{form['sizes']} {box.id}:9",
+        f"sealed_{spools.cable.id}_{box.id}": "1",
+    }
+    with capture_logs() as logs:
+        response = admin_client.post(f"{COUNTS}/{store}", data=form)
+    assert response.status_code == 400
+    assert now_holds(Decimal(10), "each") not in text(response)
+    assert "save refused: shown otherwise" not in [each["event"] for each in logs]
+    assert counts_written(session) == []
+
+
 # An adjustment, and an open package's count confirmed.
 
 

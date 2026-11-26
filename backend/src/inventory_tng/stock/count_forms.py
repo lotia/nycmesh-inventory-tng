@@ -53,9 +53,11 @@ WHOLE_PACKAGES = lazy_gettext("A whole number of packages.")
 TOO_MANY = lazy_gettext("That is more than the inventory can count.")
 HOW_MUCH_LEFT = lazy_gettext("How much is left on it.")
 # What read_count says of a box that is not about its number, so said
-# after its item's new unit too, in place of the number's problem
-# (changed_words; Ali, 2026-11-25, inventory-tng-jnwh). Not NO_SUCH_ITEM:
-# an item that does not exist has no new unit to say it after.
+# after its item's new unit or its package's new size too, in place of
+# the number's problem (changed_words; Ali, 2026-11-25, inventory-tng-jnwh,
+# inventory-tng-ehfu). Not NO_SUCH_ITEM: an item that does not exist has
+# no new unit to say it after. Nor is NO_SUCH_PACKAGE said after a size, as
+# such a box names no package (_counts_of).
 NOT_THE_NUMBER = (
     ON_THE_FORM_TWICE,
     TYPE_IT_HERE,
@@ -529,15 +531,18 @@ def _counts_of(
     session: Session, name: str, fields: Mapping[str, str]
 ) -> tuple[int | None, int | None]:
     """The item a place's field `name` counts an amount of, in its unit,
-    and the package, if it counts it sealed; neither for a field of no
-    amount."""
+    and the package, if it counts it sealed and is one of the item's: a
+    box by_form refuses as no such package has no size to have changed
+    (inventory-tng-ehfu). Neither for a field of no amount."""
     if name.startswith(COUNTED):
         return _item_id(name.removeprefix(COUNTED)), None
     if name.startswith(LOOSE_FIELD):
         return row_id(name.removeprefix(LOOSE_FIELD)), None
     if name.startswith(SEALED):
         item_part, _, package_part = name.removeprefix(SEALED).partition("_")
-        return row_id(item_part), row_id(package_part)
+        item_id = row_id(item_part)
+        package = session.get(ItemPackage, row_id(package_part) or 0)
+        return item_id, (package.id if package and package.item_id == item_id else None)
     if name.startswith(OPENED):
         row = session.get(OpenPackage, row_id(name.removeprefix(OPENED)) or 0)
         return (row.item_id if row else None), None
