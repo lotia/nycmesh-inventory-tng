@@ -102,11 +102,12 @@ def _refused_page(
     rule: str,
 ) -> HTMLResponse:
     """The recount's page as `plan` reads the records now, refused by
-    `rule`, with nothing typed kept (inventory-tng-0w7o): its amounts
-    were typed against a plan since changed, as a package resized or the
-    item's Reorder at edited, and a box keeping them would be sent again
-    against the new one, unseen. Its alert says to make the change
-    again."""
+    `rule`, with nothing typed kept (inventory-tng-0w7o). Changed since
+    (CHANGED), its amounts were typed against a plan since changed, as a
+    package resized or the item's Reorder at edited, and a box keeping
+    them would be sent again against the new one, unseen; its alert says
+    to make the change again. Refused while a check waits, the page shows
+    no form to keep them in."""
     return _page(request, signed, item, unit, plan, alert=RULES[rule])
 
 

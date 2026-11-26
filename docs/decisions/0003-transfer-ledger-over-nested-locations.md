@@ -11,7 +11,8 @@ retired package with none left is never taken), 2026-11-21 (a store
 counted with its areas), 2026-11-23 (work saved as it was shown),
 2026-11-24 (a retired item counted to zero), 2026-11-24 (every stored
 amount records its unit), 2026-11-24 (m and ft converted after stock has
-moved), 2026-11-25 (the guided recount of a unit wrong from the start)
+moved), 2026-11-25 (the guided recount of a unit wrong from the start),
+2026-11-26 (a recount changed since keeps nothing typed)
 
 ## Context
 
@@ -495,6 +496,11 @@ other unit, and retiring the item for a new one.
   be added; its unit changes; and the amounts typed are kept. Refused,
   to be shown again, if anything it would do changed since its page was
   shown, or if it reached another place before the item was held.
+- A recount changed since its page was shown says so before anything
+  wrong with its amounts, and is shown again as it is now, keeping
+  nothing typed: they were typed against what changed (Ali, 2026-11-26,
+  inventory-tng-0w7o). Rejected: keeping them where the change could
+  not make them wrong, as a package's size form does.
 - An item whose stock moved but holds nothing has nothing to write off
   or close; the rest is done as above. Its packages in the other unit,
   as a conversion left them, stay.

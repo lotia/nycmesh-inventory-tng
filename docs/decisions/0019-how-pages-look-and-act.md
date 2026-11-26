@@ -74,11 +74,13 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
 - **Every box for an amount says its unit right after it**, on screen and
   in its accessible description ("m", "ft", "each"). Where a box sits
   inside its label, the unit is hidden from the label's name, so it is
-  said once (Ali, 2026-11-26, inventory-tng-0mor). The adjustment and
-  count forms' How much and Left on it boxes, whose unit follows the item
-  picked, still say it in their name (inventory-tng-4mcj). A box counting
-  sealed packages says "sealed", and a screen reader hears it once, from
-  the box's label (Ali, 2026-11-25, inventory-tng-mdvz).
+  said once (Ali, 2026-11-26, inventory-tng-0mor). Not yet so: the count
+  form's How many arrived and the adjustment and count forms' How much
+  and Left on it still say it in their name (inventory-tng-4mcj), and
+  Reorder at, On order and Units per order in their label, before the
+  box (inventory-tng-h39f). A box counting sealed packages says
+  "sealed", and a screen reader hears it once, from the box's label
+  (Ali, 2026-11-25, inventory-tng-mdvz).
 
 ### Lists and retired records
 
