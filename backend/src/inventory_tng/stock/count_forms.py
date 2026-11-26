@@ -5,6 +5,7 @@ beside the field it is about. The handlers pass the form's fields."""
 
 from collections.abc import Callable, Collection, Mapping, Sequence
 from decimal import Decimal
+from functools import partial
 from typing import NamedTuple
 
 from sqlalchemy.orm import Session
@@ -576,10 +577,11 @@ def _unit_free_problem(
     name: str, fields: Mapping[str, str], *, separator: Separator
 ) -> Words | None:
     """What is wrong with what a place's box `name` holds whatever unit its
-    item is counted in, as by_form and item_counts read it: not a whole
-    number of packages, or what web/forms.unit_free_problem says. Not
-    whole units, nor too many packages, which depend on the unit
-    (inventory-tng-yxd1). An open package closed is not read."""
+    item is counted in and size its package holds, as by_form and
+    item_counts read it: not a whole number of packages, or what
+    web/forms.unit_free_problem says. Not whole units, nor too many
+    packages, which depend on the unit and size (inventory-tng-yxd1,
+    inventory-tng-ehfu). An open package closed is not read."""
     typed = fields.get(name, "")
     prefix = ""
     if name.startswith(ARRIVED):
@@ -611,11 +613,12 @@ def changed_words(
     """Beside each box of a count form of an item counted in another unit
     since it was shown, or of a package now of another size, by the form's
     own field names: what it is now, to check and save again (Ali,
-    2026-11-23, inventory-tng-57u8). After an item's new unit, what else is
-    wrong with the box: its problem in `others` (read_count's) that is not
-    about its number (NOT_THE_NUMBER; Ali, 2026-11-25, inventory-tng-jnwh),
-    or else what is wrong with its number in any unit, typed in the
-    decimal `separator` (Ali, 2026-11-25, inventory-tng-yxd1)."""
+    2026-11-23, inventory-tng-57u8). After it, what else is wrong with the
+    box: its problem in `others` (read_count's) that is not about its
+    number (NOT_THE_NUMBER; Ali, 2026-11-25, inventory-tng-jnwh), or else
+    what is wrong with its number at any unit and size, typed in the
+    decimal `separator` (Ali, 2026-11-25, inventory-tng-yxd1,
+    inventory-tng-ehfu)."""
     split, _ = by_place(form, root_id, place_ids)
     others = others or {}
     words: dict[str, Words] = {}
@@ -624,13 +627,13 @@ def changed_words(
             field = field_at(root_id, place_id, name)
             item_id, package_id = _counts_of(session, name, fields)
             if item_id in now.units:
-                other = others.get(field)
-                if other not in NOT_THE_NUMBER:
-                    other = _unit_free_problem(name, fields, separator=separator)
-                said = now_counted_in(now.units[item_id], other)
+                changed = partial(now_counted_in, now.units[item_id])
             elif package_id in now.sizes:
-                said = now_holds(*now.sizes[package_id])
+                changed = partial(now_holds, *now.sizes[package_id])
             else:
                 continue
-            words[field] = said
+            other = others.get(field)
+            if other not in NOT_THE_NUMBER:
+                other = _unit_free_problem(name, fields, separator=separator)
+            words[field] = changed(other)
     return words

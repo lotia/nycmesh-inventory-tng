@@ -78,29 +78,44 @@ def shown_in(form: Mapping[str, str]) -> Shown:
     return Shown(_pairs(form.get(UNITS, "")), sizes)
 
 
+def _then(said: str, problem: Words | None) -> str:
+    """`said`, of what changed since a form was shown, then `problem`,
+    anything else wrong with what was typed, so both are fixed at once."""
+    if problem is None:
+        return said
+    # Translators: %(changed)s says what changed since the form was shown,
+    # such as the item now counted in another unit or the package now
+    # holding another size; %(problem)s what else is wrong with what was
+    # typed.
+    return gettext("%(changed)s %(problem)s", changed=said, problem=problem)
+
+
 def now_counted_in(unit: str, problem: Words | None = None) -> str:
     """Beside an amount shown in an item's unit since changed: refused, and
     shown again in `unit`. Then `problem`, anything else wrong with it in
     any unit (web/forms.unit_free_problem), so both are fixed at once
     (inventory-tng-hhlr, inventory-tng-yxd1)."""
-    said = gettext(
-        "This item is now counted in %(unit)s. Check the amount and save again.",
-        unit=unit,
+    return _then(
+        gettext(
+            "This item is now counted in %(unit)s. Check the amount and save again.",
+            unit=unit,
+        ),
+        problem,
     )
-    if problem is None:
-        return said
-    # Translators: %(changed)s says the item is now counted in another
-    # unit, %(problem)s what else is wrong with the number typed.
-    return gettext("%(changed)s %(problem)s", changed=said, problem=problem)
 
 
-def now_holds(size: Decimal, unit: str) -> str:
+def now_holds(size: Decimal, unit: str, problem: Words | None = None) -> str:
     """Beside a count of a package shown at a size since changed: refused,
-    and shown again at `size`, in its item's `unit`."""
-    return gettext(
-        "This package now holds %(size)s %(unit)s. Check the count and save again.",
-        size=number(size),
-        unit=unit,
+    and shown again at `size`, in its item's `unit`. Then `problem`,
+    anything else wrong with it at any size, so both are fixed at once
+    (Ali, 2026-11-25, inventory-tng-ehfu)."""
+    return _then(
+        gettext(
+            "This package now holds %(size)s %(unit)s. Check the count and save again.",
+            size=number(size),
+            unit=unit,
+        ),
+        problem,
     )
 
 
