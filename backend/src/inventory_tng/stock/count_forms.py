@@ -54,7 +54,7 @@ TOO_MANY = lazy_gettext("That is more than the inventory can count.")
 HOW_MUCH_LEFT = lazy_gettext("How much is left on it.")
 # What read_count says of a box that is not about its number, so said
 # after its item's new unit or its package's new size too, in place of
-# the number's problem (changed_words; Ali, 2026-11-25, inventory-tng-jnwh,
+# the number's problem (_besides; Ali, 2026-11-25, inventory-tng-jnwh,
 # inventory-tng-ehfu). Not NO_SUCH_ITEM: an item that does not exist has
 # no new unit to say it after. Nor is NO_SUCH_PACKAGE said after a size, as
 # such a box names no package (_counts_of).
@@ -605,6 +605,20 @@ def _unit_free_problem(
     return unit_free_problem(typed, positive=False, separator=separator)
 
 
+def _besides(
+    name: str, fields: Mapping[str, str], read: Words | None, *, separator: Separator
+) -> Words | None:
+    """What else is wrong with a place's box `name` than its item's unit or
+    its package's size changed since shown: `read`, read_count's problem
+    with it, if not about its number (NOT_THE_NUMBER; Ali, 2026-11-25,
+    inventory-tng-jnwh), or else what is wrong with its number at any unit
+    and size (_unit_free_problem; Ali, 2026-11-25, inventory-tng-yxd1,
+    inventory-tng-ehfu)."""
+    if read in NOT_THE_NUMBER:
+        return read
+    return _unit_free_problem(name, fields, separator=separator)
+
+
 def changed_words(
     session: Session,
     form: Mapping[str, str],
@@ -618,12 +632,9 @@ def changed_words(
     """Beside each box of a count form of an item counted in another unit
     since it was shown, or of a package now of another size, by the form's
     own field names: what it is now, to check and save again (Ali,
-    2026-11-23, inventory-tng-57u8). After it, what else is wrong with the
-    box: its problem in `others` (read_count's) that is not about its
-    number (NOT_THE_NUMBER; Ali, 2026-11-25, inventory-tng-jnwh), or else
-    what is wrong with its number at any unit and size, typed in the
-    decimal `separator` (Ali, 2026-11-25, inventory-tng-yxd1,
-    inventory-tng-ehfu)."""
+    2026-11-23, inventory-tng-57u8), then what else is wrong with the box
+    (_besides), read in `others` (read_count's) and typed in the decimal
+    `separator`."""
     split, _ = by_place(form, root_id, place_ids)
     others = others or {}
     words: dict[str, Words] = {}
@@ -637,8 +648,6 @@ def changed_words(
                 changed = partial(now_holds, *now.sizes[package_id])
             else:
                 continue
-            other = others.get(field)
-            if other not in NOT_THE_NUMBER:
-                other = _unit_free_problem(name, fields, separator=separator)
-            words[field] = changed(other)
+            besides = _besides(name, fields, others.get(field), separator=separator)
+            words[field] = changed(besides)
     return words
