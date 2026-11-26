@@ -3,7 +3,8 @@
 **Status:** accepted · 2026-11-10 · builds on 0014 (one stylesheet in NYC
 Mesh's look) · amended 2026-11-12 (packages renamed and brought back),
 2026-11-15 (lists sort, filter and choose their page size), 2026-11-25
-(amount boxes say their unit)
+(amount boxes say their unit), 2026-11-26 (a unit inside a box's label
+is in its description)
 
 ## Context
 
@@ -71,10 +72,13 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
 ### Amounts
 
 - **Every box for an amount says its unit right after it**, on screen and
-  in its accessible description ("m", "ft", "each"); where the unit sits
-  inside the box's label, it is part of its accessible name instead. A box
-  counting sealed packages says "sealed", and a screen reader hears it
-  once, from the box's label (Ali, 2026-11-25, inventory-tng-mdvz).
+  in its accessible description ("m", "ft", "each"). Where a box sits
+  inside its label, the unit is hidden from the label's name, so it is
+  said once (Ali, 2026-11-26, inventory-tng-0mor). The adjustment and
+  count forms' How much and Left on it boxes, whose unit follows the item
+  picked, still say it in their name (inventory-tng-4mcj). A box counting
+  sealed packages says "sealed", and a screen reader hears it once, from
+  the box's label (Ali, 2026-11-25, inventory-tng-mdvz).
 
 ### Lists and retired records
 
