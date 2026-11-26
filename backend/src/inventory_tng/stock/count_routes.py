@@ -798,7 +798,6 @@ def count(
             item_ids=sorted({item_id for item_id in sent.twice.values() if item_id}),
         )
     problems: dict[str, Words] = dict(sent.problems)
-    refusals = (TWICE if sent.twice else None, problems.get(CLOSED_MEANWHILE))
     # Shown in a unit or a package size changed since: asked again in the
     # new ones (units_shown), checked again as it is saved. A form saved
     # before is answered as it was (store_counts.record_store_count).
@@ -822,6 +821,7 @@ def count(
     # no box to say its new size beside (Ali, 2026-11-25, inventory-tng-32t7
     # and inventory-tng-zoyw), and a package closed meanwhile has no line
     # (inventory-tng-nk28).
+    refusals = (TWICE if sent.twice else None, sent.problems.get(CLOSED_MEANWHILE))
     alerts = [each for each in (*refusals, said) if each]
     tree = None
     off_form = None

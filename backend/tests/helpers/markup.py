@@ -223,7 +223,8 @@ def said_beside(page: str | Element, box: Element) -> tuple[str, list[str]]:
     assert isinstance(after, Element)
     assert "with-unit" in after.classes
     ids = box.attrs.get("aria-describedby", "").split()
-    return after.text, [read(page).one("*", id=each).text for each in ids]
+    whole = read(page)
+    return after.text, [whole.one("*", id=each).text for each in ids]
 
 
 def unit_beside(page: str | Element, box: Element) -> tuple[str, list[str], str]:
