@@ -392,6 +392,11 @@ def test_a_count_refused_otherwise_after_a_switch_says_both(
     assert counts_written(session) == []
 
 
+def alerts_of(response: Response) -> list[str]:
+    """The alerts above a count form, in order."""
+    return [each.text for each in read(response.text).all("p", role="alert")]
+
+
 @pytest.mark.parametrize(
     ("listed", "switched"),
     [(True, True), (True, False), (False, True)],
@@ -417,14 +422,8 @@ def test_a_count_listed_elsewhere_after_a_switch_says_both_alerts(
     response = admin_client.post(f"{COUNTS}/{store}", data=form)
     assert response.status_code == 400
     where = count_routes.already_listed(spools.cable.name_shown, spools.store.name)
-    alerts = [each.text for each in read(response.text).all("p", role="alert")]
-    assert alerts == [now_counted_in("ft")] * switched + [where] * listed
+    assert alerts_of(response) == [now_counted_in("ft")] * switched + [where] * listed
     assert counts_written(session) == []
-
-
-def alerts_of(response: Response) -> list[str]:
-    """The alerts above a count form, in order."""
-    return [each.text for each in read(response.text).all("p", role="alert")]
 
 
 @pytest.mark.parametrize(
