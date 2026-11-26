@@ -11,6 +11,7 @@ never received (docs/decisions/0003)."""
 
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
+from functools import partial
 from typing import Annotated, NamedTuple
 
 import structlog
@@ -783,21 +784,26 @@ def save_item(
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
+    renamed = None
+    answer = form.get(RECORDED)
+    seen = form_version(form.get("version", ""))
+    # Changed since it was shown: said before what is wrong with what was
+    # typed (inventory-tng-ryjv), and before it is read, so a number with
+    # the other separator is counted refused only when said so. Not
+    # locked: the save locks the places of its open packages first
+    # (open_packages.unfollowing). A No saves nothing, and is answered
+    # from a page drawn before a change too (_unit_declined), so checked
+    # once it is.
+    if answer != "no" and stale_as_read(found, seen):
+        return _item_page(request, session, signed, found, alert=RULES[CHANGED])
     fields, problems, typed = forms.item_fields(
         session, form, found, separator=decimal_separator(request)
     )
-    renamed = None
-    answer = form.get(RECORDED)
-    # No saves nothing, and is answered from a page drawn before a change
-    # too (_unit_declined).
-    if fields is not None and answer == "no":
-        return _unit_declined(request, session, signed, found, form, fields.unit)
-    seen = form_version(form.get("version", ""))
-    # Changed since it was shown: said before what is wrong with what was
-    # typed (inventory-tng-ryjv). Not locked: the save locks the places of
-    # its open packages first (open_packages.unfollowing).
-    if stale_as_read(found, seen):
-        return _item_page(request, session, signed, found, alert=RULES[CHANGED])
+    if answer == "no":
+        if fields is not None:
+            return _unit_declined(request, session, signed, found, form, fields.unit)
+        if stale_as_read(found, seen):
+            return _item_page(request, session, signed, found, alert=RULES[CHANGED])
     if fields is not None:
         recorded_in = form.get(RECORDED_IN) if answer == "yes" else None
         same = forms.same_name(session, found, form, fields, typed)
@@ -1054,8 +1060,16 @@ def save_package(
     typed = forms.typed_name(session, package_name, form)
     name = typed.name
     separator = decimal_separator(request)
-    parsed, problems = forms.package_fields(
-        found, name, typed.asked, size, kept=package.size, separator=separator
+    # Read once the form is known not to be shown as it is now, so a
+    # number with the other separator is counted refused only when said so.
+    read = partial(
+        forms.package_fields,
+        found,
+        name,
+        typed.asked,
+        size,
+        kept=package.size,
+        separator=separator,
     )
     # Beside the fields of the package it was sent for, with the units
     # chosen, if any.
@@ -1080,6 +1094,7 @@ def save_package(
         # package forms ask, keeping what was typed, at the version as
         # locked, which only_unit_changed's history covers; a change after
         # it is refused as the form is sent again.
+        _, problems = read()
         _asked_in_unit_now(
             problems,
             form,
@@ -1097,6 +1112,7 @@ def save_package(
             values=values | {"package_version": str(package.edit_version)},
             status_code=409,
         )
+    parsed, problems = read()
     if parsed is not None and not problems:
         _, broken = refusal(
             session,

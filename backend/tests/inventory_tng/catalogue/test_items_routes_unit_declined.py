@@ -18,10 +18,11 @@ from inventory_tng.catalogue.paths import ITEMS, unit_recount
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.catalogue import Item, Vendor, VendorOffer
+from inventory_tng.web.forms import CHANGED, RULES
 
 from helpers.items import unit_answered
 from helpers.labels import labelled
-from helpers.markup import problem, read
+from helpers.markup import problem, read, text
 from helpers.rows import add
 from helpers.stock import Place, Spools, converted_reel, received, retire, write
 
@@ -291,6 +292,26 @@ def test_no_to_a_change_not_between_lengths_asks_afresh(
     assert read(page.text).all("span", id="unit-problem") == []
     session.refresh(cable)
     assert cable.unit == "m"
+
+
+def test_no_with_a_field_wrong_from_a_page_changed_since_says_so_first(
+    admin_client: TestClient, session: Session
+) -> None:
+    """No sent with Reorder at wrong, from a page drawn before another
+    administrator renamed the item: refused as changed since, the page as
+    it is now, not the field's problem first (inventory-tng-ryjv). Not
+    changed, it says the field's problem."""
+    cable = _moved(session, "m", "300", "5").cable
+    answered = unit_answered(cable, "no", unit="ft", minimum="-1")
+    wrong = admin_client.post(f"{ITEMS}/{cable.id}", data=answered)
+    assert wrong.status_code == 400
+    assert problem(wrong.text, "minimum")
+    cable.name = "Patch cable"
+    session.flush()
+    page = admin_client.post(f"{ITEMS}/{cable.id}", data=answered)
+    assert page.status_code == 409
+    assert str(RULES[CHANGED]) in text(page)
+    assert read(page.text).all("span", class_="problem") == []
 
 
 def test_labels_revoked_since_the_unit_was_read_asks_afresh(

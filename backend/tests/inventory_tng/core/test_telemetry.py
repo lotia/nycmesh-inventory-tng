@@ -996,6 +996,41 @@ def test_counts_a_package_amount_with_the_other_separator_once_in_a_unit_left(
     assert added(reader, name, before) == {(("separator", "comma"),): 2}
 
 
+def test_counts_no_other_separator_on_an_edit_form_shown_as_it_is_now(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """An item's Reorder at and a package's size typed "1,5" on an English
+    page, each form drawn before another administrator renamed its row:
+    refused as changed since and shown as it is now, the number never
+    said refused, so not counted or logged so (inventory-tng-ryjv,
+    inventory-tng-hnta)."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.numbers.other_separator"
+    before = counted(reader, name)
+    cable = Place(session).cable
+    reel = add(session, ItemPackage(item_id=cable.id, name="Reel", size=305))
+    item_form = shown_item_form(cable, minimum="1,5")
+    package_form = {
+        "package_name": "Reel",
+        "size": "1,5",
+        "unit_shown": cable.unit,
+        "package_version": shown(reel),
+    }
+    cable.name, reel.name = "Patch cable", "Drum"
+    session.flush()
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    with capture_logs() as logs:
+        for action, form in (
+            (f"{ITEMS}/{cable.id}", item_form),
+            (f"{ITEMS}/{cable.id}/packages/{reel.id}", package_form),
+        ):
+            answer = client.post(action, data=form)
+            assert answer.status_code == 409
+    assert added(reader, name, before) == {}
+    assert "number refused" not in [each["event"] for each in logs]
+
+
 def test_counts_a_stock_amount_with_the_other_separator_once_in_a_unit_left(
     rolled_back: Recorded, session: Session
 ) -> None:
