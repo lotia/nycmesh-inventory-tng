@@ -53,16 +53,11 @@ def _cable(session: Session, radios: Category) -> tuple[Item, ItemPackage]:
     return cable, reel
 
 
-def _to_ft(session: Session, cable: Item, *, recorded_in: str | None = None) -> None:
-    """Another administrator's switch to ft, saved: free while nothing
-    fixes its unit, else converting, answered Yes (`recorded_in`)."""
-    _switch(session, cable, "ft", recorded_in=recorded_in)
-
-
 def _switch(
-    session: Session, cable: Item, unit: str, *, recorded_in: str | None = None
+    session: Session, cable: Item, unit: str = "ft", *, recorded_in: str | None = None
 ) -> None:
-    """Another administrator's switch to `unit`, saved."""
+    """Another administrator's switch to `unit`, saved: free while nothing
+    fixes its unit, else converting, answered Yes (`recorded_in`)."""
     fields = item_fields(cable, unit=unit)
     items.save(session, cable, fields, seen=None, recorded_in=recorded_in)
     session.flush()
@@ -83,7 +78,7 @@ def test_a_package_added_in_a_unit_left_since_is_asked_again(
     action = f"{ITEMS}/{cable.id}/packages"
     drawn = _drawn(admin_client, cable, action)
     assert drawn[UNIT_SHOWN] == "m"
-    _to_ft(session, cable, recorded_in="m" if converting else None)
+    _switch(session, cable, recorded_in="m" if converting else None)
     typed = {"package_name": "Drum", "size": "300"}
     with capture_logs() as logs:
         refused = admin_client.post(action, data=drawn | typed)
@@ -114,7 +109,7 @@ def test_a_too_short_length_in_a_unit_left_since_is_asked_again(
     action = f"{ITEMS}/{cable.id}/packages/{reel.id}/settings"
     drawn = _drawn(admin_client, cable, action)
     assert drawn[UNIT_SHOWN] == "m"
-    _to_ft(session, cable)
+    _switch(session, cable)
     typed = {"short_below": "5", "minimum_sealed": "2"}
     refused = admin_client.post(action, data=drawn | typed)
     assert refused.status_code == 400
@@ -138,7 +133,7 @@ def test_a_too_short_length_in_its_packages_own_unit_is_kept_once_converted(
     cable, spool = spools.cable, spools.spool
     action = f"{ITEMS}/{cable.id}/packages/{spool.id}/settings"
     drawn = _drawn(admin_client, cable, action)
-    _to_ft(session, cable, recorded_in="m")
+    _switch(session, cable, recorded_in="m")
     assert _drawn(admin_client, cable, action)[UNIT_SHOWN] == "m"
     typed = {"short_below": "15", "minimum_sealed": ""}
     assert admin_client.post(action, data=drawn | typed).status_code == 303
@@ -176,7 +171,7 @@ def test_a_package_form_refused_otherwise_says_its_unit_changed_too(
     settings = f"{add}/{reel.id}/settings"
     drawn_add = _drawn(admin_client, cable, add)
     drawn_settings = _drawn(admin_client, cable, settings)
-    _to_ft(session, cable)
+    _switch(session, cable)
     taken = admin_client.post(
         add, data=drawn_add | {"package_name": "Reel", "size": "300"}
     )
@@ -188,42 +183,40 @@ def test_a_package_form_refused_otherwise_says_its_unit_changed_too(
     assert problem(refused.text, "short_below") == now_counted_in("ft")
 
 
-@pytest.mark.parametrize("box", ["size", "short_below"])
+@pytest.mark.parametrize(
+    ("box", "text", "wrong"),
+    [
+        ("size", "-5", ABOVE_ZERO),
+        ("short_below", "-5", ABOVE_ZERO),
+        ("size", "", SIZE_REQUIRED),
+    ],
+)
 def test_a_package_amount_wrong_in_any_unit_says_so_with_its_unit_changed(
-    admin_client: TestClient, session: Session, radios: Category, box: str
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    box: str,
+    text: str,
+    wrong: str,
 ) -> None:
-    """-5 typed in m, the cable in ft since: beside Holds on the add form,
-    or Too short to use on the package's own, the unit changed is said
-    first and the number's own problem after, so both are fixed at once;
-    typed again in ft, only the number's problem is left."""
+    """-5 typed in m, or Holds left blank, the cable in ft since: beside
+    Holds on the add form, or Too short to use on the package's own, the
+    unit changed is said first and the number's own problem after, so
+    both are fixed at once; typed again in ft, only the number's problem
+    is left."""
     cable, reel = _cable(session, radios)
     add = f"{ITEMS}/{cable.id}/packages"
     action = add if box == "size" else f"{add}/{reel.id}/settings"
     drawn = _drawn(admin_client, cable, action)
-    _to_ft(session, cable)
+    _switch(session, cable)
     others = {"package_name": "Drum"} if box == "size" else {"minimum_sealed": ""}
-    typed = others | {box: "-5"}
+    typed = others | {box: text}
     refused = admin_client.post(action, data=drawn | typed)
     assert refused.status_code == 400
-    assert problem(refused.text, box) == f"{now_counted_in('ft')} {ABOVE_ZERO}"
+    assert problem(refused.text, box) == f"{now_counted_in('ft')} {wrong}"
     again = admin_client.post(action, data=_hidden(refused.text, action) | typed)
     assert again.status_code == 400
-    assert problem(again.text, box) == str(ABOVE_ZERO)
-
-
-def test_a_package_added_with_no_size_says_so_with_its_unit_changed(
-    admin_client: TestClient, session: Session, radios: Category
-) -> None:
-    """Holds left blank on a form drawn in m, the cable in ft since: a size
-    is asked for as well as the unit changed said."""
-    cable, _ = _cable(session, radios)
-    add = f"{ITEMS}/{cable.id}/packages"
-    drawn = _drawn(admin_client, cable, add)
-    _to_ft(session, cable)
-    typed = {"package_name": "Drum", "size": ""}
-    refused = admin_client.post(add, data=drawn | typed)
-    assert refused.status_code == 400
-    assert problem(refused.text, "size") == f"{now_counted_in('ft')} {SIZE_REQUIRED}"
+    assert problem(again.text, box) == str(wrong)
 
 
 def test_a_package_amount_wrong_only_in_the_unit_left_says_just_its_unit_changed(
@@ -238,7 +231,7 @@ def test_a_package_amount_wrong_only_in_the_unit_left_says_just_its_unit_changed
     settings = f"{add}/{reel.id}/settings"
     drawn_add = _drawn(admin_client, cable, add)
     drawn_settings = _drawn(admin_client, cable, settings)
-    _to_ft(session, cable)
+    _switch(session, cable)
     long = {"short_below": "400", "minimum_sealed": ""}
     refused = admin_client.post(settings, data=drawn_settings | long)
     assert refused.status_code == 400
