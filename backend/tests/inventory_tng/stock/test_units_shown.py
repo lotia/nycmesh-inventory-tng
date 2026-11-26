@@ -15,10 +15,18 @@ from structlog.testing import capture_logs
 
 from inventory_tng.catalogue import items
 from inventory_tng.core.db_locking import UNGUARDED_INFO
+from inventory_tng.core.phrases import Words
 from inventory_tng.labels import labels
-from inventory_tng.models.catalogue import ItemPackage
+from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.stock import count_routes, counts_routes
-from inventory_tng.stock.count_forms import WHOLE_PACKAGES, changed_words
+from inventory_tng.stock.count_forms import (
+    NO_SUCH_OPEN_PACKAGE,
+    NO_SUCH_PACKAGE,
+    ON_THE_FORM_TWICE,
+    TYPE_IT_HERE,
+    WHOLE_PACKAGES,
+    changed_words,
+)
 from inventory_tng.stock.forms import (
     HOW_MUCH,
     now_counted_in,
@@ -34,6 +42,7 @@ from inventory_tng.web.forms import (
     QUANTITY_MAX,
     RULES,
     TOO_BIG,
+    WHOLE_UNITS,
     ZERO_OR_MORE,
     type_a_number,
     use_separator,
@@ -51,6 +60,7 @@ from helpers.stock import (
     adjustment_form,
     count_form_at,
     counts_written,
+    received,
     retire,
     to_feet,
 )
@@ -290,6 +300,95 @@ def test_a_box_wrong_only_in_its_new_unit_says_only_the_unit(
     each = Now({cable: "each"}, {})
     words = changed_words(session, form, store, [store], each, separator=".")
     assert words == {f"loose_{cable}": now_counted_in("each")}
+
+
+def test_a_box_wrong_otherwise_says_so_after_its_new_unit(session: Session) -> None:
+    """A box read_count refused for something other than its number says
+    that after the new unit, in place of what is wrong with its number
+    (Ali, 2026-11-25, inventory-tng-jnwh); one refused for its number in
+    the old unit says what is wrong in any, as before."""
+    spools = Spools(session)
+    cable, spool, store = spools.cable.id, spools.spool.id, spools.store.id
+    form = {f"sealed_{cable}_{spool}": "x", f"loose_{cable}": "0.5"}
+    others = {f"sealed_{cable}_{spool}": NO_SUCH_PACKAGE, f"loose_{cable}": WHOLE_UNITS}
+    ft = Now({cable: "ft"}, {})
+    words = changed_words(
+        session, form, store, [store], ft, separator=".", others=others
+    )
+    assert words == {
+        f"sealed_{cable}_{spool}": now_counted_in("ft", NO_SUCH_PACKAGE),
+        f"loose_{cable}": now_counted_in("ft"),
+    }
+
+
+def _named_twice(
+    client: TestClient, session: Session
+) -> tuple[int, int, dict[str, str], str, Words]:
+    """Cable counted on two lines, as only a hand-made form sends."""
+    place = Place(session)
+    cable = place.cable.id
+    received(session, place, [{"item_id": cable, "quantity": "5", "unit": "m"}])
+    form = count_form_at(client, place.store.id) | {
+        f"counted_{cable}": "3",
+        f"counted_0{cable}": "2",
+    }
+    return place.store.id, cable, form, f"counted_{cable}", ON_THE_FORM_TWICE
+
+
+def _typed_on_another_line(
+    client: TestClient, session: Session
+) -> tuple[int, int, dict[str, str], str, Words]:
+    """Cable on its loose line and as something else here."""
+    spools = Spools(session)
+    cable = spools.cable.id
+    form = count_form_at(client, spools.store.id) | {
+        f"sealed_{cable}_{spools.spool.id}": "2",
+        f"loose_{cable}": "0",
+        "extra_item_id": str(cable),
+        "extra_quantity": "3",
+    }
+    return spools.store.id, cable, form, f"loose_{cable}", TYPE_IT_HERE
+
+
+def _no_such_state(
+    client: TestClient, session: Session
+) -> tuple[int, int, dict[str, str], str, Words]:
+    """An open spool said to be something it cannot be."""
+    spools = Spools(session)
+    made = spools.opened()
+    form = count_form_at(client, spools.store.id) | {
+        f"opened_{made.id}": "3",
+        f"state_{made.id}": "lent",
+    }
+    return (
+        spools.store.id,
+        spools.cable.id,
+        form,
+        f"opened_{made.id}",
+        NO_SUCH_OPEN_PACKAGE,
+    )
+
+
+@pytest.mark.parametrize("switched", [True, False], ids=["switched", "same"])
+@pytest.mark.parametrize("sent", [_named_twice, _typed_on_another_line, _no_such_state])
+def test_a_count_refused_otherwise_after_a_switch_says_both(
+    admin_client: TestClient,
+    session: Session,
+    sent: Callable[[TestClient, Session], tuple[int, int, dict[str, str], str, Words]],
+    switched: bool,
+) -> None:
+    """A count refused for a box's other problem, its item switched to ft
+    meanwhile: the box says the new unit, then that problem, so both are
+    fixed at once (Ali, 2026-11-25, inventory-tng-jnwh). Not switched, it
+    says the problem alone, as before."""
+    place_id, item_id, form, field, other = sent(admin_client, session)
+    if switched:
+        to_feet(session, session.get_one(Item, item_id))
+    response = admin_client.post(f"{COUNTS}/{place_id}", data=form)
+    assert response.status_code == 400
+    said = now_counted_in("ft", other) if switched else str(other)
+    assert problem(response.text, field) == said
+    assert counts_written(session) == []
 
 
 def test_a_count_shows_the_units_and_sizes_it_shows(

@@ -787,6 +787,7 @@ def count(
         place_ids,
         separator=decimal_separator(request),
         refused=True,
+        others=sent.problems,
     )
     problems |= words
     alert = alert or said

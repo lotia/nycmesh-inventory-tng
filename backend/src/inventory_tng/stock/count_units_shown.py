@@ -29,18 +29,20 @@ def asked_again(
     now: Now,
     *,
     separator: Separator,
+    others: Mapping[str, Words] | None = None,
 ) -> tuple[dict[str, Words], str]:
     """A count form shown again as one of its items or packages changed
     since it was shown: the words beside each box of one
     (count_forms.changed_words), and above the form what one is now, as a
     sealed row of a package held nowhere has no box to say it beside. Its
-    boxes are in the decimal `separator`."""
+    boxes are in the decimal `separator`; `others`, what else read_count
+    found wrong with them, by field."""
     if now.units:
         alert = now_counted_in(min(now.units.items())[1])
     else:
         alert = now_holds(*min(now.sizes.items())[1])
     return changed_words(
-        session, form, root_id, place_ids, now, separator=separator
+        session, form, root_id, place_ids, now, separator=separator, others=others
     ), alert
 
 
@@ -76,12 +78,14 @@ def kept_as_now(
     *,
     separator: Separator,
     refused: bool = False,
+    others: Mapping[str, Words] | None = None,
 ) -> tuple[dict[str, Words], Words | None]:
     """A count form shown again keeping what was typed: the words of
     asked_again for each item or package shown otherwise since, as it
-    shows them as they are now. None for none. `refused` when the save is
-    refused for them (units_shown.refusing); otherwise it was not saved
-    for another reason (Bring it back, a save refused by another rule)."""
+    shows them as they are now, with `others`, read_count's problems.
+    None for none. `refused` when the save is refused for them
+    (units_shown.refusing); otherwise it was not saved for another reason
+    (Bring it back, a save refused by another rule)."""
     now = changed_since_sent(session, form, key, counts, root_id, place_ids)
     if not now:
         return {}, None
@@ -94,4 +98,6 @@ def kept_as_now(
             item_ids=sorted(now.units),
             item_package_ids=sorted(now.sizes),
         )
-    return asked_again(session, form, root_id, place_ids, now, separator=separator)
+    return asked_again(
+        session, form, root_id, place_ids, now, separator=separator, others=others
+    )

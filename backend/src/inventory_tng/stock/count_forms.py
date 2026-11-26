@@ -51,6 +51,15 @@ NO_SUCH_OPEN_PACKAGE = lazy_gettext("No such open package here.")
 WHOLE_PACKAGES = lazy_gettext("A whole number of packages.")
 TOO_MANY = lazy_gettext("That is more than the inventory can count.")
 HOW_MUCH_LEFT = lazy_gettext("How much is left on it.")
+# What read_count says of a box that is not about its number, so said
+# after its item's new unit too, in place of the number's problem
+# (changed_words; Ali, 2026-11-25, inventory-tng-jnwh).
+NOT_THE_NUMBER = (
+    ON_THE_FORM_TWICE,
+    TYPE_IT_HERE,
+    NO_SUCH_PACKAGE,
+    NO_SUCH_OPEN_PACKAGE,
+)
 
 # The count form's fields of forms: sealed packages, by item and package;
 # an open package, by its id, and what became of it; loose units, by item;
@@ -592,26 +601,30 @@ def changed_words(
     now: Now,
     *,
     separator: Separator,
+    others: Mapping[str, Words] | None = None,
 ) -> dict[str, Words]:
     """Beside each box of a count form of an item counted in another unit
     since it was shown, or of a package now of another size, by the form's
     own field names: what it is now, to check and save again (Ali,
     2026-11-23, inventory-tng-57u8). After an item's new unit, what else is
-    wrong with the box's number in any unit, typed in the decimal
-    `separator` (Ali, 2026-11-25, inventory-tng-yxd1)."""
+    wrong with the box: its problem in `others` (read_count's) that is not
+    about its number (NOT_THE_NUMBER; Ali, 2026-11-25, inventory-tng-jnwh),
+    or else what is wrong with its number in any unit, typed in the
+    decimal `separator` (Ali, 2026-11-25, inventory-tng-yxd1)."""
     split, _ = by_place(form, root_id, place_ids)
     words: dict[str, Words] = {}
     for place_id, fields in split.items():
         for name in fields:
+            field = field_at(root_id, place_id, name)
             item_id, package_id = _counts_of(session, name, fields)
             if item_id in now.units:
-                said = now_counted_in(
-                    now.units[item_id],
-                    _unit_free_problem(name, fields, separator=separator),
-                )
+                other = (others or {}).get(field)
+                if not any(other is each for each in NOT_THE_NUMBER):
+                    other = _unit_free_problem(name, fields, separator=separator)
+                said = now_counted_in(now.units[item_id], other)
             elif package_id in now.sizes:
                 said = now_holds(*now.sizes[package_id])
             else:
                 continue
-            words[field_at(root_id, place_id, name)] = said
+            words[field] = said
     return words
