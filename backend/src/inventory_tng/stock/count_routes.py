@@ -774,7 +774,7 @@ def count(
             item_ids=sorted({item_id for item_id in sent.twice.values() if item_id}),
         )
     problems: dict[str, Words] = dict(sent.problems)
-    alert = TWICE if sent.twice else problems.get(CLOSED_MEANWHILE)
+    refusals = (TWICE if sent.twice else None, problems.get(CLOSED_MEANWHILE))
     # Shown in a unit or a package size changed since: asked again in the
     # new ones (units_shown), checked again as it is saved. A form saved
     # before is answered as it was (store_counts.record_store_count).
@@ -792,11 +792,13 @@ def count(
     )
     problems |= words
     # Every alert is said above the form, each in its own words: why it was
-    # refused, then a unit or size changed since, then where an item is
-    # listed, so words beside a box have their reason above. A sealed row
-    # of a package held nowhere has no box to say its new size beside (Ali,
-    # 2026-11-25, inventory-tng-32t7 and inventory-tng-zoyw).
-    alerts = [each for each in (alert, said) if each]
+    # refused (named twice, then closed meanwhile), then a unit or size
+    # changed since, then where an item is listed, so words beside a box
+    # have their reason above. A sealed row of a package held nowhere has
+    # no box to say its new size beside (Ali, 2026-11-25, inventory-tng-32t7
+    # and inventory-tng-zoyw), and a package closed meanwhile has no line
+    # (inventory-tng-nk28).
+    alerts = [each for each in (*refusals, said) if each]
     tree = None
     off_form = None
     if sent.listed is not None:

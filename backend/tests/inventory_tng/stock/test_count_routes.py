@@ -18,6 +18,7 @@ from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.stock import Movement
 from inventory_tng.stock import count_routes
 from inventory_tng.stock.count_forms import (
+    CLOSED_MEANWHILE,
     ON_THE_FORM_TWICE,
     TYPE_IT_HERE,
 )
@@ -26,11 +27,12 @@ from inventory_tng.stock.counts import Counted, record_count
 from inventory_tng.stock.ledger import LOOSE, Entry, lock_place
 from inventory_tng.stock.moments import Moment, expected, moment
 from inventory_tng.stock.paths import COUNTS, NEEDS_COUNTING
-from inventory_tng.web.forms import WHOLE_UNITS, type_a_number
+from inventory_tng.web.forms import RULES, WHOLE_UNITS, type_a_number
 
 from helpers.concurrency import Committed, isolation_seen
 from helpers.locales import ENGLISH, GERMAN
 from helpers.markup import (
+    alerts_on,
     box_values,
     forms,
     links,
@@ -48,6 +50,7 @@ from helpers.stock import (
     committed_place,
     count_at,
     count_form,
+    count_form_at,
     counts_written,
     held_by_form,
     netted_retired,
@@ -194,6 +197,41 @@ def test_a_count_naming_an_item_twice_is_refused(
     done = admin_client.post(path, data=shown)
     assert done.headers["location"] == f"{COUNTS}?notice=counted&section=count#count"
     assert expected(session, place.store.id) == {place.item.id: Decimal(3)}
+
+
+@pytest.mark.parametrize(
+    ("twice", "closed"),
+    [(True, True), (True, False), (False, True)],
+    ids=["both", "twice", "closed"],
+)
+def test_a_count_named_twice_and_closed_meanwhile_says_both_alerts(
+    admin_client: TestClient, session: Session, twice: bool, closed: bool
+) -> None:
+    """Radios named on two lines, and an open spool counted though another
+    copy of the form said it used up meanwhile: above the form, that an
+    item is named twice, then that the spool was closed, each once
+    (inventory-tng-nk28). Each alone is said alone, as before. Nothing is
+    written."""
+    spools = Spools(session)
+    store, radio = spools.store.id, spools.place.item.id
+    made = spools.opened()
+    at = count_form_at(admin_client, store)
+    if closed:
+        used_up = {f"opened_{made.id}": "", f"state_{made.id}": "used_up"}
+        assert (
+            admin_client.post(f"{COUNTS}/{store}", data=at | used_up).status_code == 303
+        )
+    written = counts_written(session)
+    form = at | {"key": str(uuid.uuid4()), f"opened_{made.id}": "300"}
+    if twice:
+        form |= {f"counted_{radio}": "3", f"counted_0{radio}": "2"}
+    refused = admin_client.post(f"{COUNTS}/{store}", data=form)
+    assert refused.status_code == 400
+    assert (
+        alerts_on(refused.text)
+        == [str(count_routes.TWICE)] * twice + [str(RULES[CLOSED_MEANWHILE])] * closed
+    )
+    assert counts_written(session) == written
 
 
 def test_something_else_here_listed_on_a_count_of_one_place_is_refused(
