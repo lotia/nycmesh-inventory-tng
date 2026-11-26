@@ -37,7 +37,13 @@ from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Separator, Words, lazy_gettext, ngettext
+from inventory_tng.core.phrases import (
+    Separator,
+    Words,
+    gettext,
+    lazy_gettext,
+    ngettext,
+)
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -946,7 +952,12 @@ def _asked_in_unit_now(
     other = forms.unit_free_problem(
         form.get(box, ""), required=required, separator=separator
     )
-    problems[box] = said if other is None else f"{said} {other}"
+    if other is None:
+        problems[box] = said
+    else:
+        # Translators: %(changed)s says the item is now counted in another
+        # unit, %(problem)s what else is wrong with the number typed.
+        problems[box] = gettext("%(changed)s %(problem)s", changed=said, problem=other)
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages")

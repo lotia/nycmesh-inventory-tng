@@ -455,8 +455,11 @@ def unit_free_problem(
     package has left since, if anything, whatever unit it is read in:
     blank when `required`, unreadable, too big or not above zero. Not
     whether it is whole, or shorter than its package: those are checked
-    in the new unit once it is typed again (inventory-tng-hhlr)."""
-    read = quantity(text, positive=True, required=required, separator=separator)
+    in the new unit once it is typed again (inventory-tng-hhlr). Read
+    again after the form's own read, so not counted twice."""
+    read = quantity(
+        text, positive=True, required=required, separator=separator, counted=False
+    )
     return read if isinstance(read, str) else None
 
 

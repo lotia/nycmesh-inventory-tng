@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.catalogue import items
+from inventory_tng.catalogue.forms import SIZE_REQUIRED
 from inventory_tng.catalogue.items_routes import UNIT_SHOWN
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
@@ -208,6 +209,21 @@ def test_a_package_amount_wrong_in_any_unit_says_so_with_its_unit_changed(
     again = admin_client.post(action, data=_hidden(refused.text, action) | typed)
     assert again.status_code == 400
     assert problem(again.text, box) == str(ABOVE_ZERO)
+
+
+def test_a_package_added_with_no_size_says_so_with_its_unit_changed(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Holds left blank on a form drawn in m, the cable in ft since: a size
+    is asked for as well as the unit changed said."""
+    cable, _ = _cable(session, radios)
+    add = f"{ITEMS}/{cable.id}/packages"
+    drawn = _drawn(admin_client, cable, add)
+    _to_ft(session, cable)
+    typed = {"package_name": "Drum", "size": ""}
+    refused = admin_client.post(add, data=drawn | typed)
+    assert refused.status_code == 400
+    assert problem(refused.text, "size") == f"{now_counted_in('ft')} {SIZE_REQUIRED}"
 
 
 def test_a_package_amount_wrong_only_in_the_unit_left_says_just_its_unit_changed(

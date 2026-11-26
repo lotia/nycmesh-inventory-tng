@@ -26,7 +26,7 @@ from structlog.testing import capture_logs
 from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.app import create_app
 from inventory_tng.catalogue import items, unit_changes
-from inventory_tng.catalogue.paths import CATEGORIES, unit_recount
+from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, unit_recount
 from inventory_tng.core import db_sessions, mail
 from inventory_tng.core.db_errors import NoSession, RuleBroken
 from inventory_tng.core.masking import MASK, Masker
@@ -969,6 +969,30 @@ def test_counts_numbers_typed_with_the_other_decimal_separator(
         (("separator", "comma"),): 1,
         (("separator", "thousands"),): 1,
     }
+
+
+def test_counts_a_package_amount_with_the_other_separator_once_in_a_unit_left(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A package added, or its too-short length set, typed "1,5" in m on an
+    English page, the cable in ft since: each counted once, though read
+    again for what is wrong with it in any unit (inventory-tng-hhlr)."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.numbers.other_separator"
+    before = counted(reader, name)
+    cable = Place(session).cable
+    reel = add(session, ItemPackage(item_id=cable.id, name="Reel", size=305))
+    items.save(session, cable, item_fields(cable, unit="ft"), seen=None)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    add_form = f"{ITEMS}/{cable.id}/packages"
+    for action, typed in (
+        (add_form, {"package_name": "Drum", "size": "1,5"}),
+        (f"{add_form}/{reel.id}/settings", {"short_below": "1,5"}),
+    ):
+        answer = client.post(action, data=typed | {"unit_shown": "m"})
+        assert answer.status_code == 400
+    assert added(reader, name, before) == {(("separator", "comma"),): 2}
 
 
 def test_counts_batches_from_a_build_too_old(

@@ -316,11 +316,13 @@ def quantity(
     unit: str | None = None,
     required: Words | None = None,
     separator: Separator,
+    counted: bool = True,
 ) -> Decimal | str | None:
     """A quantity typed into a form's box whose decimal separator is
     `separator` (read_decimal): a Decimal, or what is wrong with it as a
-    str (refused_words), one typed with the other separator counted. Blank
-    is None, or `required` if one must be given. Up to QUANTITY_SCALE decimal
+    str (refused_words), one typed with the other separator counted if
+    `counted` (not when read again after its form's own read). Blank is
+    None, or `required` if one must be given. Up to QUANTITY_SCALE decimal
     places, as the ledger keeps; more than zero if `positive`, else zero or
     more; whole, for an item in `unit` counted each (whole_enough)."""
     text = text.strip()
@@ -328,7 +330,7 @@ def quantity(
         return None if required is None else str(required)
     value = read_decimal(text, separator)
     if isinstance(value, Unreadable):
-        if (which := other_separator(value, separator)) is not None:
+        if counted and (which := other_separator(value, separator)) is not None:
             other_separators.add(1, {"separator": which})
             log.info("number refused", separator=which)
         return refused_words(value, separator)
