@@ -7,7 +7,9 @@ administrator confirms it was in the old unit (convert; Ali, 2026-11-24,
 inventory-tng-y50b). Why, and what each change keeps:
 docs/decisions/0003-transfer-ledger-over-nested-locations.md.
 A package form drawn before a change, its amount typed in the unit it
-showed, is refused (require_unit_shown), never kept in the new one.
+showed, is refused (require_unit_shown), never kept in the new one;
+one refused as changed since keeps what was typed only if nothing but
+its unit changed (only_unit_changed).
 
 The arithmetic of converting is unit_conversion's; the ledger's lines keep
 their unit and convert as they are read (stock/line_amounts.py)."""
@@ -27,6 +29,7 @@ from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.models.base import QUANTITY_MAX, QUANTITY_STEP
 from inventory_tng.models.catalogue import UNITS, Item, ItemPackage, VendorOffer
+from inventory_tng.models.core import CatalogueHistory
 from inventory_tng.models.labels import Label
 from inventory_tng.models.stock import Movement, OpenPackage, OverRecorded
 from inventory_tng.stock import units_shown
@@ -93,6 +96,25 @@ def require_unit_shown(
     )
     units_shown.refused.add(1, {"changed": "unit", "save": form})
     enforce(UNIT_CHANGED)
+
+
+def only_unit_changed(session: Session, package: ItemPackage, seen: int) -> bool:
+    """Whether each change to `package` since its form showed version
+    `seen` moved its unit, from its history: then a form drawn again can
+    keep what was typed, at its version now, and undo no one's change
+    unseen; a rename or resize since without a unit change cannot
+    (inventory-tng-hnta)."""
+    history = CatalogueHistory
+    old, new = history.old_row, history.new_row
+    other = (
+        history.table_name == ItemPackage.__tablename__,
+        history.row_id == package.id,
+        history.action == "update",
+        new["edit_version"].as_integer() > seen,
+        old["edit_version"] != new["edit_version"],
+        old["unit"] == new["unit"],
+    )
+    return not exists_where(session, *other)
 
 
 def unit_fixed(session: Session, item: Item) -> UnitFixed | None:

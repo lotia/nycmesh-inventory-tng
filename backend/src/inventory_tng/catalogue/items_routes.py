@@ -1070,12 +1070,17 @@ def save_package(
     _, stale = refusal(
         session, lambda: relock(session, package, current=True, seen=seen), CHANGED
     )
-    if stale and form.get(UNIT_SHOWN, package.unit) == package.unit:
+    if stale and (
+        form.get(UNIT_SHOWN, package.unit) == package.unit
+        or not unit_changes.only_unit_changed(session, package, seen)
+    ):
         return _item_page(request, session, signed, found, alert=RULES[CHANGED])
     if stale:
-        # Its item's unit switched, which moves its packages' versions
+        # Only its item's unit switched, which moves its packages' versions
         # (inventory-tng-74f3): asked again in the new unit, as the other
-        # package forms ask, keeping what was typed, at its version now.
+        # package forms ask, keeping what was typed, at the version as
+        # locked, which only_unit_changed's history covers; a change after
+        # it is refused as the form is sent again.
         _asked_in_unit_now(
             problems,
             form,
@@ -1084,7 +1089,7 @@ def save_package(
             required=forms.SIZE_REQUIRED,
             separator=separator,
         )
-        del values["package_version"]
+        values["package_version"] = str(package.edit_version)
         return _item_page(
             request,
             session,

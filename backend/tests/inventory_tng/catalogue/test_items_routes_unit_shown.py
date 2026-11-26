@@ -257,6 +257,33 @@ def test_a_package_resized_in_a_unit_left_since_says_so_first_with_any_problem(
     assert (reel.name, reel.size, reel.unit) == ("Drum", Decimal(1000), "ft")
 
 
+@pytest.mark.parametrize("renamed_first", [True, False])
+def test_a_package_renamed_as_well_as_switched_since_is_shown_as_it_is_now(
+    admin_client: TestClient, session: Session, radios: Category, renamed_first: bool
+) -> None:
+    """The Reel's size form drawn in m; since, the cable switched to ft and
+    another administrator renamed the Reel Spool, either first. Refused as
+    changed since, the page showing Spool, not Drum kept at the version
+    now, which would save over Spool unseen."""
+    cable, reel = _cable(session, radios)
+    action = f"{ITEMS}/{cable.id}/packages/{reel.id}"
+    drawn = _drawn(admin_client, cable, action)
+    for change in (True, False) if renamed_first else (False, True):
+        if change:
+            items.save_package(session, reel, "Spool", reel.size, seen=None)
+            session.flush()
+        else:
+            _switch(session, cable)
+    typed = {"package_name": "Drum", "size": "1000"}
+    refused = admin_client.post(action, data=drawn | typed)
+    assert refused.status_code == 409
+    assert "someone else saved this" in text(refused)
+    assert "Spool" in box_values(refused.text, "package_name")
+    assert "Drum" not in box_values(refused.text, "package_name")
+    session.refresh(reel)
+    assert reel.name == "Spool"
+
+
 def test_a_package_amount_wrong_only_in_the_unit_left_says_just_its_unit_changed(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:

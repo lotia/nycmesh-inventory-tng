@@ -292,8 +292,10 @@ any unit, such as "Use a number above 0.", so both are fixed at once,
 but not what depends on the unit, as the number is typed again in the
 new one (inventory-tng-hhlr). A package's size form, which the switch
 makes changed since, says so before anything else wrong with what was
-typed, so the admin is told once: its unit changed as above, otherwise
-the page as it is now (inventory-tng-hnta). Bring it back that brings the area back
+typed, so the admin is told once: its unit changed as above, keeping
+what was typed, if its history shows nothing else changed since;
+otherwise the page as it is now, so no rename or resize is saved over
+unseen (inventory-tng-hnta). Bring it back that brings the area back
 answers 200 even so, as it saved no amount for the words to refuse (Ali,
 2026-11-23, inventory-tng-itfm). We rejected converting
 what was shown into what is now: a unit switched because it was wrong may
