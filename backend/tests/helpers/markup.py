@@ -215,18 +215,23 @@ def problem(page: str | Element, field: str) -> str:
     return read(page).one("span", class_="problem", id=f"{field}-problem").text
 
 
-def unit_beside(page: str | Element, box: Element) -> tuple[str, list[str], str]:
+def said_beside(page: str | Element, box: Element) -> tuple[str, list[str]]:
     """What an amount's box says beside it (decision 0019, Amounts): the
-    words right after it, in its .with-unit wrapper; the words of each
-    element describing it (aria-describedby), in order; and the spoken
-    words of the label around it, which name it."""
+    words right after it, in its .with-unit wrapper, and the words of each
+    element describing it (aria-describedby), in order."""
     after = box.parent
     assert isinstance(after, Element)
     assert "with-unit" in after.classes
     ids = box.attrs.get("aria-describedby", "").split()
+    return after.text, [read(page).one("*", id=each).text for each in ids]
+
+
+def unit_beside(page: str | Element, box: Element) -> tuple[str, list[str], str]:
+    """said_beside, and the spoken words of the label around the box,
+    which name it."""
     label = box.find_parent("label")
     assert isinstance(label, Element)
-    return after.text, [read(page).one("*", id=each).text for each in ids], label.spoken
+    return *said_beside(page, box), label.spoken
 
 
 def described_and_invalid(box: Element) -> tuple[str | None, str | None]:

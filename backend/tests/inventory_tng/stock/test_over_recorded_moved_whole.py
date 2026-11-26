@@ -20,7 +20,7 @@ from inventory_tng.stock import (
 )
 from inventory_tng.stock.ledger import Form
 
-from helpers.markup import Element, box_values, read, text, words_on
+from helpers.markup import box_values, read, said_beside, text, words_on
 from helpers.over_recorded import (
     PAGE,
     adjustment_units,
@@ -97,12 +97,8 @@ def test_its_count_box_says_its_unit_after_it_and_to_a_screen_reader(
     (check,) = checks(session)
     page = read(admin_client.get(PAGE).text)
     box = page.one("input", name="count")
-    after = box.parent
-    assert isinstance(after, Element)
-    assert ("with-unit" in after.classes, after.text) == (True, unit)
-    described = box.attrs["aria-describedby"].split()
-    assert described == [f"unit-count-{check.id}"]
-    assert page.one("*", id=described[0]).text == unit
+    assert said_beside(page, box) == (unit, [unit])
+    assert box.attrs["aria-describedby"] == f"unit-count-{check.id}"
     assert "aria-invalid" not in box.attrs
 
 

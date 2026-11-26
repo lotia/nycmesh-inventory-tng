@@ -12,7 +12,7 @@ from inventory_tng.stock.paths import COUNTS
 from inventory_tng.web.formatting import PRINTED_LENGTH
 from inventory_tng.web.forms import type_a_number
 
-from helpers.markup import Element, read, units_offered
+from helpers.markup import Element, read, said_beside, units_offered
 from helpers.stock import Place, Spools, count_form_at, received, to_feet
 
 
@@ -33,14 +33,8 @@ def invalid(page: Element, name: str) -> bool:
 
 
 def beside(page: Element, name: str) -> tuple[str, list[str]]:
-    """The words right after the box named `name`, and each that describes
-    it to a screen reader (aria-describedby), in order."""
-    box = page.one("input", name=name)
-    after = box.parent
-    assert isinstance(after, Element)
-    assert "with-unit" in after.classes
-    ids = box.attrs.get("aria-describedby", "").split()
-    return after.text, [page.one("*", id=each).text for each in ids]
+    """said_beside the box named `name`."""
+    return said_beside(page, page.one("input", name=name))
 
 
 def loose_cable_and_radios(session: Session, unit: str) -> Place:
