@@ -293,8 +293,10 @@ confirmed (inventory-tng-fezg), say after those words what is
 wrong with the number in any unit, such as "Use a number above 0.", so
 both are fixed at once, but not what depends on the unit, such as whole
 units, as the number is typed again in the new one. A count form's box
-refused for something else, such as its item on the form twice, says
-that instead (Ali, 2026-11-25, inventory-tng-jnwh). A package's size
+of a package resized since says the same after its new size (Ali,
+2026-11-25, inventory-tng-ehfu). A count form's box refused for
+something else, such as its item on the form twice, says that instead
+(Ali, 2026-11-25, inventory-tng-jnwh). A package's size
 form, which the switch makes changed since, says so before anything
 else wrong with what was typed, so the admin is told once: its unit
 changed as above, keeping what was typed, if its history shows nothing
