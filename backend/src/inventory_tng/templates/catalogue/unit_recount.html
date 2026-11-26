@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "_described_by.html" import described_by with context %}
 {#- The guided recount of an item whose unit was wrong from the start
 (catalogue/unit_recounts.py): all it does, said before it is done, and the
 amounts to give again in the new unit (Ali, 2026-11-25). -#}
@@ -63,19 +64,20 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
   {#- Labelled as on its own form (forms.HOLDS), named by the package,
   and marked retired as on the item page; each amount's unit right after
   its box, and in its description, not its name (decision 0019, Amounts;
-  inventory-tng-0mor). #}
+  inventory-tng-0mor); refused, marked invalid, its problem heard in its
+  label (inventory-tng-qyf6). #}
   <fieldset>
     <legend>{{ package.name_shown }}{% if package.retired_at %} <span class="tag">{% trans %}Retired{% endtrans %}</span>{% endif %}</legend>
     {% set name = size_of ~ package.id %}
     <label>{{ holds }} <span class="hint">{#- Translators: the package's size before the recount, in its unit as it was, as "was 1000 ft". #}{% trans size=package.size | amount, old=package.unit %}was {{ size }} {{ old }}{% endtrans %}</span>
-      <span class="with-unit"><input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, package.size | box_amount(decimal)) }}" required aria-describedby="unit-{{ name }}">
+      <span class="with-unit"><input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, package.size | box_amount(decimal)) }}" required{{ described_by(name, ["unit-" ~ name], labelled=true) }}>
         <span id="unit-{{ name }}" aria-hidden="true">{{ unit }}</span></span>
       {% include "_field_problem.html" %}
     </label>
     {% if package.short_below is not none %}
     {% set name = short_below_of ~ package.id %}
     <label>{% trans %}Too short to use{% endtrans %} <span class="hint">{% trans %}below; blank: none{% endtrans %}</span>
-      <span class="with-unit"><input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, package.short_below | box_amount(decimal)) }}" aria-describedby="unit-{{ name }}">
+      <span class="with-unit"><input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, package.short_below | box_amount(decimal)) }}"{{ described_by(name, ["unit-" ~ name], labelled=true) }}>
         <span id="unit-{{ name }}" aria-hidden="true">{{ unit }}</span></span>
       {% include "_field_problem.html" %}
     </label>

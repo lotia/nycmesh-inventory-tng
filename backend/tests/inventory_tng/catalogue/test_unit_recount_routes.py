@@ -33,6 +33,7 @@ from helpers.markup import (
     address,
     alerts_on,
     box_values,
+    described_and_invalid,
     hidden_fields,
     problem,
     read,
@@ -938,6 +939,38 @@ def test_each_size_asked_again_says_its_new_unit_after_its_box(
         [new],
         "Too short to use below; blank: none",
     )
+
+
+@pytest.mark.parametrize("refused", ["size", "short_below"])
+def test_a_refused_size_is_marked_invalid_and_keeps_its_unit(
+    admin_client: TestClient, session: Session, refused: str
+) -> None:
+    """The Reel's Holds or Too short to use sent as "lots": only that box
+    is marked invalid, still described by its unit alone, as its problem
+    is in its label (inventory-tng-h3tw's rule; inventory-tng-qyf6)."""
+    cable = Place(session, cable_unit="ft").cable
+    label = labels.make_for_item(session, cable.id)
+    assert label is not None
+    items.save(
+        session, cable, item_fields(cable, unit="m"), seen=None, recorded_in="ft"
+    )
+    assert labels.revoke(session, label.id, datetime.now(UTC))
+    reel = items.add_package(session, cable, "Reel", Decimal(1000), shown_unit="m")
+    reel.short_below = Decimal(10)
+    session.flush()
+    sent = _sent(_page(admin_client, cable.id), **{f"{refused}_{reel.id}": "lots"})
+    page = admin_client.post(unit_recount(cable.id, "ft"), data=sent)
+    assert page.status_code == 400
+    assert problem(page.text, f"{refused}_{reel.id}")
+    assert {
+        name: described_and_invalid(
+            read(page.text).one("input", name=f"{name}_{reel.id}")
+        )
+        for name in ("size", "short_below")
+    } == {
+        name: (f"unit-{name}_{reel.id}", "true" if name == refused else None)
+        for name in ("size", "short_below")
+    }
 
 
 def test_a_converted_items_retired_package_is_resized_and_stays_retired(
