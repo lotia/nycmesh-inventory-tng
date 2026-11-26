@@ -108,11 +108,13 @@ is, read [README.md](README.md).
       finish and push the current batch first or pause it. A paused
       batch stays in progress and waits on the urgent one
       (`bd dep add <paused> <urgent>`), so `bd show` says why it waits.
+      A red `main` the last push caused needs no asking (rule 15).
     - **An investigation batch** has its own stages: investigate,
       review the findings, report to the person, file beads for what
       it found. Nothing is simplified or pushed; it closes once the
       person has the report and the beads are filed.
-    - **The batch bead closes** once its issues are closed and pushed.
+    - **The batch bead closes** once its issues are closed and pushed,
+      and CI has passed on the push (rule 15).
 14. **Write beads so a maintainer can follow them.** Every bead, note and
     handoff must make clear what issue it tracks and give enough context to
     act on it. Open with a short summary of the problem or task and why it
@@ -122,6 +124,24 @@ is, read [README.md](README.md).
     sentence. Name functions, files (file:line) and tables where relevant,
     but say what each does or why it matters, so the reader needn't open
     the code to follow the issue.
+15. **After a push, CI is watched, not waited on.** Watch the push's CI
+    run without blocking on it (`gh run watch <run> --exit-status` in the
+    background, or the harness's equivalent), and start the next batch
+    meanwhile. When the run ends:
+    - **Green:** close the pushed batch's beads, and tell the person how
+      long its jobs took.
+    - **Red, caused by the push** (the failing check fails locally on the
+      pushed commit too): a P1 bug, P0 if it harms data. Fix it forward
+      at once as a batch of one, ahead of any batch in progress, without
+      asking (Ali, 2026-11-25): the stage under way finishes, then the fix
+      gets its own stages and is pushed alone. Tell the person at the next
+      check-in.
+    - **Red, flaky** (it passes locally and on one re-run of the job): file
+      a P1 bead for the flaky test, first in the `do-next` batch (rule 13).
+    - **Red, from CI itself** (setup, network, the runner): re-run the job
+      once and tell the person.
+    - **While `main` is red,** push nothing else. The next batch may go on
+      building; its push waits for green.
 
 ## More guidance
 
