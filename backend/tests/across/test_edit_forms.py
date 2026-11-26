@@ -135,6 +135,7 @@ def test_a_save_after_another_since_the_form_was_shown_is_refused(
 WRONG: dict[str, dict[str, str]] = {
     "item": {"minimum": "-1"},
     "category": {"name": ""},
+    "location": {"name": ""},
     "reading": {"reading": "xx"},
 }
 

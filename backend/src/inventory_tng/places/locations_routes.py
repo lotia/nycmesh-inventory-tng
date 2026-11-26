@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db_errors import attempt
+from inventory_tng.core.db_locking import stale_since
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import zone_at
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -32,7 +33,7 @@ from inventory_tng.web.admin_pages import (
     retirement,
     undo_retire,
 )
-from inventory_tng.web.forms import ALERTS, RULES, form_version, rule_words
+from inventory_tng.web.forms import ALERTS, CHANGED, RULES, form_version, rule_words
 from inventory_tng.web.navigation import SECTION_LOCATIONS
 from inventory_tng.web.pages import not_found, redirect
 
@@ -191,13 +192,17 @@ def save_location(
     found = changeable(session, location_id)
     if found is None:
         return not_found()
+    seen = form_version(version)
+    # Changed since it was shown: said before what is wrong with what was
+    # typed (inventory-tng-ryjv).
+    if stale_since(session, found, seen):
+        return _location_page(request, session, signed, found, alert=RULES[CHANGED])
     name = name.strip()
     broken = None
     parent, problem = place_change(session, found, name, parent_id)
 
     if problem is None:
         under = parent.id if parent else None
-        seen = form_version(version)
         zone = time_zone or None
 
         def save() -> None:

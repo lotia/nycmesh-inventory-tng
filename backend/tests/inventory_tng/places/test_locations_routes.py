@@ -179,7 +179,9 @@ def test_a_place_holding_stock_is_not_retired(
 
 def test_a_place_needs_a_name(admin_client: TestClient, session: Session) -> None:
     hub = place(session, "Hub", "store")
-    refused = admin_client.post(f"{LOCATIONS}/{hub.id}", data={"name": " "})
+    refused = admin_client.post(
+        f"{LOCATIONS}/{hub.id}", data={"name": " ", "version": shown(hub)}
+    )
     assert refused.status_code == 400
     assert hub.name == "Hub"
 
