@@ -53,7 +53,8 @@ TOO_MANY = lazy_gettext("That is more than the inventory can count.")
 HOW_MUCH_LEFT = lazy_gettext("How much is left on it.")
 # What read_count says of a box that is not about its number, so said
 # after its item's new unit too, in place of the number's problem
-# (changed_words; Ali, 2026-11-25, inventory-tng-jnwh).
+# (changed_words; Ali, 2026-11-25, inventory-tng-jnwh). Not NO_SUCH_ITEM:
+# an item that does not exist has no new unit to say it after.
 NOT_THE_NUMBER = (
     ON_THE_FORM_TWICE,
     TYPE_IT_HERE,
@@ -614,14 +615,15 @@ def changed_words(
     or else what is wrong with its number in any unit, typed in the
     decimal `separator` (Ali, 2026-11-25, inventory-tng-yxd1)."""
     split, _ = by_place(form, root_id, place_ids)
+    others = others or {}
     words: dict[str, Words] = {}
     for place_id, fields in split.items():
         for name in fields:
             field = field_at(root_id, place_id, name)
             item_id, package_id = _counts_of(session, name, fields)
             if item_id in now.units:
-                other = (others or {}).get(field)
-                if not any(other is each for each in NOT_THE_NUMBER):
+                other = others.get(field)
+                if other not in NOT_THE_NUMBER:
                     other = _unit_free_problem(name, fields, separator=separator)
                 said = now_counted_in(now.units[item_id], other)
             elif package_id in now.sizes:
