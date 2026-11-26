@@ -408,7 +408,9 @@ def _recounted(
     # place holding only that is not counted again (Ali, 2026-11-25,
     # inventory-tng-86uq): it held nothing anyone could see or count,
     # before the recount and after, so the places returned are plan.held's.
-    for each in _held(session, item.id):
+    # The log names such places apart, as residue_location_ids.
+    residue = _held(session, item.id)
+    for each in residue:
         sent = uuid.uuid5(key, f"{each.place.id} {unit}")
         _write_off(session, each, sent, admin_id, item.id, reason)
     for row in plan.opened:
@@ -431,6 +433,7 @@ def _recounted(
     item.minimum, item.on_order = amounts.minimum, amounts.on_order
     item.unit_recounted_after = _last_transaction(session, item.id)
     places = sorted(each.place.id for each in plan.held)
+    residue_places = sorted({each.place.id for each in residue} - set(places))
     once_committed(session, recounted.add, 1, {"from": old, "to": unit})
     once_committed(
         session,
@@ -441,6 +444,7 @@ def _recounted(
         from_unit=old,
         to_unit=unit,
         location_ids=places,
+        residue_location_ids=residue_places,
         open_package_ids=[row.id for row in plan.opened],
         item_package_ids=sorted(each.package.id for each in plan.packages),
         resized_package_ids=[package.id for package in plan.resized],

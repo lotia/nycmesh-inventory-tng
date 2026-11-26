@@ -303,7 +303,8 @@ def test_a_place_holding_only_a_part_of_a_thousandth_is_not_counted_again(
     0.305 m, as 1 ft reads, moved to the van: the store reads 0 m, with
     -0.0002 m below it, -0.001 ft in ft. Written off in ft, but not
     listed to count, as it held nothing anyone could see or count (Ali,
-    2026-11-25, inventory-tng-86uq); the van, holding 0.305 m, is."""
+    2026-11-25, inventory-tng-86uq); the van, holding 0.305 m, is. The
+    log names the store apart, as a place written off for a residue."""
     place = Place(session, cable_unit="ft")
     cable, store, van = place.cable, place.store, place.van
     received(session, place, [{"item_id": cable.id, "quantity": "1", "unit": "ft"}])
@@ -313,8 +314,14 @@ def test_a_place_holding_only_a_part_of_a_thousandth_is_not_counted_again(
         session, place, lines=[{"item_id": cable.id, "quantity": "0.305", "unit": "m"}]
     )
     assert _balance(session, store.id, cable.id) == 0
-    done = _recount(admin_client, cable.id)
+    with capture_logs() as logs:
+        done = _recount(admin_client, cable.id)
     assert done.status_code == 303
+    (logged,) = [each for each in logs if each["event"] == "item unit recounted"]
+    assert (logged["location_ids"], logged["residue_location_ids"]) == (
+        [van.id],
+        [store.id],
+    )
     session.expire_all()
     written = counts_written(session)
     assert [(t.from_location_id, t.to_location_id) for t in written] == [

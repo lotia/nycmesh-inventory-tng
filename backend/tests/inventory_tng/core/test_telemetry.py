@@ -1228,6 +1228,7 @@ def test_counts_unit_recounts_by_unit(rolled_back: Recorded, session: Session) -
         "from_unit": "m",
         "to_unit": "ft",
         "location_ids": [place.store.id, place.van.id],
+        "residue_location_ids": [],
         "open_package_ids": [],
         "item_package_ids": [],
         "resized_package_ids": [],
