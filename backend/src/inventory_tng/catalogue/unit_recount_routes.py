@@ -93,6 +93,23 @@ def _page(
     )
 
 
+def _refused_page(
+    request: Request,
+    session: Session,
+    signed: SignedIn,
+    item: Item,
+    unit: str,
+    rule: str,
+) -> HTMLResponse:
+    """The recount's page as the records are now, refused by `rule`, with
+    nothing typed kept (inventory-tng-0w7o): its amounts were typed
+    against a plan since changed, as a package resized or the item's
+    Reorder at edited, and a box keeping them would be sent again
+    against the new one, unseen. Its alert says to make the change
+    again."""
+    return _page(request, session, signed, item, unit, alert=RULES[rule])
+
+
 @router.get(UNIT_RECOUNT)
 def recount_page(
     request: Request,
@@ -125,12 +142,11 @@ def recount(
     if unit not in unit_recounts.units_open(session, found):
         return redirect(f"{ITEMS}/{item_id}")
     # Changed since it was shown: said before what is wrong with the
-    # amounts (unit_recounts.stale_as_read), what was typed kept.
+    # amounts (unit_recounts.stale_as_read), the page as it is now with
+    # nothing typed kept (_refused_page).
     seen = form.get("seen", "")
     if unit_recounts.stale_as_read(session, found, seen):
-        return _page(
-            request, session, signed, found, unit, values=form, alert=RULES[CHANGED]
-        )
+        return _refused_page(request, session, signed, found, unit, CHANGED)
     # The offers and packages as now: one added or retired since is
     # refused as changed.
     offers = [each.offer.id for each in queries.current_offers(session, item_id)]
@@ -162,9 +178,7 @@ def recount(
         session.refresh(found)
         if unit not in unit_recounts.units_open(session, found):
             return redirect(f"{ITEMS}/{item_id}")
-        return _page(
-            request, session, signed, found, unit, values=form, alert=RULES[broken]
-        )
+        return _refused_page(request, session, signed, found, unit, broken)
     assert done is not None  # Refused, or done.
     session.commit()
     after = {"unit": unit, "places": _listed(done.places)}

@@ -477,8 +477,8 @@ def test_a_stale_form_says_so_before_its_amounts_problems(
 ) -> None:
     """The bead's example (inventory-tng-0w7o): -5 typed as Reorder at
     while another admin receives stock of the item. Refused as changed at
-    once, the page shown as it is now with -5 kept, not only what is
-    wrong with -5. Logged once, by id."""
+    once, the page shown as it is now, nothing typed kept, not only what
+    is wrong with -5. Logged once, by id."""
     spools = Spools(session)
     page = _page(admin_client, spools.cable.id)
     spools.receive(uuid.uuid4())
@@ -489,7 +489,7 @@ def test_a_stale_form_says_so_before_its_amounts_problems(
     assert refused.status_code == 409
     assert alerts_on(refused.text) == [str(RULES["changed_since_shown"])]
     assert read(refused.text).all("span", class_="problem") == []
-    assert box_values(refused.text, "minimum") == ["-5"]
+    assert box_values(refused.text, "minimum") == [""]
     assert [
         each["reason"] for each in logs if each["event"] == "unit recount refused"
     ] == ["changed"]
@@ -819,6 +819,30 @@ def test_a_converted_items_package_sizes_are_checked(
     )
     session.expire_all()
     assert (place.cable.unit, reel.size) == ("ft", 1000)
+
+
+@pytest.mark.parametrize("size", ["-5", "304.8"])
+def test_a_size_typed_against_a_package_resized_since_is_not_kept(
+    admin_client: TestClient, session: Session, size: str
+) -> None:
+    """The Reel resized from 1000 ft to 500 ft by another admin after the
+    page was shown, its size typed in m against 1000 ft: refused as
+    changed, the box showing 500 as now, not the size typed, which sent
+    again would be saved against a size the admin never saw
+    (inventory-tng-0w7o). With a problem of its own or none."""
+    place, _, reel = converted_reel(session)
+    cable = place.cable
+    page = _page(admin_client, cable.id, "m")
+    items.save_package(session, reel, "Reel", Decimal(500), seen=None)
+    session.flush()
+    refused = admin_client.post(
+        unit_recount(cable.id, "m"), data=_sent(page, **{f"size_{reel.id}": size})
+    )
+    assert refused.status_code == 409
+    assert alerts_on(refused.text) == [str(RULES["changed_since_shown"])]
+    assert box_values(refused.text, f"size_{reel.id}") == ["500"]
+    session.expire_all()
+    assert (cable.unit, reel.size) == ("ft", 500)
 
 
 def test_a_converted_items_package_added_since_shown_is_refused(
