@@ -1184,8 +1184,14 @@ def test_a_reading_rule_deleted_meanwhile_is_gone_for_the_next_change(
         lambda s, r: reading_rules.change(s, r, units.Rule("Gbit/s"), ada, seen=None),
     )
     then = saving if second == "save" else deleting_rule(rule_id)
-    error = second_failed(committed, deleting_rule(rule_id), then)
+    with capture_logs() as logs:
+        error = second_failed(committed, deleting_rule(rule_id), then)
     assert isinstance(error, Gone), error
+    assert [
+        {key: line[key] for key in ("table", "row_id")}
+        for line in logs
+        if line["event"] == "change refused: deleted meanwhile"
+    ] == [{"table": "reading_rule", "row_id": rule_id}]
     assert committed.session().get(ReadingRule, rule_id) is None
 
 
