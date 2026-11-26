@@ -32,7 +32,16 @@ from inventory_tng.models.admins import (
 )
 
 from helpers.mail import SentMail
-from helpers.markup import box_values, button, forms, links, read, text, words_on
+from helpers.markup import (
+    box_values,
+    button,
+    described_and_invalid,
+    forms,
+    links,
+    read,
+    text,
+    words_on,
+)
 from helpers.sign_in import (
     PASSWORD,
     TIME_STEP,
@@ -206,8 +215,7 @@ def test_a_refused_authenticator_rename_is_tied_to_its_problem(
     path = f"{ACCOUNT}/authenticators/{authenticator.id}/name"
 
     def tied(page: str) -> tuple[str | None, str | None]:
-        box = read(page).one("form", action=path).one("input")
-        return box.attrs.get("aria-describedby"), box.attrs.get("aria-invalid")
+        return described_and_invalid(read(page).one("form", action=path).one("input"))
 
     assert tied(client.get(ACCOUNT).text) == (None, None)
     refused = client.post(path, data={"authenticator_name": " "})

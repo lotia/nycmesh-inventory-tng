@@ -229,6 +229,11 @@ def unit_beside(page: str | Element, box: Element) -> tuple[str, list[str], str]
     return after.text, [read(page).one("*", id=each).text for each in ids], label.spoken
 
 
+def described_and_invalid(box: Element) -> tuple[str | None, str | None]:
+    """A box's aria-describedby and aria-invalid, None where unset."""
+    return box.attrs.get("aria-describedby"), box.attrs.get("aria-invalid")
+
+
 def alerts_on(page: str | Element) -> list[str]:
     """The words of each alert paragraph on the page, in order."""
     return [each.text for each in read(page).all("p", role="alert")]

@@ -21,7 +21,15 @@ from inventory_tng.site_settings.paths import SETTINGS
 from inventory_tng.web.forms import PICK_A_ZONE
 
 from helpers.mail import SentMail
-from helpers.markup import Element, box_values, hidden_fields, options, read, text
+from helpers.markup import (
+    Element,
+    box_values,
+    described_and_invalid,
+    hidden_fields,
+    options,
+    read,
+    text,
+)
 from helpers.rows import add, history, shown
 from helpers.sign_in import confirmed_long_ago, new_admin, sign_in_with, with_code
 
@@ -135,11 +143,6 @@ def test_sign_in_settings_refuse_what_cannot_be(
     assert session.get_one(SignInSettings, 1).totp_policy == "required"
 
 
-def _tied(box: Element) -> tuple[str | None, str | None]:
-    """The box's aria-describedby and aria-invalid, None where unset."""
-    return box.attrs.get("aria-describedby"), box.attrs.get("aria-invalid")
-
-
 def test_refused_totp_policy_radios_are_tied_to_their_problem(
     admin_client: TestClient, session: Session
 ) -> None:
@@ -147,15 +150,13 @@ def test_refused_totp_policy_radios_are_tied_to_their_problem(
     by it and marked invalid; unrefused, neither (Ali, 2026-11-26,
     inventory-tng-l361)."""
     radios = read(admin_client.get(SETTINGS).text).all("input", name="totp_policy")
-    assert radios
-    assert [_tied(each) for each in radios] == [(None, None)] * len(radios)
+    assert {described_and_invalid(each) for each in radios} == {(None, None)}
     version = shown(session.get_one(SignInSettings, 1))
     form = SIGN_IN_FORM | {"totp_policy": "sometimes", "sign_in_version": version}
     refused = read(admin_client.post(f"{SETTINGS}/sign-in", data=form).text)
     radios = refused.all("input", name="totp_policy")
-    assert [_tied(each) for each in radios] == [("totp_policy-problem", "true")] * len(
-        radios
-    )
+    tied = {described_and_invalid(each) for each in radios}
+    assert tied == {("totp_policy-problem", "true")}
     assert refused.one("*", id="totp_policy-problem").text
 
 
@@ -177,9 +178,9 @@ def test_a_refused_reason_rename_is_tied_to_its_problem(
         )
 
     problem = f"reason_{given.id}-problem"
-    assert _tied(box(given)) == (problem, "true")
+    assert described_and_invalid(box(given)) == (problem, "true")
     assert page.one("*", id=problem).text == str(REASON_TAKEN)
-    assert _tied(box(other)) == (None, None)
+    assert described_and_invalid(box(other)) == (None, None)
 
 
 def test_sign_in_settings_ask_for_a_fresh_code(
