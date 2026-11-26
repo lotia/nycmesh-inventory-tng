@@ -179,24 +179,26 @@ def by_form(
                 lines.append((item.id, LOOSE, amount))
         elif field.startswith(OPENED):
             row = session.get(OpenPackage, row_id(field.removeprefix(OPENED)) or 0)
-            unit = session.get_one(Item, row.item_id).unit if row else "m"
-            amount = quantity(typed, positive=False, unit=unit, separator=separator)
             if row is None or row.location_id != place_id or state not in STATES:
                 problems[field] = NO_SUCH_OPEN_PACKAGE
             elif (reason := STATES[state]) is not None:
                 # Closed already, by this form saved and sent again or
                 # meanwhile, it is as said: closing it writes nothing
                 # (open_packages.close), so a form sent again unchanged
-                # is answered as before (inventory-tng-kro9).
+                # is answered as before (inventory-tng-kro9). Its amount
+                # is not read, so not counted refused (inventory-tng-7f45).
                 close.append((row.id, reason))
             elif row.closed_at is not None:
                 # Its line is gone from the form, so said above it.
                 problems[CLOSED_MEANWHILE] = RULES[CLOSED_MEANWHILE]
-            elif isinstance(amount, str):
-                problems[field] = amount
             else:
-                assert amount is not None  # Typed, so not blank.
-                lines.append((row.item_id, Form(open_package_id=row.id), amount))
+                unit = session.get_one(Item, row.item_id).unit
+                amount = quantity(typed, positive=False, unit=unit, separator=separator)
+                if isinstance(amount, str):
+                    problems[field] = amount
+                else:
+                    assert amount is not None  # Typed, so not blank.
+                    lines.append((row.item_id, Form(open_package_id=row.id), amount))
     found = None
     if form.get(FOUND_PACKAGE, "").strip():
         package = session.get(ItemPackage, row_id(form[FOUND_PACKAGE]) or 0)

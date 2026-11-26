@@ -1019,6 +1019,34 @@ def test_counts_a_stock_amount_with_the_other_separator_once_in_a_unit_left(
     assert added(reader, name, before) == {(("separator", "comma"),): 2}
 
 
+def test_counts_no_other_separator_for_an_open_package_closed_on_a_count(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """ "1,5" typed for an open spool on an English page, then marked used
+    up: its amount is not read, so the count saves and no number is
+    counted or logged refused (inventory-tng-7f45)."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.numbers.other_separator"
+    before = counted(reader, name)
+    spools = Spools(session)
+    made = spools.opened()
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    form = count_form_at(client, spools.store.id) | {
+        f"opened_{made.id}": "1,5",
+        f"state_{made.id}": "used_up",
+    }
+    with capture_logs() as logs:
+        answer = client.post(
+            f"{COUNTS}/{spools.store.id}", data=form, follow_redirects=False
+        )
+    assert answer.status_code == 303
+    session.refresh(made)
+    assert made.closed_at is not None
+    assert added(reader, name, before) == {}
+    assert "number refused" not in [each["event"] for each in logs]
+
+
 def test_counts_batches_from_a_build_too_old(
     rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
