@@ -1,8 +1,8 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% block main %}
-{#- Under the alert, one more: areas emptied and others retired at once
-(stock/count_gone_areas.py). #}
+{#- Under the alert, more: areas emptied and others retired at once
+(stock/count_gone_areas.py), or something else here listed already. #}
 {% for words in more_alerts %}<p role="alert">{{ words }}</p>{% endfor %}
 {% if caution %}<p class="warning" role="status">{{ caution }}</p>{% endif %}
 {% if place.retired_at %}

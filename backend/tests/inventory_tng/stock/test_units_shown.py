@@ -49,7 +49,7 @@ from inventory_tng.web.forms import (
 )
 
 from helpers.items import NOW
-from helpers.markup import box_values, hidden_fields, problem, text
+from helpers.markup import box_values, hidden_fields, problem, read, text
 from helpers.over_recorded import adjustments, checks, counted, moved_whole
 from helpers.package_forms import quantities_by_form
 from helpers.rows import add, item_fields, setting_up, tag
@@ -388,6 +388,36 @@ def test_a_count_refused_otherwise_after_a_switch_says_both(
     assert response.status_code == 400
     said = now_counted_in("ft", other) if switched else str(other)
     assert problem(response.text, field) == said
+    assert counts_written(session) == []
+
+
+@pytest.mark.parametrize(
+    ("listed", "switched"),
+    [(True, True), (True, False), (False, True)],
+    ids=["both", "listed", "switched"],
+)
+def test_a_count_listed_elsewhere_after_a_switch_says_both_alerts(
+    admin_client: TestClient, session: Session, listed: bool, switched: bool
+) -> None:
+    """Cable picked as something else here, though the store lists it, and
+    switched to ft meanwhile: above the form, the new unit, then where it
+    is listed (Ali, 2026-11-25, inventory-tng-zoyw). Each alone is said
+    alone, as before."""
+    spools = Spools(session)
+    cable, store = spools.cable.id, spools.store.id
+    form = count_form_at(admin_client, store) | {
+        f"sealed_{cable}_{spools.spool.id}": "2",
+        f"loose_{cable}": "0",
+    }
+    if listed:
+        form |= {"extra_item_id": str(cable), "extra_quantity": "3"}
+    if switched:
+        to_feet(session, spools.cable)
+    response = admin_client.post(f"{COUNTS}/{store}", data=form)
+    assert response.status_code == 400
+    where = count_routes.already_listed(spools.cable.name_shown, spools.store.name)
+    alerts = [each.text for each in read(response.text).all("p", role="alert")]
+    assert alerts == [now_counted_in("ft")] * switched + [where] * listed
     assert counts_written(session) == []
 
 

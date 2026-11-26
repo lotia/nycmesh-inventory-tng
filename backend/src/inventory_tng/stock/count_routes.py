@@ -372,6 +372,7 @@ def _count_page(
     items: Mapping[int, Collection[int]] | None = None,
     recount: Mapping[int, Mapping[int, Figures]] | None = None,
     alert: Words | None = None,
+    more_alerts: Sequence[Words] = (),
     picked: Mapping[str, str] | None = None,
     gone: Gone = NONE_GONE,
     gone_now: Collection[int] = (),
@@ -393,8 +394,9 @@ def _count_page(
     the areas gone from it, retired, and what left them since it was first
     shown, up to its moment, shown under the places it went to
     (count_gone_areas), whose own lines count what they held before
-    (count_arrivals.as_held); `gone_now`, those of them just gone, said
-    in alerts in place of `alert` (gone_words); `tree`, the place's
+    (count_arrivals.as_held); `more_alerts`, said under `alert`;
+    `gone_now`, those of them just gone, said in alerts in place of
+    both (gone_words); `tree`, the place's
     (queries.place_tree), and `left`, what left the areas gone, split at
     `at` (moves_since), if read already. `off_form`, something else here
     naming an item a recount did not ask for at its place
@@ -420,7 +422,6 @@ def _count_page(
     if left is None:
         left = moves_since(session, gone, at.as_of)
     leaving = areas_leaving(session, gone, tree, left) if gone.ids else None
-    more_alerts: Sequence[Words] = ()
     if gone_now:
         assert leaving is not None  # The areas just gone are of those gone.
         alert, *more_alerts = gone_words(leaving, gone_now)
@@ -793,6 +794,7 @@ def count(
     alert = alert or said
     tree = None
     off_form = None
+    more_alerts: list[Words] = []
     if sent.listed is not None:
         log.info(
             "count refused: something else here listed there",
@@ -803,13 +805,23 @@ def count(
         tree = queries.place_tree(session, place)
         listed_alert, beside = _listed_words(session, tree, sent.listed)
         problems |= beside
-        alert = alert or listed_alert
+        # Said under any other alert, so the words beside its line have
+        # their reason above (Ali, 2026-11-25, inventory-tng-zoyw).
+        if alert:
+            more_alerts.append(listed_alert)
+        else:
+            alert = listed_alert
         off_form = None if sent.listed.on_form else sent.listed
     if problems:
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.
         return as_sent(
-            problems=problems, alert=alert, tree=tree, left=left(), off_form=off_form
+            problems=problems,
+            alert=alert,
+            more_alerts=more_alerts,
+            tree=tree,
+            left=left(),
+            off_form=off_form,
         )
     # Filtered to some items, a place of a store's form with nothing typed
     # was not counted, the store's own too.
