@@ -38,10 +38,10 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-# The page after's address says the recount retired the item's packages
-# in the old unit, so offers to add them in the new one; without it, as
-# after an item converted before is recounted, it offers nothing, however
-# the item's stock has moved since.
+# The page after's address says the recount was the one that retires the
+# item's packages in the old unit, any it had, so offers to add them in
+# the new one; without it, as after an item converted before is
+# recounted, it offers nothing, however the item's stock has moved since.
 RETIRED_PACKAGES = "retired"
 
 
@@ -193,8 +193,9 @@ def recounted(
     address, each linked to its count of the item; and the packages of
     the labels it revoked, also in its address, by label id: current
     ones, to print again, and retired ones, which can't be until they are
-    brought back; and, if its address says it retired the item's packages
-    (RETIRED_PACKAGES), a link to add them in the new unit."""
+    brought back; and, if its address says it was the recount that
+    retires the item's packages (RETIRED_PACKAGES), a link to add them
+    in the new unit."""
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
