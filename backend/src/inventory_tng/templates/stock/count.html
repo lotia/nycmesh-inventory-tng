@@ -36,16 +36,16 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
 {% endif %}
 {% set filtered = shown.only or shown.search %}
 {% set columns = 4 if recount else 3 %}
-{#- A place's lines on the count form: its items, each by its total or by
-form (0020). Those of an item moved there from an area gone from the form
-add to its running total, a box left blank as the records say, a sealed
-one by its size, an open package closed as none
-(frontend/src/admin/running-totals.ts). #}
 {#- What follows a box: the item's unit, or, for sealed packages, that it
 counts them (inventory-tng-mdvz). #}
 {% macro counted_in(item, row) -%}
 {%- if row.sealed %}{#- Translators: follows the box where the number of an item's sealed packages is typed, as in "2 sealed". #}{% trans %}sealed{% endtrans %}{% else %}{{ item.unit }}{% endif -%}
 {%- endmacro %}
+{#- A place's lines on the count form: its items, each by its total or by
+form (0020). Those of an item moved there from an area gone from the form
+add to its running total, a box left blank as the records say, a sealed
+one by its size, an open package closed as none
+(frontend/src/admin/running-totals.ts). #}
 {% macro item_rows(group, columns) %}
     {% set prefix = group.prefix %}
     {% set where = group.label if group.path else "" %}

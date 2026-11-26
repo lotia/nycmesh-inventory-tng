@@ -27,7 +27,9 @@ test("the adjustment and count forms say the unit beside the box", async ({
   await adjust.getByLabel("found there").check();
   await adjust.getByLabel(/^Why/).selectOption({ index: 1 });
   await adjust.getByRole("button", { name: "Record it" }).click();
-  await expect(page.getByRole("status")).toBeVisible();
+  // Saved before leaving: going to another page first cancels the save if
+  // it is still being sent.
+  await expect(adjust.getByRole("status")).toHaveText("Recorded.");
 
   await page.goto(`/admin/counts/${storeId}`);
   const counted = page.getByRole("textbox", { name: `${cable} counted` });
