@@ -81,11 +81,14 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
         {% set was = whole.count | box_amount(decimal) %}
         {#- Its unit right after it, and in its description (decision 0019,
         Amounts; inventory-tng-4vn8); refused, its problem first, and marked
-        invalid, as on the count form (inventory-tng-h3tw). #}
-        <span class="with-unit"><input id="{{ name }}" name="count" inputmode="{{ each.unit | keyboard }}" required value="{{ values.get(name, was) }}" data-was="{{ was }}"{{ described_by(name, ["unit-" ~ name, name ~ "-was"]) }}>
+        invalid, as on the count form (inventory-tng-h3tw). What it was, only
+        once changed: a hidden element named in aria-describedby is still
+        read (inventory-tng-suqp; hints.ts followWas). #}
+        {% set changed = values.get(name, was) != was %}
+        <span class="with-unit"><input id="{{ name }}" name="count" inputmode="{{ each.unit | keyboard }}" required value="{{ values.get(name, was) }}" data-was="{{ was }}"{{ described_by(name, ["unit-" ~ name] + ([name ~ "-was"] if changed else [])) }}>
           <span id="unit-{{ name }}">{{ each.unit }}</span></span>
         {% include "_field_problem.html" %}
-        <p class="hint" id="{{ name }}-was"{% if values.get(name, was) == was %} hidden{% endif %}>{% trans words=whole.words %}Was {{ words }}{% endtrans %}</p>
+        <p class="hint" id="{{ name }}-was"{% if not changed %} hidden{% endif %}>{% trans words=whole.words %}Was {{ words }}{% endtrans %}</p>
         <button>{% trans %}Confirm count{% endtrans %}<span class="sr-only"> {{ which(each) }}</span></button>
       </form>
       {% else %}

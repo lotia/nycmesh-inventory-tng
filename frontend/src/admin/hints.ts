@@ -28,21 +28,28 @@ export function followPicks(document: Document): void {
     }
     const show = () => {
       const picked = select.options[select.selectedIndex];
-      const fits = picked?.hasAttribute("data-hinted") ?? false;
-      hint.hidden = !fits;
-      // Only its own id, among any others describing the field.
-      const ids = (field.getAttribute("aria-describedby") ?? "")
-        .split(" ")
-        .filter((id) => id !== "" && id !== hint.id);
-      const described = fits ? [...ids, hint.id] : ids;
-      if (described.length > 0) {
-        field.setAttribute("aria-describedby", described.join(" "));
-      } else {
-        field.removeAttribute("aria-describedby");
-      }
+      showDescribing(field, hint, picked?.hasAttribute("data-hinted") ?? false);
     };
     select.addEventListener("change", show);
     show();
+  }
+}
+
+/**
+ * Shows or hides words describing a field, naming them last in its
+ * aria-describedby only while shown: an element it names is read even
+ * when hidden. Other ids describing the field are kept.
+ */
+function showDescribing(field: Element, words: HTMLElement, shown: boolean) {
+  words.hidden = !shown;
+  const ids = (field.getAttribute("aria-describedby") ?? "")
+    .split(" ")
+    .filter((id) => id !== "" && id !== words.id);
+  const described = shown ? [...ids, words.id] : ids;
+  if (described.length > 0) {
+    field.setAttribute("aria-describedby", described.join(" "));
+  } else {
+    field.removeAttribute("aria-describedby");
   }
 }
 
@@ -108,8 +115,9 @@ export function followTyped(document: Document): void {
  * What a field held when the page was sent, shown under it once it is
  * changed: "Was 305 m" under an open package's count on the recorded-more
  * page (inventory-tng-0gg). The field carries `data-was`, what it held; the
- * words are the element with its id and `-was`. Without this, they show
- * only on a page sent back with another count.
+ * words are the element with its id and `-was`, named in its
+ * aria-describedby only while shown (inventory-tng-suqp). Without this,
+ * they show only on a page sent back with another count.
  */
 export function followWas(document: Document): void {
   for (const field of document.querySelectorAll<HTMLInputElement>(
@@ -120,7 +128,7 @@ export function followWas(document: Document): void {
       continue;
     }
     field.addEventListener("input", () => {
-      was.hidden = field.value === field.dataset.was;
+      showDescribing(field, was, field.value !== field.dataset.was);
     });
   }
 }

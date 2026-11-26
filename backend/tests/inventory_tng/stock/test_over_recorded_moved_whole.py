@@ -88,9 +88,10 @@ def test_its_count_box_shows_the_keypad_its_items_unit_takes(
 def test_its_count_box_says_its_unit_after_it_and_to_a_screen_reader(
     admin_client: TestClient, registered_client: TestClient, session: Session, unit: str
 ) -> None:
-    """The unit its line was recorded in, right after the box and first in
-    its description, before what it held (decision 0019, Amounts;
-    inventory-tng-4vn8)."""
+    """The unit its line was recorded in, right after the box and in its
+    description (decision 0019, Amounts; inventory-tng-4vn8). Unedited,
+    what it held is hidden and not named either, as a screen reader would
+    still read it (inventory-tng-suqp); a refused edit names it, below."""
     spools = Spools(session, cable_unit=unit)
     moved_whole(registered_client, spools)
     (check,) = checks(session)
@@ -100,7 +101,7 @@ def test_its_count_box_says_its_unit_after_it_and_to_a_screen_reader(
     assert isinstance(after, Element)
     assert ("with-unit" in after.classes, after.text) == (True, unit)
     described = box.attrs["aria-describedby"].split()
-    assert described == [f"unit-count-{check.id}", f"count-{check.id}-was"]
+    assert described == [f"unit-count-{check.id}"]
     assert page.one("*", id=described[0]).text == unit
     assert "aria-invalid" not in box.attrs
 

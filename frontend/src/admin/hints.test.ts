@@ -113,19 +113,40 @@ test("a button says the number in the page's decimal separator (inventory-tng-qn
 });
 
 test("what a field held shows once it is changed, and hides back", () => {
+  // Described by it only while shown, after its unit (inventory-tng-suqp).
   document.body.innerHTML = `
-    <input id="count-3" value="305" data-was="305">
+    <input id="count-3" value="305" data-was="305" aria-describedby="unit-count-3">
+    <span id="unit-count-3">m</span>
     <p id="count-3-was" hidden>Was 305 m</p>
     <input id="lonely" value="1" data-was="1">`;
   followWas(document);
   const field = document.getElementById("count-3") as HTMLInputElement;
   const was = document.getElementById("count-3-was") as HTMLElement;
+  const described = () => field.getAttribute("aria-describedby");
   field.value = "300";
   field.dispatchEvent(new Event("input"));
   expect(was.hidden).toBe(false);
+  expect(described()).toBe("unit-count-3 count-3-was");
+  field.value = "301";
+  field.dispatchEvent(new Event("input"));
+  expect(described()).toBe("unit-count-3 count-3-was");
   field.value = "305";
   field.dispatchEvent(new Event("input"));
   expect(was.hidden).toBe(true);
+  expect(described()).toBe("unit-count-3");
+});
+
+test("a field sent back changed loses its was words once put back", () => {
+  document.body.innerHTML = `
+    <input id="count-3" value="300" data-was="305" aria-describedby="count-3-problem unit-count-3 count-3-was">
+    <p id="count-3-was">Was 305 m</p>`;
+  followWas(document);
+  const field = document.getElementById("count-3") as HTMLInputElement;
+  field.value = "305";
+  field.dispatchEvent(new Event("input"));
+  expect(field.getAttribute("aria-describedby")).toBe(
+    "count-3-problem unit-count-3",
+  );
 });
 
 test("with nothing typed, the words the page sent", () => {
