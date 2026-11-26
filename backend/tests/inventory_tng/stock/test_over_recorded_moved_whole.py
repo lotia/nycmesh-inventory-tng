@@ -5,6 +5,7 @@ it arrived."""
 import uuid
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
@@ -19,7 +20,7 @@ from inventory_tng.stock import (
 )
 from inventory_tng.stock.ledger import Form
 
-from helpers.markup import box_values, read, text, words_on
+from helpers.markup import Element, box_values, read, text, words_on
 from helpers.over_recorded import (
     PAGE,
     adjustment_units,
@@ -81,6 +82,26 @@ def test_its_count_box_shows_the_keypad_its_items_unit_takes(
     }
     keypads = {"m": "decimal", "each": "numeric"}
     assert shown == {name: keypads[unit] for name, unit in keyboards.items()}
+
+
+@pytest.mark.parametrize("unit", ["m", "ft", "each"])
+def test_its_count_box_says_its_unit_after_it_and_to_a_screen_reader(
+    admin_client: TestClient, registered_client: TestClient, session: Session, unit: str
+) -> None:
+    """The unit its line was recorded in, right after the box and first in
+    its description, before what it held (decision 0019, Amounts;
+    inventory-tng-4vn8)."""
+    spools = Spools(session, cable_unit=unit)
+    moved_whole(registered_client, spools)
+    (check,) = checks(session)
+    page = read(admin_client.get(PAGE).text)
+    box = page.one("input", name="count")
+    after = box.parent
+    assert isinstance(after, Element)
+    assert ("with-unit" in after.classes, after.text) == (True, unit)
+    described = box.attrs["aria-describedby"].split()
+    assert described == [f"unit-count-{check.id}", f"count-{check.id}-was"]
+    assert page.one("*", id=described[0]).text == unit
 
 
 def test_its_count_confirmed_as_it_was_writes_nothing(
