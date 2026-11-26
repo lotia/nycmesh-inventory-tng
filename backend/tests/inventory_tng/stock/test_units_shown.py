@@ -246,7 +246,7 @@ def test_every_box_wrong_in_any_unit_says_so_after_its_new_unit(
 ) -> None:
     """Each kind of box of a cable switched to ft, its number wrong in any
     unit: the new unit, then what is wrong, as the box reads it, so both
-    are fixed at once (Ali, 2026-11-26, inventory-tng-yxd1). An open
+    are fixed at once (Ali, 2026-11-25, inventory-tng-yxd1). An open
     package said used up is not read, so only its unit is said."""
     spools = Spools(session)
     made = spools.opened()
@@ -265,16 +265,13 @@ def test_every_box_wrong_in_any_unit_says_so_after_its_new_unit(
     ft = Now({cable: "ft"}, {})
     words = changed_words(session, form, store, [store], ft, separator=".")
 
-    def both(problem: object) -> str:
-        return f"{now_counted_in('ft')} {problem}"
-
     assert words == {
-        f"loose_{cable}": both(ZERO_OR_MORE),
-        f"sealed_{cable}_{spool}": both(WHOLE_PACKAGES),
-        f"opened_{made.id}": both(type_a_number(".")),
-        "extra_quantity": both(use_separator(".")),
-        "found_left": both(ABOVE_ZERO),
-        f"arrived_{spools.van.id}_loose_{cable}": both(TOO_BIG),
+        f"loose_{cable}": now_counted_in("ft", ZERO_OR_MORE),
+        f"sealed_{cable}_{spool}": now_counted_in("ft", WHOLE_PACKAGES),
+        f"opened_{made.id}": now_counted_in("ft", type_a_number(".")),
+        "extra_quantity": now_counted_in("ft", use_separator(".")),
+        "found_left": now_counted_in("ft", ABOVE_ZERO),
+        f"arrived_{spools.van.id}_loose_{cable}": now_counted_in("ft", TOO_BIG),
     }
     used_up = form | {f"state_{made.id}": "used_up"}
     words = changed_words(session, used_up, store, [store], ft, separator=".")
@@ -285,7 +282,7 @@ def test_a_box_wrong_only_in_its_new_unit_says_only_the_unit(
     session: Session,
 ) -> None:
     """Half a cable typed, the cable now counted each: only the new unit is
-    said, as the number is typed again in it (Ali, 2026-11-26,
+    said, as the number is typed again in it (Ali, 2026-11-25,
     inventory-tng-yxd1)."""
     spools = Spools(session)
     cable, store = spools.cable.id, spools.store.id
@@ -359,7 +356,7 @@ def test_a_count_box_below_0_after_a_switch_to_ft_says_both(
     admin_client: TestClient, session: Session
 ) -> None:
     """-5 typed for the cable in m, the cable switched to ft: both said at
-    once, not the second only once it is typed again (Ali, 2026-11-26,
+    once, not the second only once it is typed again (Ali, 2026-11-25,
     inventory-tng-yxd1)."""
     place = Place(session)
     form = count_form_at(admin_client, place.store.id) | {
@@ -504,9 +501,9 @@ def test_an_adjustment_shown_in_m_says_so_whatever_else_is_wrong(
 @pytest.mark.parametrize(
     ("typed", "unit", "said"),
     [
-        ("-5", "ft", f"{now_counted_in('ft')} {ABOVE_ZERO}"),
-        ("", "ft", f"{now_counted_in('ft')} {HOW_MUCH}"),
-        ("1,5", "ft", f"{now_counted_in('ft')} {use_separator('.')}"),
+        ("-5", "ft", now_counted_in("ft", ABOVE_ZERO)),
+        ("", "ft", now_counted_in("ft", HOW_MUCH)),
+        ("1,5", "ft", now_counted_in("ft", use_separator("."))),
         ("1.5", "each", now_counted_in("each")),
     ],
     ids=["below 0", "blank", "comma", "half of one"],
@@ -516,7 +513,7 @@ def test_an_adjustment_wrong_after_a_switch_says_what_in_any_unit(
 ) -> None:
     """An amount typed in m, the cable switched since: what is wrong with
     it in any unit is said after the new unit, so both are fixed at once;
-    whole units, which depend on the unit, are not (Ali, 2026-11-26,
+    whole units, which depend on the unit, are not (Ali, 2026-11-25,
     inventory-tng-yxd1)."""
     place = Place(session)
     form = adjustment_form(

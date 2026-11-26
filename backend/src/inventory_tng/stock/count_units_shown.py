@@ -87,11 +87,11 @@ def kept_as_now(
         return {}, None
     if refused:
         refusing("count", now)
-        return asked_again(session, form, root_id, place_ids, now, separator=separator)
-    log.info(
-        "count shown again in units changed since",
-        location_id=root_id,
-        item_ids=sorted(now.units),
-        item_package_ids=sorted(now.sizes),
-    )
+    else:
+        log.info(
+            "count shown again in units changed since",
+            location_id=root_id,
+            item_ids=sorted(now.units),
+            item_package_ids=sorted(now.sizes),
+        )
     return asked_again(session, form, root_id, place_ids, now, separator=separator)

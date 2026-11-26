@@ -598,7 +598,7 @@ def changed_words(
     own field names: what it is now, to check and save again (Ali,
     2026-11-23, inventory-tng-57u8). After an item's new unit, what else is
     wrong with the box's number in any unit, typed in the decimal
-    `separator` (Ali, 2026-11-26, inventory-tng-yxd1)."""
+    `separator` (Ali, 2026-11-25, inventory-tng-yxd1)."""
     split, _ = by_place(form, root_id, place_ids)
     words: dict[str, Words] = {}
     for place_id, fields in split.items():
