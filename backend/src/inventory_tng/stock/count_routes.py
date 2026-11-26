@@ -779,7 +779,14 @@ def count(
     # before is answered as it was (store_counts.record_store_count).
     shown_as = shown_in(form)
     words, said = kept_as_now(
-        session, form, key, sent.places.values(), place.id, place_ids, refused=True
+        session,
+        form,
+        key,
+        sent.places.values(),
+        place.id,
+        place_ids,
+        separator=decimal_separator(request),
+        refused=True,
     )
     problems |= words
     alert = alert or said
@@ -874,7 +881,14 @@ def count(
             # Changed between the check above and the save: the form as
             # sent, in the units and sizes now, each box of one changed
             # saying so.
-            words, said = asked_again(session, form, place.id, place_ids, shown_now)
+            words, said = asked_again(
+                session,
+                form,
+                place.id,
+                place_ids,
+                shown_now,
+                separator=decimal_separator(request),
+            )
             return as_sent(problems=words, alert=said, left=left())
         # Refused for another reason, shown again keeping what was typed, in
         # the units and sizes now: one changed since is said too. The
@@ -885,7 +899,13 @@ def count(
             # As for a place there is not, as the form's own page answers.
             return not_found()
         changed, said = kept_as_now(
-            session, form, key, sent.places.values(), place.id, place_ids
+            session,
+            form,
+            key,
+            sent.places.values(),
+            place.id,
+            place_ids,
+            separator=decimal_separator(request),
         )
         if broken == COUNTABLE and retired is not None:
             # Areas retired, or emptied, since: the form as it is now,
@@ -1122,7 +1142,15 @@ def bring_back(
         since.asks_for,
         separator=decimal_separator(request),
     ).places
-    words, said = kept_as_now(session, form, key, sent.values(), place.id, place_ids)
+    words, said = kept_as_now(
+        session,
+        form,
+        key,
+        sent.values(),
+        place.id,
+        place_ids,
+        separator=decimal_separator(request),
+    )
     again = partial(
         _count_page,
         request,

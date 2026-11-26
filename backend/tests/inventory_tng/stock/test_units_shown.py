@@ -18,12 +18,26 @@ from inventory_tng.core.db_locking import UNGUARDED_INFO
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import ItemPackage
 from inventory_tng.stock import count_routes, counts_routes
-from inventory_tng.stock.count_forms import changed_words
-from inventory_tng.stock.forms import now_counted_in, now_holds, shown_field, shown_in
+from inventory_tng.stock.count_forms import WHOLE_PACKAGES, changed_words
+from inventory_tng.stock.forms import (
+    HOW_MUCH,
+    now_counted_in,
+    now_holds,
+    shown_field,
+    shown_in,
+)
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.stock.units_shown import Now, Shown
-from inventory_tng.web.forms import RULES
+from inventory_tng.web.forms import (
+    ABOVE_ZERO,
+    QUANTITY_MAX,
+    RULES,
+    TOO_BIG,
+    ZERO_OR_MORE,
+    type_a_number,
+    use_separator,
+)
 
 from helpers.items import NOW
 from helpers.markup import box_values, hidden_fields, problem, text
@@ -211,7 +225,9 @@ def test_every_box_of_an_item_or_package_changed_says_what_it_is_now(
         "found_left": "4",
         f"arrived_{spools.van.id}_loose_{cable}": "1",
     }
-    words = changed_words(session, form, store, [store], Now({cable: "ft"}, {}))
+    words = changed_words(
+        session, form, store, [store], Now({cable: "ft"}, {}), separator="."
+    )
     assert words == dict.fromkeys(
         [
             f"loose_{cable}",
@@ -223,6 +239,60 @@ def test_every_box_of_an_item_or_package_changed_says_what_it_is_now(
         ],
         now_counted_in("ft"),
     )
+
+
+def test_every_box_wrong_in_any_unit_says_so_after_its_new_unit(
+    session: Session,
+) -> None:
+    """Each kind of box of a cable switched to ft, its number wrong in any
+    unit: the new unit, then what is wrong, as the box reads it, so both
+    are fixed at once (Ali, 2026-11-26, inventory-tng-yxd1). An open
+    package said used up is not read, so only its unit is said."""
+    spools = Spools(session)
+    made = spools.opened()
+    cable, spool, store = spools.cable.id, spools.spool.id, spools.store.id
+    too_big = str(QUANTITY_MAX + 1)
+    form = {
+        f"loose_{cable}": "-1",
+        f"sealed_{cable}_{spool}": "1.5",
+        f"opened_{made.id}": "x",
+        "extra_item_id": str(cable),
+        "extra_quantity": "2,5",
+        "found_package_id": str(spool),
+        "found_left": "0",
+        f"arrived_{spools.van.id}_loose_{cable}": too_big,
+    }
+    ft = Now({cable: "ft"}, {})
+    words = changed_words(session, form, store, [store], ft, separator=".")
+
+    def both(problem: object) -> str:
+        return f"{now_counted_in('ft')} {problem}"
+
+    assert words == {
+        f"loose_{cable}": both(ZERO_OR_MORE),
+        f"sealed_{cable}_{spool}": both(WHOLE_PACKAGES),
+        f"opened_{made.id}": both(type_a_number(".")),
+        "extra_quantity": both(use_separator(".")),
+        "found_left": both(ABOVE_ZERO),
+        f"arrived_{spools.van.id}_loose_{cable}": both(TOO_BIG),
+    }
+    used_up = form | {f"state_{made.id}": "used_up"}
+    words = changed_words(session, used_up, store, [store], ft, separator=".")
+    assert words[f"opened_{made.id}"] == now_counted_in("ft")
+
+
+def test_a_box_wrong_only_in_its_new_unit_says_only_the_unit(
+    session: Session,
+) -> None:
+    """Half a cable typed, the cable now counted each: only the new unit is
+    said, as the number is typed again in it (Ali, 2026-11-26,
+    inventory-tng-yxd1)."""
+    spools = Spools(session)
+    cable, store = spools.cable.id, spools.store.id
+    form = {f"loose_{cable}": "0.5"}
+    each = Now({cable: "each"}, {})
+    words = changed_words(session, form, store, [store], each, separator=".")
+    assert words == {f"loose_{cable}": now_counted_in("each")}
 
 
 def test_a_count_shows_the_units_and_sizes_it_shows(
@@ -278,8 +348,31 @@ def test_a_count_box_not_read_after_a_switch_to_ft_says_so(
     to_feet(session, place.cable)
     response = admin_client.post(f"{COUNTS}/{place.store.id}", data=form)
     assert response.status_code == 400
-    assert problem(response.text, "extra_quantity") == now_counted_in("ft")
+    assert problem(response.text, "extra_quantity") == now_counted_in(
+        "ft", use_separator(".")
+    )
     assert box_values(response.text, "extra_quantity") == ["2,5"]
+    assert counts_written(session) == []
+
+
+def test_a_count_box_below_0_after_a_switch_to_ft_says_both(
+    admin_client: TestClient, session: Session
+) -> None:
+    """-5 typed for the cable in m, the cable switched to ft: both said at
+    once, not the second only once it is typed again (Ali, 2026-11-26,
+    inventory-tng-yxd1)."""
+    place = Place(session)
+    form = count_form_at(admin_client, place.store.id) | {
+        "extra_item_id": str(place.cable.id),
+        "extra_quantity": "-5",
+    }
+    to_feet(session, place.cable)
+    response = admin_client.post(f"{COUNTS}/{place.store.id}", data=form)
+    assert response.status_code == 400
+    assert problem(response.text, "extra_quantity") == (
+        "This item is now counted in ft. Check the amount and save again. "
+        "Use 0 or more."
+    )
     assert counts_written(session) == []
 
 
@@ -361,6 +454,7 @@ def test_a_count_of_a_box_of_ten_saved_once_it_holds_twelve_is_asked_again(
         place.store.id,
         [place.store.id],
         Now({}, {box.id: (Decimal(12), "each")}),
+        separator=".",
     ) == {field: now_holds(Decimal(12), "each")}
 
 
@@ -404,6 +498,35 @@ def test_an_adjustment_shown_in_m_says_so_whatever_else_is_wrong(
     response = admin_client.post(ADJUSTMENTS, data=form | {"reason_id": ""})
     assert response.status_code == 400
     assert now_counted_in("ft") in text(response)
+    assert counts_written(session) == []
+
+
+@pytest.mark.parametrize(
+    ("typed", "unit", "said"),
+    [
+        ("-5", "ft", f"{now_counted_in('ft')} {ABOVE_ZERO}"),
+        ("", "ft", f"{now_counted_in('ft')} {HOW_MUCH}"),
+        ("1,5", "ft", f"{now_counted_in('ft')} {use_separator('.')}"),
+        ("1.5", "each", now_counted_in("each")),
+    ],
+    ids=["below 0", "blank", "comma", "half of one"],
+)
+def test_an_adjustment_wrong_after_a_switch_says_what_in_any_unit(
+    admin_client: TestClient, session: Session, typed: str, unit: str, said: str
+) -> None:
+    """An amount typed in m, the cable switched since: what is wrong with
+    it in any unit is said after the new unit, so both are fixed at once;
+    whole units, which depend on the unit, are not (Ali, 2026-11-26,
+    inventory-tng-yxd1)."""
+    place = Place(session)
+    form = adjustment_form(
+        session, place.store, place.cable, amount=typed, direction="found"
+    )
+    place.cable.unit = unit
+    session.flush()
+    response = admin_client.post(ADJUSTMENTS, data=form)
+    assert response.status_code == 400
+    assert problem(response.text, "amount") == said
     assert counts_written(session) == []
 
 

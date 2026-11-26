@@ -341,3 +341,19 @@ def quantity(
     if unit is not None and not whole_enough(unit, value):
         return str(WHOLE_UNITS)
     return value
+
+
+def unit_free_problem(
+    text: str, *, positive: bool, required: Words | None = None, separator: Separator
+) -> str | None:
+    """What is wrong with an amount typed in a unit its item or package has
+    left since, if anything, whatever unit it is read in (quantity, as its
+    box reads it, `positive` and `required` alike): blank when required,
+    unreadable, too big or below what the box allows. Not whether it is
+    whole, nor shorter than its package: those are checked in the new unit
+    once it is typed again (inventory-tng-hhlr, inventory-tng-yxd1). Read
+    again after the form's own read, so not counted twice."""
+    read = quantity(
+        text, positive=positive, required=required, separator=separator, counted=False
+    )
+    return read if isinstance(read, str) else None

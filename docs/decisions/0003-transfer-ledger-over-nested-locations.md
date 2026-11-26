@@ -287,17 +287,18 @@ for anything else while keeping what was typed (Bring it back on a count,
 a save refused by another rule) is shown in the units and sizes now
 too, so it says the same beside each box of one changed since
 (inventory-tng-dcqp), a box it could not read too. The item page's
-package forms say after those words what is wrong with the number in
-any unit, such as "Use a number above 0.", so both are fixed at once,
-but not what depends on the unit, as the number is typed again in the
-new one (inventory-tng-hhlr). A package's size form, which the switch
-makes changed since, says so before anything else wrong with what was
-typed, so the admin is told once: its unit changed as above, keeping
-what was typed, if its history shows nothing else changed since;
-otherwise the page as it is now, so no rename or resize is saved over
-unseen (inventory-tng-hnta). Bring it back that brings the area back
-answers 200 even so, as it saved no amount for the words to refuse (Ali,
-2026-11-23, inventory-tng-itfm). We rejected converting
+package forms (inventory-tng-hhlr), and the count and adjustment forms
+(Ali, 2026-11-26, inventory-tng-yxd1), say after those words what is
+wrong with the number in any unit, such as "Use a number above 0.", so
+both are fixed at once, but not what depends on the unit, such as whole
+units, as the number is typed again in the new one. A package's size
+form, which the switch makes changed since, says so before anything
+else wrong with what was typed, so the admin is told once: its unit
+changed as above, keeping what was typed, if its history shows nothing
+else changed since; otherwise the page as it is now, so no rename or
+resize is saved over unseen (inventory-tng-hnta). Bring it back that
+brings the area back answers 200 even so, as it saved no amount for the
+words to refuse (Ali, 2026-11-23, inventory-tng-itfm). We rejected converting
 what was shown into what is now: a unit switched because it was wrong may
 mean the volunteer's number was right in the new one, so asking again is
 safer.

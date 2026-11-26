@@ -41,7 +41,6 @@ from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import (
     Separator,
     Words,
-    gettext,
     lazy_gettext,
     ngettext,
 )
@@ -83,6 +82,7 @@ from inventory_tng.web.forms import (
     RULES,
     WHOLE_UNITS,
     form_version,
+    unit_free_problem,
 )
 from inventory_tng.web.listing import (
     UNASKED,
@@ -952,16 +952,12 @@ def _asked_in_unit_now(
     the number is to be typed again in the new one (inventory-tng-hhlr)."""
     if form.get(UNIT_SHOWN, "") == unit:
         return
-    said = now_counted_in(unit)
-    other = forms.unit_free_problem(
-        form.get(box, ""), required=required, separator=separator
+    problems[box] = now_counted_in(
+        unit,
+        unit_free_problem(
+            form.get(box, ""), positive=True, required=required, separator=separator
+        ),
     )
-    if other is None:
-        problems[box] = said
-    else:
-        # Translators: %(changed)s says the item is now counted in another
-        # unit, %(problem)s what else is wrong with the number typed.
-        problems[box] = gettext("%(changed)s %(problem)s", changed=said, problem=other)
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages")

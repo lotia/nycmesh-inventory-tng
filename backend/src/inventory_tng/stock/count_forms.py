@@ -25,7 +25,14 @@ from inventory_tng.stock.forms import (
 )
 from inventory_tng.stock.ledger import LOOSE, Form, repeated
 from inventory_tng.stock.units_shown import Now
-from inventory_tng.web.forms import QUANTITY_MAX, RULES, quantity, read_amount, row_id
+from inventory_tng.web.forms import (
+    QUANTITY_MAX,
+    RULES,
+    quantity,
+    read_amount,
+    row_id,
+    unit_free_problem,
+)
 
 # The count form's fields of items: counted, by item, and one chosen at
 # the foot.
@@ -551,24 +558,57 @@ def typed_named(
     return items, packages
 
 
+def _unit_free_problem(
+    name: str, fields: Mapping[str, str], *, separator: Separator
+) -> Words | None:
+    """What is wrong with what a place's box `name` holds whatever unit its
+    item is counted in, as by_form and item_counts read it: not a whole
+    number of packages, or what web/forms.unit_free_problem says. Not
+    whole units, nor too many packages, which depend on the unit
+    (inventory-tng-yxd1). An open package closed is not read."""
+    typed = fields.get(name, "")
+    prefix = ""
+    if name.startswith(ARRIVED):
+        area, _, name = name.removeprefix(ARRIVED).partition("_")
+        prefix = f"{ARRIVED}{area}_"
+    if name.startswith(SEALED):
+        unread = typed.strip() and whole(typed, 0, INTEGER_MAX) is None
+        return WHOLE_PACKAGES if unread else None
+    state = fields.get(f"{prefix}{STATE}{name.removeprefix(OPENED)}", "here")
+    if name.startswith(OPENED) and state != "here":
+        return None
+    if name == FOUND_LEFT:
+        return unit_free_problem(
+            typed, positive=True, required=HOW_MUCH_LEFT, separator=separator
+        )
+    return unit_free_problem(typed, positive=False, separator=separator)
+
+
 def changed_words(
     session: Session,
     form: Mapping[str, str],
     root_id: int,
     place_ids: Collection[int],
     now: Now,
+    *,
+    separator: Separator,
 ) -> dict[str, Words]:
     """Beside each box of a count form of an item counted in another unit
     since it was shown, or of a package now of another size, by the form's
     own field names: what it is now, to check and save again (Ali,
-    2026-11-23, inventory-tng-57u8)."""
+    2026-11-23, inventory-tng-57u8). After an item's new unit, what else is
+    wrong with the box's number in any unit, typed in the decimal
+    `separator` (Ali, 2026-11-26, inventory-tng-yxd1)."""
     split, _ = by_place(form, root_id, place_ids)
     words: dict[str, Words] = {}
     for place_id, fields in split.items():
         for name in fields:
             item_id, package_id = _counts_of(session, name, fields)
             if item_id in now.units:
-                said = now_counted_in(now.units[item_id])
+                said = now_counted_in(
+                    now.units[item_id],
+                    _unit_free_problem(name, fields, separator=separator),
+                )
             elif package_id in now.sizes:
                 said = now_holds(*now.sizes[package_id])
             else:

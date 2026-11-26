@@ -11,7 +11,7 @@ from collections.abc import Collection, Mapping
 import structlog
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.phrases import Words
+from inventory_tng.core.phrases import Separator, Words
 from inventory_tng.core.sent_forms import digest_spent
 from inventory_tng.stock.count_forms import PlaceCount, changed_words, typed_named
 from inventory_tng.stock.forms import now_counted_in, now_holds, shown_in
@@ -27,16 +27,21 @@ def asked_again(
     root_id: int,
     place_ids: Collection[int],
     now: Now,
+    *,
+    separator: Separator,
 ) -> tuple[dict[str, Words], str]:
     """A count form shown again as one of its items or packages changed
     since it was shown: the words beside each box of one
     (count_forms.changed_words), and above the form what one is now, as a
-    sealed row of a package held nowhere has no box to say it beside."""
+    sealed row of a package held nowhere has no box to say it beside. Its
+    boxes are in the decimal `separator`."""
     if now.units:
         alert = now_counted_in(min(now.units.items())[1])
     else:
         alert = now_holds(*min(now.sizes.items())[1])
-    return changed_words(session, form, root_id, place_ids, now), alert
+    return changed_words(
+        session, form, root_id, place_ids, now, separator=separator
+    ), alert
 
 
 def changed_since_sent(
@@ -69,6 +74,7 @@ def kept_as_now(
     root_id: int,
     place_ids: Collection[int],
     *,
+    separator: Separator,
     refused: bool = False,
 ) -> tuple[dict[str, Words], Words | None]:
     """A count form shown again keeping what was typed: the words of
@@ -81,11 +87,11 @@ def kept_as_now(
         return {}, None
     if refused:
         refusing("count", now)
-        return asked_again(session, form, root_id, place_ids, now)
+        return asked_again(session, form, root_id, place_ids, now, separator=separator)
     log.info(
         "count shown again in units changed since",
         location_id=root_id,
         item_ids=sorted(now.units),
         item_package_ids=sorted(now.sizes),
     )
-    return asked_again(session, form, root_id, place_ids, now)
+    return asked_again(session, form, root_id, place_ids, now, separator=separator)

@@ -995,6 +995,30 @@ def test_counts_a_package_amount_with_the_other_separator_once_in_a_unit_left(
     assert added(reader, name, before) == {(("separator", "comma"),): 2}
 
 
+def test_counts_a_stock_amount_with_the_other_separator_once_in_a_unit_left(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """An adjustment and a count box typed "1,5" in m on an English page,
+    the cable in ft since: each counted once, though read again for what
+    is wrong with it in any unit (inventory-tng-yxd1)."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.numbers.other_separator"
+    before = counted(reader, name)
+    place = Place(session)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    adjusted = adjustment_form(session, place.store, place.cable, amount="1,5")
+    count = count_form_at(client, place.store.id) | {
+        "extra_item_id": str(place.cable.id),
+        "extra_quantity": "1,5",
+    }
+    to_feet(session, place.cable)
+    assert client.post(ADJUSTMENTS, data=adjusted).status_code == 400
+    path = f"{COUNTS}/{place.store.id}"
+    assert client.post(path, data=count).status_code == 400
+    assert added(reader, name, before) == {(("separator", "comma"),): 2}
+
+
 def test_counts_batches_from_a_build_too_old(
     rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:

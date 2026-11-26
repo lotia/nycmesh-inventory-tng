@@ -30,6 +30,7 @@ from inventory_tng.web.forms import (
     read_amount,
     row_id,
     type_a_number,
+    unit_free_problem,
     up_to,
 )
 
@@ -77,13 +78,20 @@ def shown_in(form: Mapping[str, str]) -> Shown:
     return Shown(_pairs(form.get(UNITS, "")), sizes)
 
 
-def now_counted_in(unit: str) -> str:
+def now_counted_in(unit: str, problem: Words | None = None) -> str:
     """Beside an amount shown in an item's unit since changed: refused, and
-    shown again in `unit`."""
-    return gettext(
+    shown again in `unit`. Then `problem`, anything else wrong with it in
+    any unit (web/forms.unit_free_problem), so both are fixed at once
+    (inventory-tng-hhlr, inventory-tng-yxd1)."""
+    said = gettext(
         "This item is now counted in %(unit)s. Check the amount and save again.",
         unit=unit,
     )
+    if problem is None:
+        return said
+    # Translators: %(changed)s says the item is now counted in another
+    # unit, %(problem)s what else is wrong with the number typed.
+    return gettext("%(changed)s %(problem)s", changed=said, problem=problem)
 
 
 def now_holds(size: Decimal, unit: str) -> str:
@@ -140,11 +148,20 @@ def adjustment(
     if isinstance(amount, str):
         problems["amount"] = amount
     # Shown in another unit, or in none: asked again in its unit now, which
-    # the form shown again shows, whatever else is wrong (units_shown).
+    # the form shown again shows, whatever else is wrong (units_shown); what
+    # is wrong with the amount in any unit is said after.
     unit = shown_in(form).units.get(item.id, "") if item else ""
     if item and unit != item.unit:
         units_shown.refusing("adjustment", Now({item.id: item.unit}, {}))
-        problems["amount"] = now_counted_in(item.unit)
+        problems["amount"] = now_counted_in(
+            item.unit,
+            unit_free_problem(
+                form.get("amount", ""),
+                positive=True,
+                required=HOW_MUCH,
+                separator=separator,
+            ),
+        )
     direction = form.get("direction")
     if direction not in ("found", "off"):
         problems["direction"] = FOUND_OR_OFF

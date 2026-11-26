@@ -101,7 +101,7 @@ msgstr ""
 
 #. Translators: %(changed)s says the item is now counted in another
 #. unit, %(problem)s what else is wrong with the number typed.
-#: src/inventory_tng/catalogue/items_routes.py
+#: src/inventory_tng/stock/forms.py
 #, python-format
 msgid "%(changed)s %(problem)s"
 msgstr ""
