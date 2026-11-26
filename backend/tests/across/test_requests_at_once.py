@@ -1135,18 +1135,7 @@ def test_a_name_saved_as_a_rule_changes_never_reads_as_another(
         items.add(session, fields)
 
     first, second = (adding, ruling) if swapped else (ruling, adding)
-    one, two = committed.session(), committed.session()
-    first(one)
-    one.flush()
-
-    def write_second() -> None:
-        second(two)
-        two.flush()
-
-    worker = committed.blocked(two, write_second)
-    one.commit()
-    error = worker.finished().error
-    two.rollback()
+    error = second_failed(committed, first, second)
     if swapped:
         assert isinstance(error, RuleBroken), error
         assert error.rule == items.READ_ALIKE
