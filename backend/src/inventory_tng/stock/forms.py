@@ -197,18 +197,21 @@ def confirmed_count(
     it: shown in another, from a form sent from elsewhere, it is asked
     again (stock/units_shown.py). Its item's unit may be the other length
     now: over_recorded.confirm_count converts the difference into it, under
-    the lock it is saved with (inventory-tng-4fjq)."""
+    the lock it is saved with (inventory-tng-4fjq). Shown in another, it
+    also says what is wrong with the number in any unit, read once so the
+    other separator is counted once (inventory-tng-fezg)."""
     item_id, unit = queries.item_moved(session, movement_id)
-    if shown != unit:
-        units_shown.refusing("confirm_count", Now({item_id: unit}, {}))
-        return now_counted_in(unit)
-    return quantity(
+    read = quantity(
         typed,
         positive=False,
-        unit=unit,
+        unit=unit if shown == unit else None,
         required=type_a_number(separator),
         separator=separator,
     )
+    if shown != unit:
+        units_shown.refusing("confirm_count", Now({item_id: unit}, {}))
+        return now_counted_in(unit, read if isinstance(read, str) else None)
+    return read
 
 
 def why_problem(reason: str, words: str) -> Words | None:

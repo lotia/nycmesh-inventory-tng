@@ -568,3 +568,44 @@ def test_a_confirmed_count_shown_in_another_unit_is_asked_again(
     assert now_counted_in("m") in text(response)
     assert checks(session)[0].settled_at is None
     assert adjustments(session) == []
+
+
+@pytest.mark.parametrize(
+    ("typed", "said"),
+    [
+        ("-5", now_counted_in("m", ZERO_OR_MORE)),
+        ("1,5", now_counted_in("m", use_separator("."))),
+        ("", now_counted_in("m", type_a_number("."))),
+    ],
+)
+def test_a_confirmed_count_in_another_unit_says_what_is_wrong_in_any(
+    admin_client: TestClient,
+    registered_client: TestClient,
+    session: Session,
+    typed: str,
+    said: str,
+) -> None:
+    """-5 typed in ft for a spool's line in m: the box says both at once,
+    as the count and adjustment forms do (inventory-tng-fezg), and a
+    comma is counted refused once."""
+    spools = Spools(session)
+    moved_whole(registered_client, spools)
+    with capture_logs() as logs:
+        check, response = counted(admin_client, session, typed, unit="ft")
+    assert response.status_code == 400
+    assert problem(response.text, f"count-{check.id}") == said
+    refused = [each for each in logs if each["event"] == "number refused"]
+    assert len(refused) == (typed == "1,5")
+    assert checks(session)[0].settled_at is None
+
+
+def test_a_confirmed_count_wrong_only_in_its_new_unit_says_only_the_unit(
+    admin_client: TestClient, registered_client: TestClient, session: Session
+) -> None:
+    """Half a spool's worth in m, for a line counted each: whole units are
+    checked once it is typed again in each."""
+    spools = Spools(session, cable_unit="each")
+    moved_whole(registered_client, spools)
+    check, response = counted(admin_client, session, "0.5", unit="m")
+    assert response.status_code == 400
+    assert problem(response.text, f"count-{check.id}") == now_counted_in("each")
