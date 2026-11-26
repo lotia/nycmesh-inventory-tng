@@ -38,10 +38,8 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-# The page after's address says the recount was the one that retires the
-# item's packages in the old unit, any it had, so offers to add them in
-# the new one; without it, as after an item converted before is
-# recounted, it offers nothing, however the item's stock has moved since.
+# In the page after's address: the recount retired the item's packages
+# in the old unit, any it had, so the page offers to add them in the new.
 RETIRED_PACKAGES = "retired"
 
 
@@ -162,7 +160,7 @@ def recount(
     assert done is not None  # Refused, or done.
     session.commit()
     after = {"labels": _listed(done.revoked)} if done.revoked else {}
-    if not done.converted:
+    if done.add_packages:
         after["packages"] = RETIRED_PACKAGES
     return redirect(
         UNIT_RECOUNTED.format(item_id=item_id), places=_listed(done.places), **after
@@ -193,9 +191,8 @@ def recounted(
     address, each linked to its count of the item; and the packages of
     the labels it revoked, also in its address, by label id: current
     ones, to print again, and retired ones, which can't be until they are
-    brought back; and, if its address says it was the recount that
-    retires the item's packages (RETIRED_PACKAGES), a link to add them
-    in the new unit."""
+    brought back; and a link to add its packages in the new unit, if its
+    address says the recount retired them (RETIRED_PACKAGES)."""
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
