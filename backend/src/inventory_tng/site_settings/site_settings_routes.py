@@ -197,11 +197,12 @@ def change_reason(
         _, broken = refusal(session, change, "unique")
         problem = broken and forms.REASON_TAKEN
     if problem is not None:
-        # Its box shows what was typed, beside its problem.
+        # A rename refused shows what was typed, beside its problem; a
+        # retire or bring-back refused, the name stored, as it did not use
+        # what was typed (inventory-tng-jlsi).
         field = f"reason_{reason_id}"
-        return _page(
-            request, session, signed, problems={field: problem}, values={field: name}
-        )
+        typed = {field: name} if action == "rename" else {}
+        return _page(request, session, signed, problems={field: problem}, values=typed)
     session.commit()
     notice = {"retire": "reason_retired", "restore": "restored"}
     return redirect(SETTINGS, notice=notice.get(action, "saved"), section="reasons")

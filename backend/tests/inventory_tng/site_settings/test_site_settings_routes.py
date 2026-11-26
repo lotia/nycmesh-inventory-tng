@@ -2,6 +2,7 @@
 (site_settings/site_settings_routes.py)."""
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,7 +19,7 @@ from inventory_tng.models.site_settings import (
 from inventory_tng.models.stock import AdjustmentReason
 from inventory_tng.site_settings.forms import REASON_TAKEN, whole_minutes
 from inventory_tng.site_settings.paths import SETTINGS
-from inventory_tng.web.forms import PICK_A_ZONE
+from inventory_tng.web.forms import NAME_MAX, PICK_A_ZONE
 
 from helpers.mail import SentMail
 from helpers.markup import (
@@ -212,6 +213,28 @@ def test_a_refused_reason_rename_keeps_the_name_typed(
     stale = admin_client.post(path, data=form | {"name": "Dropped"})
     assert stale.status_code == 409
     assert names(stale.text) == [["Gifted"], ["Lent out"]]
+
+
+@pytest.mark.parametrize("action", ["retire", "restore"])
+def test_a_refused_retire_or_bring_back_shows_the_name_stored(
+    admin_client: TestClient, session: Session, action: str
+) -> None:
+    """Refused, a Retire or Bring it back shows the reason's stored name,
+    not what was typed in its box: it did not use it, and the box kept
+    would refuse it again (inventory-tng-jlsi). Bring it back is refused
+    as another current reason has its name; Retire, as the box held a
+    name too long."""
+    given = add(session, AdjustmentReason(name="Lent out"))
+    typed = "x" * (NAME_MAX + 1)
+    if action == "restore":
+        given.retired_at = datetime.now(UTC)
+        add(session, AdjustmentReason(name="Lent out"))
+        typed = "Borrowed"
+    form = {"name": typed, "version": shown(given), "action": action}
+    refused = admin_client.post(f"{SETTINGS}/reasons/{given.id}", data=form)
+    assert refused.status_code == 400
+    box = read(refused.text).one("form", action=f"{SETTINGS}/reasons/{given.id}")
+    assert box_values(box, "name") == ["Lent out"]
 
 
 def test_sign_in_settings_ask_for_a_fresh_code(
