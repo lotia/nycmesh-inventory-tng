@@ -154,6 +154,24 @@ WRONG: dict[str, dict[str, str]] = {
 }
 
 
+def test_every_form_is_sent_wrong() -> None:
+    """So a form added to FORMS is checked to say it is stale first too."""
+    assert WRONG.keys() == FORMS.keys()
+
+
+@pytest.mark.parametrize("name", WRONG)
+def test_a_current_form_sent_wrong_is_refused_for_its_field(
+    admin_client: TestClient, session: Session, name: str
+) -> None:
+    """Each WRONG really is wrong, so the test below proves the order."""
+    make, _, _ = FORMS[name]
+    path, sends, row, field = make(session)
+    form = sends | WRONG[name] | {field: shown(row)}
+    refused = admin_client.post(path, data=form)
+    assert refused.status_code == 400
+    assert str(RULES[CHANGED]) not in text(refused)
+
+
 @pytest.mark.parametrize("name", WRONG)
 def test_a_stale_form_says_so_before_its_fields_problems(
     admin_client: TestClient, session: Session, name: str
