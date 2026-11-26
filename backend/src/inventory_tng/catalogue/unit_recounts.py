@@ -355,10 +355,11 @@ def recount(
 
 class Recounted(NamedTuple):
     """What is left to do after a recount: count the item again at the
-    places it brought to zero from what they were shown to hold, by id; print again the labels it revoked,
-    by id (queries.revoked_packages names their packages); and add its
-    packages in the new unit, as it retired them, unless the item was
-    converted before (Planned.converted) and they were given new sizes."""
+    places it brought to zero from what they were shown to hold, by id;
+    print again the labels it revoked, by id (queries.revoked_packages
+    names their packages); and add its packages in the new unit, as it
+    retired them, unless the item was converted before
+    (Planned.converted) and they were given new sizes."""
 
     places: list[int]
     revoked: list[int]
