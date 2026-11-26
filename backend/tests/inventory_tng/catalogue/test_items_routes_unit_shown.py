@@ -20,7 +20,7 @@ from inventory_tng.catalogue.items_routes import UNIT_SHOWN
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.stock.forms import now_counted_in
-from inventory_tng.web.forms import ABOVE_ZERO
+from inventory_tng.web.forms import ABOVE_ZERO, CHANGED, RULES
 
 from helpers.items import new_item
 from helpers.markup import box_values, problem, read, text
@@ -246,7 +246,7 @@ def test_a_package_resized_in_a_unit_left_since_says_so_first_with_any_problem(
     )
     assert refused.status_code == 409
     assert problem(refused.text, "size") == said
-    assert "someone else saved this" not in text(refused)
+    assert str(RULES[CHANGED]) not in text(refused)
     assert "Drum" in box_values(refused.text, "package_name")
     assert typed in box_values(refused.text, "size")
     again = _hidden(refused.text, action)
@@ -277,7 +277,7 @@ def test_a_package_renamed_as_well_as_switched_since_is_shown_as_it_is_now(
     typed = {"package_name": "Drum", "size": "1000"}
     refused = admin_client.post(action, data=drawn | typed)
     assert refused.status_code == 409
-    assert "someone else saved this" in text(refused)
+    assert str(RULES[CHANGED]) in text(refused)
     assert "Spool" in box_values(refused.text, "package_name")
     assert "Drum" not in box_values(refused.text, "package_name")
     session.refresh(reel)
@@ -299,7 +299,7 @@ def test_a_package_resized_with_its_unit_since_is_shown_as_it_is_now(
     session.flush()
     refused = admin_client.post(action, data=drawn | {"size": "300"})
     assert refused.status_code == 409
-    assert "someone else saved this" in text(refused)
+    assert str(RULES[CHANGED]) in text(refused)
     assert "1000" in box_values(refused.text, "size")
     assert "300" not in box_values(refused.text, "size")
     session.refresh(reel)

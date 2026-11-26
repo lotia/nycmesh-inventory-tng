@@ -53,6 +53,7 @@ from helpers.markup import (
     options,
     read,
     text,
+    units_offered,
     words_on,
 )
 from helpers.rows import item_fields, shown, violates
@@ -130,10 +131,7 @@ def test_how_much_is_followed_by_the_unit_of_the_item_picked(
     inventory-tng-mdvz)."""
     place = Place(session, cable_unit=unit)
     page = read(admin_client.get(COUNTS).text)
-    units = {
-        option.attrs["value"]: option.attrs.get("data-unit")
-        for option in page.one("select", name="item_id").all("option")
-    }
+    units = units_offered(page, "item_id")
     assert units[str(place.cable.id)] == unit
     assert units[str(place.item.id)] == "each"
     after = page.one("input", name="amount").parent

@@ -24,6 +24,7 @@ from inventory_tng.stock.moments import expected
 
 from helpers.markup import (
     Element,
+    alerts_on,
     box_values,
     button,
     hidden_fields,
@@ -512,8 +513,7 @@ def test_an_area_emptied_and_another_retired_are_named_together(
     retire(session, made.empty)
     refused = admin_client.post(made.path, data=setup.shown)
     words = text(refused)
-    alerts = [each.text for each in read(refused.text).all("p", role="alert")]
-    assert alerts == [
+    assert alerts_on(refused.text) == [
         emptied_words(gone.name),
         (
             f"Not saved: {made.empty.name} was retired while you counted, so it "

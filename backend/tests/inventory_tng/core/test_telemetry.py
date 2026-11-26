@@ -941,6 +941,10 @@ def test_counts_a_length_reported_in_a_unit_changed_since(
     }
 
 
+# Numbers refused as typed with the other decimal separator.
+OTHER_SEPARATOR = "inventory.numbers.other_separator"
+
+
 def test_counts_numbers_typed_with_the_other_decimal_separator(
     rolled_back: Recorded, session: Session
 ) -> None:
@@ -948,8 +952,7 @@ def test_counts_numbers_typed_with_the_other_decimal_separator(
     (inventory-tng-mat2), and a comma and thousands in an English one's; a
     number refused otherwise is not counted (inventory-tng-qnwz)."""
     client, _, reader, _ = rolled_back
-    name = "inventory.numbers.other_separator"
-    before = counted(reader, name)
+    before = counted(reader, OTHER_SEPARATOR)
     place = Place(session)
     _, key = new_admin(session)
     sign_in_with(client, key=key)
@@ -965,7 +968,7 @@ def test_counts_numbers_typed_with_the_other_decimal_separator(
             ADJUSTMENTS, data=form, headers={"Accept-Language": language}
         )
         assert answer.status_code == 400
-    assert added(reader, name, before) == {
+    assert added(reader, OTHER_SEPARATOR, before) == {
         (("separator", "point"),): 2,
         (("separator", "comma"),): 1,
         (("separator", "thousands"),): 1,
@@ -979,8 +982,7 @@ def test_counts_a_package_amount_with_the_other_separator_once_in_a_unit_left(
     English page, the cable in ft since: each counted once, though read
     again for what is wrong with it in any unit (inventory-tng-hhlr)."""
     client, _, reader, _ = rolled_back
-    name = "inventory.numbers.other_separator"
-    before = counted(reader, name)
+    before = counted(reader, OTHER_SEPARATOR)
     cable = Place(session).cable
     reel = add(session, ItemPackage(item_id=cable.id, name="Reel", size=305))
     items.save(session, cable, item_fields(cable, unit="ft"), seen=None)
@@ -993,7 +995,7 @@ def test_counts_a_package_amount_with_the_other_separator_once_in_a_unit_left(
     ):
         answer = client.post(action, data=typed | {"unit_shown": "m"})
         assert answer.status_code == 400
-    assert added(reader, name, before) == {(("separator", "comma"),): 2}
+    assert added(reader, OTHER_SEPARATOR, before) == {(("separator", "comma"),): 2}
 
 
 def test_counts_no_other_separator_on_an_edit_form_shown_as_it_is_now(
@@ -1005,8 +1007,7 @@ def test_counts_no_other_separator_on_an_edit_form_shown_as_it_is_now(
     said refused, so not counted or logged so (inventory-tng-ryjv,
     inventory-tng-hnta)."""
     client, _, reader, _ = rolled_back
-    name = "inventory.numbers.other_separator"
-    before = counted(reader, name)
+    before = counted(reader, OTHER_SEPARATOR)
     cable = Place(session).cable
     reel = add(session, ItemPackage(item_id=cable.id, name="Reel", size=305))
     item_form = shown_item_form(cable, minimum="1,5")
@@ -1027,7 +1028,7 @@ def test_counts_no_other_separator_on_an_edit_form_shown_as_it_is_now(
         ):
             answer = client.post(action, data=form)
             assert answer.status_code == 409
-    assert added(reader, name, before) == {}
+    assert added(reader, OTHER_SEPARATOR, before) == {}
     assert "number refused" not in [each["event"] for each in logs]
 
 
@@ -1038,8 +1039,7 @@ def test_counts_a_stock_amount_with_the_other_separator_once_in_a_unit_left(
     the cable in ft since: each counted once, though read again for what
     is wrong with it in any unit (inventory-tng-yxd1)."""
     client, _, reader, _ = rolled_back
-    name = "inventory.numbers.other_separator"
-    before = counted(reader, name)
+    before = counted(reader, OTHER_SEPARATOR)
     place = Place(session)
     _, key = new_admin(session)
     sign_in_with(client, key=key)
@@ -1052,7 +1052,7 @@ def test_counts_a_stock_amount_with_the_other_separator_once_in_a_unit_left(
     assert client.post(ADJUSTMENTS, data=adjusted).status_code == 400
     path = f"{COUNTS}/{place.store.id}"
     assert client.post(path, data=count).status_code == 400
-    assert added(reader, name, before) == {(("separator", "comma"),): 2}
+    assert added(reader, OTHER_SEPARATOR, before) == {(("separator", "comma"),): 2}
 
 
 def test_counts_no_other_separator_for_an_open_package_closed_on_a_count(
@@ -1062,8 +1062,7 @@ def test_counts_no_other_separator_for_an_open_package_closed_on_a_count(
     up: its amount is not read, so the count saves and no number is
     counted or logged refused (inventory-tng-7f45)."""
     client, _, reader, _ = rolled_back
-    name = "inventory.numbers.other_separator"
-    before = counted(reader, name)
+    before = counted(reader, OTHER_SEPARATOR)
     spools = Spools(session)
     made = spools.opened()
     _, key = new_admin(session)
@@ -1079,7 +1078,7 @@ def test_counts_no_other_separator_for_an_open_package_closed_on_a_count(
     assert answer.status_code == 303
     session.refresh(made)
     assert made.closed_at is not None
-    assert added(reader, name, before) == {}
+    assert added(reader, OTHER_SEPARATOR, before) == {}
     assert "number refused" not in [each["event"] for each in logs]
 
 
@@ -1091,8 +1090,7 @@ def test_counts_no_other_separator_for_a_found_package_of_no_such_package(
     there is no such package and no number is counted or logged refused
     (inventory-tng-ndrg)."""
     client, _, reader, _ = rolled_back
-    name = "inventory.numbers.other_separator"
-    before = counted(reader, name)
+    before = counted(reader, OTHER_SEPARATOR)
     spools = Spools(session)
     _, key = new_admin(session)
     sign_in_with(client, key=key)
@@ -1104,7 +1102,7 @@ def test_counts_no_other_separator_for_a_found_package_of_no_such_package(
         answer = client.post(f"{COUNTS}/{spools.store.id}", data=form)
     assert answer.status_code == 400
     assert str(NO_SUCH_PACKAGE) in text(answer)
-    assert added(reader, name, before) == {}
+    assert added(reader, OTHER_SEPARATOR, before) == {}
     assert "number refused" not in [each["event"] for each in logs]
 
 

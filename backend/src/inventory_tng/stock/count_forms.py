@@ -595,9 +595,10 @@ def _unit_free_problem(
     if name.startswith(SEALED):
         unread = typed.strip() and whole(typed, 0, INTEGER_MAX) is None
         return WHOLE_PACKAGES if unread else None
-    state = fields.get(f"{prefix}{STATE}{name.removeprefix(OPENED)}", "here")
-    if name.startswith(OPENED) and state != "here":
-        return None
+    if name.startswith(OPENED):
+        state = fields.get(f"{prefix}{STATE}{name.removeprefix(OPENED)}", "here")
+        if state != "here":
+            return None
     if name == FOUND_LEFT:
         return unit_free_problem(
             typed, positive=True, required=HOW_MUCH_LEFT, separator=separator

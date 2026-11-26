@@ -30,7 +30,6 @@ from inventory_tng.web.forms import (
     read_amount,
     row_id,
     type_a_number,
-    unit_free_problem,
     up_to,
 )
 
@@ -153,29 +152,24 @@ def adjustment(
     item = chosen(session, Item, form.get("item_id", ""), current=False)
     if item is None:
         problems["item_id"] = PICK_AN_ITEM
+    # Shown in another unit, or in none: asked again in its unit now, which
+    # the form shown again shows, whatever else is wrong (units_shown); what
+    # is wrong with the amount in any unit is said after, read once so the
+    # other separator is counted once.
+    unit = shown_in(form).units.get(item.id, "") if item else ""
     amount = quantity(
         form.get("amount", ""),
         positive=True,
-        unit=item.unit if item else None,
+        unit=item.unit if item and unit == item.unit else None,
         required=HOW_MUCH,
         separator=separator,
     )
     if isinstance(amount, str):
         problems["amount"] = amount
-    # Shown in another unit, or in none: asked again in its unit now, which
-    # the form shown again shows, whatever else is wrong (units_shown); what
-    # is wrong with the amount in any unit is said after.
-    unit = shown_in(form).units.get(item.id, "") if item else ""
     if item and unit != item.unit:
         units_shown.refusing("adjustment", Now({item.id: item.unit}, {}))
         problems["amount"] = now_counted_in(
-            item.unit,
-            unit_free_problem(
-                form.get("amount", ""),
-                positive=True,
-                required=HOW_MUCH,
-                separator=separator,
-            ),
+            item.unit, amount if isinstance(amount, str) else None
         )
     direction = form.get("direction")
     if direction not in ("found", "off"):

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.web.formatting import PRINTED_LENGTH
 
-from helpers.markup import Element, read
+from helpers.markup import Element, read, units_offered
 from helpers.stock import Place, Spools, received, to_feet
 
 
@@ -88,10 +88,7 @@ def test_something_else_here_says_the_unit_of_each_item_offered(
     place = loose_cable_and_radios(session, "m")
     other = Place(session, cable_unit="ft")
     page = page_at(admin_client, place.store.id)
-    units = {
-        option.attrs["value"]: option.attrs.get("data-unit")
-        for option in page.one("select", name="extra_item_id").all("option")
-    }
+    units = units_offered(page, "extra_item_id")
     assert units[str(other.cable.id)] == "ft"
     assert units[str(other.item.id)] == "each"
     after = page.one("input", name="extra_quantity").parent

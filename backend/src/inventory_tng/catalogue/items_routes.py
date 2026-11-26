@@ -794,7 +794,8 @@ def save_item(
     # (open_packages.unfollowing). A No saves nothing, and is answered
     # from a page drawn before a change too (_unit_declined), so checked
     # once it is.
-    if answer != "no" and stale_as_read(found, seen):
+    stale = stale_as_read(found, seen)
+    if answer != "no" and stale:
         return _item_page(request, session, signed, found, alert=RULES[CHANGED])
     fields, problems, typed = forms.item_fields(
         session, form, found, separator=decimal_separator(request)
@@ -802,7 +803,7 @@ def save_item(
     if answer == "no":
         if fields is not None:
             return _unit_declined(request, session, signed, found, form, fields.unit)
-        if stale_as_read(found, seen):
+        if stale:
             return _item_page(request, session, signed, found, alert=RULES[CHANGED])
     if fields is not None:
         recorded_in = form.get(RECORDED_IN) if answer == "yes" else None

@@ -371,8 +371,7 @@ def name_device(
     # row is locked; the save locks a device its own way and checks again
     # (devices.name_device).
     if stale_as_read(device, seen):
-        alert = RULES[CHANGED]
-        return _device_page(request, signed, session, device, alert=alert)
+        return _device_page(request, signed, session, device, alert=RULES[CHANGED])
     label = label.strip()
     if (problem := forms.label_problem(label)) is not None:
         problems = {"label": problem}

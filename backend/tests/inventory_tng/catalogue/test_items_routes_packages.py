@@ -24,7 +24,7 @@ from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage, ReadingRule
 from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
-from inventory_tng.web.forms import ABOVE_ZERO, RULES
+from inventory_tng.web.forms import ABOVE_ZERO, CHANGED, RULES
 
 from helpers.items import NOW, new_item, same_size_twins, shown_item_form
 from helpers.markup import box_values, checked, forms, problem, read, text, words_on
@@ -98,7 +98,7 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
         f"{page}/packages/{box.id}",
         data={"package_name": "Bag", "size": "25", "package_version": "1"},
     )
-    assert "someone else saved this" in text(stale)
+    assert str(RULES[CHANGED]) in text(stale)
     for name, size in (("", "25"), ("Bag", "lots"), ("--", "25")):
         assert send(box, name, size).status_code == 400
     # Never as short as its too-short length.
@@ -130,13 +130,13 @@ def test_a_package_changed_since_says_so_before_what_is_wrong_with_its_size(
     session.flush()
     stale = admin_client.post(action, data=typed | {"package_version": drawn})
     assert stale.status_code == 409
-    assert str(RULES["changed_since_shown"]) in text(stale)
+    assert str(RULES[CHANGED]) in text(stale)
     assert not read(stale.text).all("span", class_="problem")
     assert "Carton" in box_values(stale.text, "package_name")
     wrong = admin_client.post(action, data=typed | {"package_version": shown(box)})
     assert wrong.status_code == 400
     assert problem(wrong.text, "size") == str(ABOVE_ZERO)
-    assert "someone else saved this" not in text(wrong)
+    assert str(RULES[CHANGED]) not in text(wrong)
     assert box.name == "Carton"
 
 

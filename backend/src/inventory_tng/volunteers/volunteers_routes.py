@@ -254,8 +254,7 @@ def save_volunteer(
     # typed (inventory-tng-ryjv). Not locked: the save locks their custody
     # location first (volunteers._lock).
     if stale_as_read(found, seen):
-        alert = RULES[CHANGED]
-        return _volunteer_page(request, session, signed, found, alert=alert)
+        return _volunteer_page(request, session, signed, found, alert=RULES[CHANGED])
     name, email = name.strip(), email.strip()
     problems = volunteer_problems(name, email)
     if not problems:

@@ -50,7 +50,7 @@ from inventory_tng.web.forms import (
 )
 
 from helpers.items import NOW
-from helpers.markup import box_values, hidden_fields, problem, read, text
+from helpers.markup import alerts_on, box_values, hidden_fields, problem, text
 from helpers.over_recorded import adjustments, checks, counted, moved_whole
 from helpers.package_forms import quantities_by_form
 from helpers.rows import add, item_fields, setting_up, tag
@@ -392,11 +392,6 @@ def test_a_count_refused_otherwise_after_a_switch_says_both(
     assert counts_written(session) == []
 
 
-def alerts_of(response: Response) -> list[str]:
-    """The alerts above a count form, in order."""
-    return [each.text for each in read(response.text).all("p", role="alert")]
-
-
 @pytest.mark.parametrize(
     ("listed", "switched"),
     [(True, True), (True, False), (False, True)],
@@ -422,7 +417,9 @@ def test_a_count_listed_elsewhere_after_a_switch_says_both_alerts(
     response = admin_client.post(f"{COUNTS}/{store}", data=form)
     assert response.status_code == 400
     where = count_routes.already_listed(spools.cable.name_shown, spools.store.name)
-    assert alerts_of(response) == [now_counted_in("ft")] * switched + [where] * listed
+    assert (
+        alerts_on(response.text) == [now_counted_in("ft")] * switched + [where] * listed
+    )
     assert counts_written(session) == []
 
 
@@ -445,10 +442,19 @@ def test_a_count_named_twice_after_a_switch_says_both_alerts(
     response = admin_client.post(f"{COUNTS}/{place_id}", data=form)
     assert response.status_code == 400
     assert (
-        alerts_of(response)
+        alerts_on(response.text)
         == [str(count_routes.TWICE)] * twice + [now_counted_in("ft")] * switched
     )
     assert counts_written(session) == []
+
+
+def _used_up_meanwhile(
+    client: TestClient, at: dict[str, str], store: int, opened_id: int
+) -> None:
+    """The open package `opened_id` said used up on another copy of the
+    count form `at`, so closed while this one was being typed."""
+    shut = at | {f"opened_{opened_id}": "", f"state_{opened_id}": "used_up"}
+    assert client.post(f"{COUNTS}/{store}", data=shut).status_code == 303
 
 
 @pytest.mark.parametrize(
@@ -471,8 +477,7 @@ def test_a_count_of_a_package_closed_meanwhile_and_one_resized_says_both(
     box = box_of_ten(session, spools.place)
     at = count_form_at(admin_client, store)
     if closed:
-        shut = at | {f"opened_{made.id}": "", f"state_{made.id}": "used_up"}
-        assert admin_client.post(f"{COUNTS}/{store}", data=shut).status_code == 303
+        _used_up_meanwhile(admin_client, at, store, made.id)
     written = counts_written(session)
     form = at | {"key": str(uuid.uuid4()), f"opened_{made.id}": "300"}
     if resized:
@@ -484,7 +489,7 @@ def test_a_count_of_a_package_closed_meanwhile_and_one_resized_says_both(
     response = admin_client.post(f"{COUNTS}/{store}", data=form)
     assert response.status_code == 400
     assert (
-        alerts_of(response)
+        alerts_on(response.text)
         == [str(RULES[CLOSED_MEANWHILE])] * closed
         + [now_holds(Decimal(12), "each")] * resized
     )
@@ -502,8 +507,7 @@ def test_a_count_closed_meanwhile_switched_and_listed_says_all_three(
     cable, store = spools.cable.id, spools.store.id
     made = spools.opened()
     at = count_form_at(admin_client, store)
-    shut = at | {f"opened_{made.id}": "", f"state_{made.id}": "used_up"}
-    assert admin_client.post(f"{COUNTS}/{store}", data=shut).status_code == 303
+    _used_up_meanwhile(admin_client, at, store, made.id)
     form = at | {
         "key": str(uuid.uuid4()),
         f"opened_{made.id}": "300",
@@ -515,7 +519,7 @@ def test_a_count_closed_meanwhile_switched_and_listed_says_all_three(
     response = admin_client.post(f"{COUNTS}/{store}", data=form)
     assert response.status_code == 400
     where = count_routes.already_listed(spools.cable.name_shown, spools.store.name)
-    assert alerts_of(response) == [
+    assert alerts_on(response.text) == [
         str(RULES[CLOSED_MEANWHILE]),
         now_counted_in("ft"),
         where,

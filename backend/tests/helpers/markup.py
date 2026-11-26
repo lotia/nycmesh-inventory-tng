@@ -215,6 +215,20 @@ def problem(page: str | Element, field: str) -> str:
     return read(page).one("span", class_="problem", id=f"{field}-problem").text
 
 
+def alerts_on(page: str | Element) -> list[str]:
+    """The words of each alert paragraph on the page, in order."""
+    return [each.text for each in read(page).all("p", role="alert")]
+
+
+def units_offered(page: str | Element, name: str) -> dict[str, str | None]:
+    """The unit each choice of the list named `name` carries (data-unit),
+    by its value: None for one that carries none."""
+    return {
+        option.attrs["value"]: option.attrs.get("data-unit")
+        for option in read(page).one("select", name=name).all("option")
+    }
+
+
 def sorted_columns(page: str | Element) -> list[tuple[str, str, str]]:
     """Each heading a list is sorted by (one a table): which way (its
     aria-sort), its link's words as spoken, and where that link goes."""
