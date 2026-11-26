@@ -2159,6 +2159,13 @@ msgid ""
 " new size instead."
 msgstr ""
 
+#. %(unit)s is the item's unit now, such as m or ft; the title names the one it
+#. was recounted into.
+#: src/inventory_tng/templates/catalogue/unit_recounted.html
+#, python-format
+msgid "Its unit has since changed to %(unit)s."
+msgstr ""
+
 #: src/inventory_tng/web/forms.py
 msgid "Its unit is fixed, as a label has been printed for it."
 msgstr ""

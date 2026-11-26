@@ -1,7 +1,12 @@
 {% extends "admin_base.html" %}
 {#- After a guided recount (catalogue/unit_recounts.py): what is left to
-do, in its unit now (Ali, 2026-11-25). -#}
+do, in its unit now, and whether that is still the one recounted into
+(Ali, 2026-11-25, inventory-tng-9yg2). -#}
 {% block main %}
+{% if recounted_into != item.unit %}
+{#- Translators: %(unit)s is the item's unit now, such as m or ft; the title names the one it was recounted into. #}
+<p>{% trans unit=item.unit %}Its unit has since changed to {{ unit }}.{% endtrans %}</p>
+{% endif %}
 {% if places %}
 <p>{% trans item=item.name_shown, unit=item.unit %}The records now hold none of {{ item }} at these places. Count it at each, in {{ unit }}:{% endtrans %}</p>
 <ul>

@@ -163,7 +163,10 @@ def recount(
     if done.add_packages:
         after["packages"] = RETIRED_PACKAGES
     return redirect(
-        UNIT_RECOUNTED.format(item_id=item_id), places=_listed(done.places), **after
+        UNIT_RECOUNTED.format(item_id=item_id),
+        unit=unit,
+        places=_listed(done.places),
+        **after,
     )
 
 
@@ -183,6 +186,7 @@ def recounted(
     signed: AdminSignedIn,
     session: DbSession,
     item_id: int,
+    unit: str = "",
     places: str = "",
     labels: str = "",
     packages: str = "",
@@ -192,10 +196,15 @@ def recounted(
     the labels it revoked, also in its address, by label id: current
     ones, to print again, and retired ones, which can't be until they are
     brought back; and a link to add its packages in the new unit, if its
-    address says the recount retired them (RETIRED_PACKAGES)."""
+    address says the recount retired them (RETIRED_PACKAGES). Its title
+    names the unit recounted into, from its address, and a line says the
+    item's unit has changed since, if it has; a unit not one of the
+    item's lengths is its unit now."""
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
+    if unit not in unit_changes.units_open(found.unit, "moved"):
+        unit = found.unit
     # A retired one, holding nothing now, is counted no more.
     current = [
         each
@@ -209,9 +218,10 @@ def recounted(
         signed,
         "catalogue/unit_recounted.html",
         {
-            "title": recounted_title(found.name_shown, found.unit),
+            "title": recounted_title(found.name_shown, unit),
             "back_link": (item_path, found.name_shown),
             "item": found,
+            "recounted_into": unit,
             "add_packages": packages == RETIRED_PACKAGES,
             "places": sorted(
                 current,

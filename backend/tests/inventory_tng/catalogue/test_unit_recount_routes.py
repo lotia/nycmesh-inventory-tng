@@ -29,6 +29,8 @@ from inventory_tng.stock.paths import COUNTS
 from inventory_tng.web.forms import RULES
 
 from helpers.markup import (
+    Element,
+    address,
     box_values,
     hidden_fields,
     problem,
@@ -694,6 +696,74 @@ def test_a_converted_items_page_after_offers_no_packages_once_stock_moves(
     after = admin_client.get(done.headers["location"])
     assert after.status_code == 200
     assert "Add its packages" not in words_on(after.text)
+
+
+def _recounted_into(page: Element, item: Item, unit: str) -> None:
+    """The page after's title names the item recounted into `unit`."""
+    page.one("h1", f"{item.name_shown} recounted in {unit}")
+
+
+def test_the_page_after_names_the_unit_recounted_into_once_changed_since(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Recounted into ft, then converted to m: reloaded, the page after
+    still says ft, adds that its unit has since changed to m, and asks
+    the count in m, as a count today is (inventory-tng-9yg2)."""
+    spools = _spools(session)
+    cable = spools.cable
+    done = _recount(admin_client, cable.id)
+    assert done.status_code == 303
+    assert address(done.headers["location"])[1]["unit"] == ["ft"]
+    session.expire_all()
+    cable.unit = "m"
+    session.flush()
+    after = read(admin_client.get(done.headers["location"]).text)
+    _recounted_into(after, cable, "ft")
+    after.one("p", "Its unit has since changed to m.")
+    assert "Count it at each, in m:" in words_on(after)
+
+
+def test_the_page_after_adds_nothing_while_the_unit_is_unchanged(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Its unit still the one recounted into: no line says it changed."""
+    spools = _spools(session)
+    done = _recount(admin_client, spools.cable.id)
+    assert address(done.headers["location"])[1]["unit"] == ["ft"]
+    after = read(admin_client.get(done.headers["location"]).text)
+    _recounted_into(after, spools.cable, "ft")
+    assert "since changed" not in words_on(after)
+
+
+def _after(client: TestClient, item_id: int, query: str) -> Element:
+    page = client.get(f"{UNIT_RECOUNTED.format(item_id=item_id)}?{query}")
+    assert page.status_code == 200
+    return read(page.text)
+
+
+def test_an_edited_or_missing_unit_in_the_address_is_the_unit_now(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Another of the item's lengths is taken as recounted into; a unit
+    not one of them (each, for an item in m), or none, is its unit now."""
+    cable = Spools(session).cable
+    _recounted_into(_after(admin_client, cable.id, "unit=ft"), cable, "ft")
+    for query in ("unit=each", "unit=", "places="):
+        after = _after(admin_client, cable.id, query)
+        _recounted_into(after, cable, "m")
+        assert "since changed" not in words_on(after)
+
+
+def test_an_unknown_unit_in_the_address_is_the_unit_now(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Nothing outside the app's units is shown: the item's unit now."""
+    cable = Spools(session).cable
+    _recounted_into(_after(admin_client, cable.id, "unit=ft"), cable, "ft")
+    for unknown in ("furlong", "M", "ft%20", "%3Cb%3E"):
+        after = _after(admin_client, cable.id, f"unit={unknown}")
+        _recounted_into(after, cable, "m")
+        assert "since changed" not in words_on(after)
 
 
 def test_a_converted_items_package_sizes_are_checked(

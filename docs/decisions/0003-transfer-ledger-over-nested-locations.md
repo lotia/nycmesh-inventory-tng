@@ -531,4 +531,6 @@ other unit, and retiring the item for a new one.
   packages, as nothing is counted or retired. The page after takes all
   this from its address, set by the recount, not from the item as it is
   now: reloaded once such an item's stock has moved, it still offers no
-  packages to add (inventory-tng-mu57).
+  packages to add (inventory-tng-mu57). Its title names the unit
+  recounted into, also from its address, and a line says if the item's
+  unit has changed since (Ali, 2026-11-25, inventory-tng-9yg2).
