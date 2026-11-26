@@ -139,40 +139,22 @@ def test_a_save_after_another_since_the_form_was_shown_is_refused(
     assert admin_client.post(path, data=form).status_code == 303
 
 
-# A field of each form, sent wrong.
+# A field of each form, sent wrong: every form in FORMS has one.
 WRONG: dict[str, dict[str, str]] = {
     "item": {"minimum": "-1"},
     "category": {"name": ""},
     "location": {"name": ""},
+    "reading": {"reading": "xx"},
     "volunteer": {"name": ""},
     "device": {"label": "x" * (NAME_MAX + 1)},
     "reason": {"name": "x" * (NAME_MAX + 1)},
     "scan": {"name_check_minutes": "-1"},
     "sign_in": {"session_days": "0"},
     "site": {"time_zone": "Mars/Olympus_Mons"},
-    "reading": {"reading": "xx"},
 }
 
 
-def test_every_form_is_sent_wrong() -> None:
-    """So a form added to FORMS is checked to say it is stale first too."""
-    assert WRONG.keys() == FORMS.keys()
-
-
-@pytest.mark.parametrize("name", WRONG)
-def test_a_current_form_sent_wrong_is_refused_for_its_field(
-    admin_client: TestClient, session: Session, name: str
-) -> None:
-    """Each WRONG really is wrong, so the test below proves the order."""
-    make, _, _ = FORMS[name]
-    path, sends, row, field = make(session)
-    form = sends | WRONG[name] | {field: shown(row)}
-    refused = admin_client.post(path, data=form)
-    assert refused.status_code == 400
-    assert str(RULES[CHANGED]) not in text(refused)
-
-
-@pytest.mark.parametrize("name", WRONG)
+@pytest.mark.parametrize("name", FORMS)
 def test_a_stale_form_says_so_before_its_fields_problems(
     admin_client: TestClient, session: Session, name: str
 ) -> None:
@@ -181,6 +163,10 @@ def test_a_stale_form_says_so_before_its_fields_problems(
     make, column, meanwhile = FORMS[name]
     path, sends, row, field = make(session)
     form = sends | WRONG[name] | {field: shown(row)}
+    # Sent while current, the field is refused: it really is wrong.
+    refused = admin_client.post(path, data=form)
+    assert refused.status_code == 400
+    assert str(RULES[CHANGED]) not in text(refused)
     setattr(row, column, meanwhile)
     session.flush()
     refused = admin_client.post(path, data=form)
