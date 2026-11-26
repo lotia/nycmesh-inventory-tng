@@ -287,8 +287,9 @@ for anything else while keeping what was typed (Bring it back on a count,
 a save refused by another rule) is shown in the units and sizes now
 too, so it says the same beside each box of one changed since
 (inventory-tng-dcqp), a box it could not read too. The item page's
-package forms (inventory-tng-hhlr), and the count and adjustment forms
-(Ali, 2026-11-25, inventory-tng-yxd1), say after those words what is
+package forms (inventory-tng-hhlr), the count and adjustment forms
+(Ali, 2026-11-25, inventory-tng-yxd1), and an open package's count
+confirmed (inventory-tng-fezg), say after those words what is
 wrong with the number in any unit, such as "Use a number above 0.", so
 both are fixed at once, but not what depends on the unit, such as whole
 units, as the number is typed again in the new one. A count form's box
