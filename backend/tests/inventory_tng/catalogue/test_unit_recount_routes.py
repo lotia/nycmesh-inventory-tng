@@ -22,6 +22,7 @@ from inventory_tng.models.catalogue import Item, ItemPackage, VendorOffer
 from inventory_tng.models.labels import Label
 from inventory_tng.models.stock import AdjustmentReason, Movement, OpenPackage
 from inventory_tng.stock import open_packages
+from inventory_tng.stock.balance import balance
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
@@ -46,6 +47,7 @@ from helpers.stock import (
     raise_check,
     received,
     retire,
+    write,
 )
 
 
@@ -284,6 +286,46 @@ def test_a_part_of_a_thousandth_left_by_a_conversion_is_brought_to_zero(
     ).all()
     assert lines == [(Decimal("0.305"), "m"), (Decimal("0.001"), "ft")]
     assert expected(session, place.store.id) == {}
+
+
+def _balance(session: Session, place_id: int, item_id: int) -> Decimal | None:
+    return session.scalar(
+        select(balance.c.quantity).where(
+            balance.c.location_id == place_id, balance.c.item_id == item_id
+        )
+    )
+
+
+def test_a_place_holding_only_a_part_of_a_thousandth_is_not_counted_again(
+    admin_client: TestClient, session: Session
+) -> None:
+    """1 ft received at the store, the cable set to m (as converted), and
+    0.305 m, as 1 ft reads, moved to the van: the store reads 0 m, with
+    -0.0002 m below it, -0.001 ft in ft. Written off in ft, but not
+    listed to count, as it held nothing anyone could see or count (Ali,
+    2026-11-25, inventory-tng-86uq); the van, holding 0.305 m, is."""
+    place = Place(session, cable_unit="ft")
+    cable, store, van = place.cable, place.store, place.van
+    received(session, place, [{"item_id": cable.id, "quantity": "1", "unit": "ft"}])
+    cable.unit = "m"
+    session.flush()
+    write(
+        session, place, lines=[{"item_id": cable.id, "quantity": "0.305", "unit": "m"}]
+    )
+    assert _balance(session, store.id, cable.id) == 0
+    done = _recount(admin_client, cable.id)
+    assert done.status_code == 303
+    session.expire_all()
+    written = counts_written(session)
+    assert [(t.from_location_id, t.to_location_id) for t in written] == [
+        (van.id, None),
+        (None, store.id),
+    ]
+    assert _balance(session, store.id, cable.id) == 0
+    assert _balance(session, van.id, cable.id) == 0
+    page = read(admin_client.get(done.headers["location"]).text)
+    page.one("a", f"Count it at {van.name}", href=f"{COUNTS}/{van.id}?item={cable.id}")
+    assert f"Count it at {store.name}" not in words_on(page)
 
 
 @pytest.mark.parametrize("closed", [True, False])

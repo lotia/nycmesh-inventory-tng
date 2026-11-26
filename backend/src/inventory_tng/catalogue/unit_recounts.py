@@ -355,7 +355,7 @@ def recount(
 
 class Recounted(NamedTuple):
     """What is left to do after a recount: count the item again at the
-    places it brought to zero, by id; print again the labels it revoked,
+    places it brought to zero from what they were shown to hold, by id; print again the labels it revoked,
     by id (queries.revoked_packages names their packages); and add its
     packages in the new unit, as it retired them, unless the item was
     converted before (Planned.converted) and they were given new sizes."""
@@ -403,7 +403,10 @@ def _recounted(
     item.unit = unit
     session.flush()
     # Read in the new unit: a part of a thousandth left by lines converted
-    # before (inventory-tng-8s2c), at any place it has been, all held.
+    # before (inventory-tng-8s2c), at any place it has been, all held. A
+    # place holding only that is not counted again (Ali, 2026-11-25,
+    # inventory-tng-86uq): it held nothing anyone could see or count,
+    # before the recount and after, so the places returned are plan.held's.
     for each in _held(session, item.id):
         sent = uuid.uuid5(key, f"{each.place.id} {unit}")
         _write_off(session, each, sent, admin_id, item.id, reason)

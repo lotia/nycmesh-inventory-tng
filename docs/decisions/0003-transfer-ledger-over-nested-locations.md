@@ -517,7 +517,10 @@ other unit, and retiring the item for a new one.
   retired one's is printed once it is brought back (Ali, 2026-11-25,
   inventory-tng-l26i).
 - The page after links to a count of the item at each place, in the new
-  unit, and to adding its packages in it. For an item converted before
+  unit, and to adding its packages in it. A place holding only a part of
+  a thousandth is not listed, though written off: it held nothing anyone
+  could see or count, before and after (Ali, 2026-11-25,
+  inventory-tng-86uq). Rejected: listing it. For an item converted before
   whose stock never moved, neither page says to count it or add its
   packages, as nothing is counted or retired. The page after takes all
   this from its address, set by the recount, not from the item as it is
