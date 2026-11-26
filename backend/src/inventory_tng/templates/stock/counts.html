@@ -26,33 +26,36 @@
     {#- The unit each item is shown in: an adjustment of one counted in
     another since is asked again (stock/forms.py, UNITS). #}
     <input type="hidden" name="units" value="{{ units }}">
+    {#- A refused box is marked invalid (inventory-tng-h3tw). Its problem
+    (_field_problem.html) sits inside its label, so is in its name; the
+    radios' sits outside theirs, so describes each. #}
     <label>{% trans %}Place{% endtrans %}
-      <select name="location_id" required>
+      <select name="location_id" required{% if problems.get("location_id") %} aria-invalid="true"{% endif %}>
         <option value="">{% trans %}Pick one{% endtrans %}</option>
         {% for place in places %}<option value="{{ place.id }}" {% if values.get('location_id') == place.id | string %}selected{% endif %}>{{ place.name }}{{ retired(place) }}</option>{% endfor %}
       </select>
       {% with name = "location_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}Item{% endtrans %}
-      <select name="item_id" required>
+      <select name="item_id" required{% if problems.get("item_id") %} aria-invalid="true"{% endif %}>
         <option value="">{% trans %}Pick one{% endtrans %}</option>
         {% for item in items %}<option value="{{ item.id }}" data-unit="{{ item.unit }}" {% if values.get('item_id') == item.id | string %}selected{% endif %}>{{ item.name_shown }} ({{ item.unit }})</option>{% endfor %}
       </select>
       {% with name = "item_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}How much{% endtrans %}
-      <span class="with-unit"><input name="amount" inputmode="decimal" value="{{ values.get('amount', '') }}" required>
+      <span class="with-unit"><input name="amount" inputmode="decimal" value="{{ values.get('amount', '') }}" required{% if problems.get("amount") %} aria-invalid="true"{% endif %}>
         <span data-unit-of="item_id"></span></span>
       {% with name = "amount" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <fieldset>
       <legend>{% trans %}It was{% endtrans %}</legend>
-      <label><input type="radio" name="direction" value="found" {% if values.get('direction') == 'found' %}checked{% endif %} required> {% trans %}found there{% endtrans %}</label>
-      <label><input type="radio" name="direction" value="off" {% if values.get('direction') == 'off' %}checked{% endif %}> {% trans %}written off from there{% endtrans %}</label>
+      <label><input type="radio" name="direction" value="found" {% if values.get('direction') == 'found' %}checked{% endif %} required{% if problems.get("direction") %} aria-describedby="direction-problem" aria-invalid="true"{% endif %}> {% trans %}found there{% endtrans %}</label>
+      <label><input type="radio" name="direction" value="off" {% if values.get('direction') == 'off' %}checked{% endif %}{% if problems.get("direction") %} aria-describedby="direction-problem" aria-invalid="true"{% endif %}> {% trans %}written off from there{% endtrans %}</label>
       {% with name = "direction" %}{% include "_field_problem.html" %}{% endwith %}
     </fieldset>
     <label>{% trans %}Why{% endtrans %} <span class="hint">{% trans link=settings_path %}the list is under <a href="{{ link }}">Site settings</a>{% endtrans %}</span>
-      <select name="reason_id" required>
+      <select name="reason_id" required{% if problems.get("reason_id") %} aria-invalid="true"{% endif %}>
         <option value="">{% trans %}Pick one{% endtrans %}</option>
         {% for reason in reasons %}<option value="{{ reason.id }}" {% if values.get('reason_id') == reason.id | string %}selected{% endif %}>{{ reason.name }}</option>{% endfor %}
       </select>

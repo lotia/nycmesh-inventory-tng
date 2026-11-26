@@ -88,6 +88,9 @@ def test_how_many_arrived_is_followed_by_its_unit(
     assert isinstance(label, Element)
     assert label.one("span", class_="with-unit").text == "each"
     assert label.spoken.endswith("each")
+    box = moved.page.one("input", name=moved.arrived())
+    assert "aria-describedby" not in box.attrs
+    assert "aria-invalid" not in box.attrs
 
 
 def test_fewer_arrived_is_lost_where_they_went(
@@ -204,6 +207,10 @@ def test_a_fix_that_is_no_number_is_said_beside_its_box(
     ]
     assert "open" in details.attrs
     assert "whole" in text(page).lower()
+    # Its problem is under its label, so describes it (inventory-tng-h3tw).
+    box = details.one("input", name=moved.arrived())
+    assert box.attrs["aria-describedby"] == f"{moved.arrived()}-problem"
+    assert box.attrs["aria-invalid"] == "true"
     assert expected(session, moved.there.id) == {moved.item: Decimal(2)}
 
 

@@ -1,20 +1,35 @@
 """What each box of a count form is counted in, right after it and to a
 screen reader (templates/stock/count.html; inventory-tng-mdvz): the
-item's unit, or "sealed" for a box counting sealed packages."""
+item's unit, or "sealed" for a box counting sealed packages. Refused, a
+box's problem comes first (inventory-tng-h3tw)."""
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from inventory_tng.stock.count_forms import WHOLE_PACKAGES
 from inventory_tng.stock.paths import COUNTS
 from inventory_tng.web.formatting import PRINTED_LENGTH
+from inventory_tng.web.forms import type_a_number
 
 from helpers.markup import Element, read, units_offered
-from helpers.stock import Place, Spools, received, to_feet
+from helpers.stock import Place, Spools, count_form_at, received, to_feet
 
 
 def page_at(client: TestClient, place_id: int) -> Element:
     return read(client.get(f"{COUNTS}/{place_id}").text)
+
+
+def refused(client: TestClient, place_id: int, typed: dict[str, str]) -> Element:
+    """The count form sent with `typed`, refused, as shown again."""
+    form = count_form_at(client, place_id) | typed
+    response = client.post(f"{COUNTS}/{place_id}", data=form)
+    assert response.status_code == 400
+    return read(response.text)
+
+
+def invalid(page: Element, name: str) -> bool:
+    return page.one("*", name=name).attrs.get("aria-invalid") == "true"
 
 
 def beside(page: Element, name: str) -> tuple[str, list[str]]:
@@ -94,3 +109,53 @@ def test_something_else_here_says_the_unit_of_each_item_offered(
     after = page.one("input", name="extra_quantity").parent
     assert isinstance(after, Element)
     assert after.one("span", data_unit_of="extra_item_id").text == ""
+
+
+def test_a_refused_box_is_described_by_its_problem_then_its_unit(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A screen reader on the box hears why it was refused, then its unit;
+    a box with no problem is as before (inventory-tng-h3tw)."""
+    place = loose_cable_and_radios(session, "m")
+    cable, radios = f"counted_{place.cable.id}", f"counted_{place.item.id}"
+    page = refused(admin_client, place.store.id, {cable: "lots", radios: "3"})
+    assert beside(page, cable) == ("m", [type_a_number(), "m"])
+    assert invalid(page, cable)
+    assert beside(page, radios) == ("each", ["each"])
+    assert not invalid(page, radios)
+
+
+def test_a_refused_sealed_or_open_box_is_described_by_its_problem_first(
+    admin_client: TestClient, session: Session
+) -> None:
+    """A sealed box says only its problem, its label saying "sealed"; an
+    open package's box, its problem, unit and how to read a printed
+    length."""
+    spools = Spools(session)
+    opened = spools.opened()
+    sealed = f"sealed_{spools.cable.id}_{spools.spool.id}"
+    typed = {sealed: "1.5", f"opened_{opened.id}": "lots"}
+    page = refused(admin_client, spools.store.id, typed)
+    assert beside(page, sealed) == ("sealed", [str(WHOLE_PACKAGES)])
+    assert beside(page, f"opened_{opened.id}") == (
+        "m",
+        [type_a_number(), "m", str(PRINTED_LENGTH)],
+    )
+    assert invalid(page, sealed)
+    assert invalid(page, f"opened_{opened.id}")
+
+
+def test_a_refused_box_whose_problem_is_in_its_label_is_marked_invalid(
+    admin_client: TestClient, session: Session
+) -> None:
+    """How much's problem is inside its label, so in its name already: it
+    is not described by it again, only marked invalid."""
+    place = loose_cable_and_radios(session, "m")
+    typed = {"extra_item_id": str(place.cable.id), "extra_quantity": "lots"}
+    page = refused(admin_client, place.store.id, typed)
+    box = page.one("input", name="extra_quantity")
+    label = box.find_parent("label")
+    assert isinstance(label, Element)
+    assert type_a_number() in label.spoken
+    assert "aria-describedby" not in box.attrs
+    assert invalid(page, "extra_quantity")

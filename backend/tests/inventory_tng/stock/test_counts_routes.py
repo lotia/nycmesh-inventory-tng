@@ -165,6 +165,45 @@ def test_an_adjustment_says_what_is_missing(
     assert str(problem) in text(refused)
 
 
+ADJUSTMENT_BOXES = ("location_id", "item_id", "amount", "direction", "reason_id")
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"location_id": ""},
+        {"item_id": "999999"},
+        {"amount": "0"},
+        {"direction": "sideways"},
+        {"reason_id": ""},
+    ],
+    ids=lambda change: next(iter(change)),
+)
+def test_an_adjustment_s_refused_box_is_tied_to_its_problem(
+    admin_client: TestClient, session: Session, change: dict[str, str]
+) -> None:
+    """Only the refused box is marked invalid (inventory-tng-h3tw). A box's
+    problem inside its label is in its name; the radios' is outside
+    theirs, so describes each."""
+    place = stocked(session)
+    form = adjustment_form(session, place.store, place.item) | change
+    page = read(admin_client.post(ADJUSTMENTS, data=form).text)
+    (name,) = change
+    adjust = page.one("section", id="adjust")
+    for box in ADJUSTMENT_BOXES:
+        for each in adjust.all("*", name=box):
+            assert (each.attrs.get("aria-invalid") == "true") == (box == name)
+            described = each.attrs.get("aria-describedby")
+            if box == name == "direction":
+                assert described == "direction-problem"
+            else:
+                assert described is None
+    if name != "direction":
+        label = adjust.one("*", name=name).find_parent("label")
+        assert isinstance(label, Element)
+        assert label.one("span", class_="problem", id=f"{name}-problem")
+
+
 def test_the_database_holds_counts_to_their_rules(session: Session) -> None:
     """A count needs its admin; an adjustment, its reason too."""
     place = Place(session)

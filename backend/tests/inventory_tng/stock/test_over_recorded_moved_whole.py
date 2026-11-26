@@ -102,6 +102,7 @@ def test_its_count_box_says_its_unit_after_it_and_to_a_screen_reader(
     described = box.attrs["aria-describedby"].split()
     assert described == [f"unit-count-{check.id}", f"count-{check.id}-was"]
     assert page.one("*", id=described[0]).text == unit
+    assert "aria-invalid" not in box.attrs
 
 
 def test_its_count_confirmed_as_it_was_writes_nothing(
@@ -207,6 +208,15 @@ def test_a_count_not_a_number_is_asked_again(
         page = response.text
         assert problem in page
         assert box_values(page, "count") == [typed]
+        # Its problem first, then its unit and what it held
+        # (inventory-tng-h3tw).
+        box = read(page).one("input", name="count")
+        assert box.attrs["aria-describedby"].split() == [
+            f"count-{check.id}-problem",
+            f"unit-count-{check.id}",
+            f"count-{check.id}-was",
+        ]
+        assert box.attrs["aria-invalid"] == "true"
         # Edited, what it held shows under it.
         was = read(page).one("p", id=f"count-{check.id}-was")
         assert (was.text, was.classes, "hidden" in was.attrs) == (
