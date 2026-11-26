@@ -348,12 +348,16 @@ def relock(
     (inventory-tng-oxa0). With `current`, Gone unless the row, as locked,
     is current (True) or retired (False); with `seen`, unchanged since
     then."""
-    found = locked_row(session, type(row), inspect(row).identity)
+    ident = inspect(row).identity
+    found = locked_row(session, type(row), ident)
     if found is None:
+        # Its id as the session knows it: read from the row, expired, it
+        # would be loaded again, and is gone.
+        assert ident is not None  # A row the session holds.
         log.info(
             "change refused: deleted meanwhile",
             table=type(row).__tablename__,
-            row_id=getattr(row, "id"),  # noqa: B009
+            row_id=ident[0],
         )
         raise Gone
     assert found is row  # The session's own object, refreshed.

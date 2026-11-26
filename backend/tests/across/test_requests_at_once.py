@@ -1184,6 +1184,29 @@ def test_a_reading_rule_deleted_meanwhile_is_gone_for_the_next_change(
     assert committed.session().get(ReadingRule, rule_id) is None
 
 
+def test_a_reading_rule_deleted_is_gone_though_its_session_expired_it(
+    committed: Committed,
+) -> None:
+    """A rule deleted by another request while this session holds it
+    expired, as a rollback leaves it: still Gone, its id logged as the
+    session knows it, not loaded again from a row that is gone (a server
+    error)."""
+    rule_id = reading_rule(committed)
+    one, two = committed.session(), committed.session()
+    rule = two.get_one(ReadingRule, rule_id)
+    deleting_rule(rule_id)(one)
+    one.commit()
+    two.expire(rule)
+    with capture_logs() as logs, pytest.raises(Gone):
+        db_locking.relock(two, rule)
+    two.rollback()
+    assert [
+        line["row_id"]
+        for line in logs
+        if line["event"] == "change refused: deleted meanwhile"
+    ] == [rule_id]
+
+
 def receiving(item: Item, store: Location, amount: str) -> Write:
     """A receipt of `amount` of the item into the store, as the ledger
     writes every save, count and adjustment."""
