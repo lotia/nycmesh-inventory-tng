@@ -98,12 +98,18 @@ def require_unit_shown(
     enforce(UNIT_CHANGED)
 
 
+# What a package's form shows besides its unit, which no switch of its
+# item's unit changes (follow).
+SHOWN_ON_FORM = ("name", "size", "short_below")
+
+
 def only_unit_changed(session: Session, package: ItemPackage, seen: int) -> bool:
     """Whether each change to `package` since its form showed version
-    `seen` moved its unit, from its history: then a form drawn again can
-    keep what was typed, at its version now, and undo no one's change
-    unseen; a rename or resize since without a unit change cannot
-    (inventory-tng-hnta)."""
+    `seen` moved only its unit, from its history: then a form drawn again
+    can keep what was typed, at its version now, and undo no one's change
+    unseen; a rename or resize since cannot, with its unit or without, as
+    a guided recount gives a size with the unit (unit_recounts._resize;
+    inventory-tng-hnta)."""
     old, new = CatalogueHistory.old_row, CatalogueHistory.new_row
     return not exists_where(
         session,
@@ -112,7 +118,10 @@ def only_unit_changed(session: Session, package: ItemPackage, seen: int) -> bool
         CatalogueHistory.action == "update",
         new["edit_version"].as_integer() > seen,
         old["edit_version"] != new["edit_version"],
-        old["unit"] == new["unit"],
+        or_(
+            old["unit"] == new["unit"],
+            *(old[shown].is_distinct_from(new[shown]) for shown in SHOWN_ON_FORM),
+        ),
     )
 
 

@@ -284,6 +284,28 @@ def test_a_package_renamed_as_well_as_switched_since_is_shown_as_it_is_now(
     assert reel.name == "Spool"
 
 
+def test_a_package_resized_with_its_unit_since_is_shown_as_it_is_now(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """The Reel's size form drawn in m; since, it was given 1000 ft in one
+    change, as a guided recount gives a size with the unit
+    (unit_recounts._resize). Refused as changed since, the page showing
+    1000, not 300 kept to be saved over it unseen (inventory-tng-hnta)."""
+    cable, reel = _cable(session, radios)
+    action = f"{ITEMS}/{cable.id}/packages/{reel.id}"
+    drawn = _drawn(admin_client, cable, action)
+    cable.unit = reel.unit = "ft"
+    reel.size = Decimal(1000)
+    session.flush()
+    refused = admin_client.post(action, data=drawn | {"size": "300"})
+    assert refused.status_code == 409
+    assert "someone else saved this" in text(refused)
+    assert "1000" in box_values(refused.text, "size")
+    assert "300" not in box_values(refused.text, "size")
+    session.refresh(reel)
+    assert reel.size == Decimal(1000)
+
+
 def test_a_package_amount_wrong_only_in_the_unit_left_says_just_its_unit_changed(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
