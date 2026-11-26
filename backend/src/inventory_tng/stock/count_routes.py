@@ -123,6 +123,7 @@ from inventory_tng.stock.count_forms import (
     NONE_GONE,
     PICKED,
     TYPE_IT_HERE,
+    CountForm,
     Figures,
     Gone,
     Listed,
@@ -342,6 +343,29 @@ def _shown_places(
     for place in by_name(session, Location, Location.id.in_(gone)):
         shown.append((place, (place.name,)))
     return shown
+
+
+# Why a count form is refused for its boxes, as logged: a package it
+# counts closed meanwhile, or a box's own problem, such as no number
+# (inventory-tng-0k3a). An item named twice and something else here
+# listed elsewhere are logged on their own.
+CLOSED = "closed_meanwhile"
+BOX_PROBLEM = "box_problem"
+
+
+def _box_refusals(sent: CountForm) -> list[str]:
+    """Why read_count's problems refuse the count, from CLOSED and
+    BOX_PROBLEM, leaving out the boxes of an item named twice and the line
+    something else here should be typed on."""
+    reasons = [CLOSED] if CLOSED_MEANWHILE in sent.problems else []
+    if any(
+        field != CLOSED_MEANWHILE
+        and field not in sent.twice
+        and words is not TYPE_IT_HERE
+        for field, words in sent.problems.items()
+    ):
+        reasons.append(BOX_PROBLEM)
+    return reasons
 
 
 def _listed_words(
@@ -814,6 +838,10 @@ def count(
         alerts.append(listed_alert)
         off_form = None if sent.listed.on_form else sent.listed
     if problems:
+        if reasons := _box_refusals(sent):
+            log.info(
+                "count refused for its boxes", location_id=place.id, reasons=reasons
+            )
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.
         return as_sent(

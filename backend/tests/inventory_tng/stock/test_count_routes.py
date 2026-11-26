@@ -1,8 +1,9 @@
 """A place's count form (stock/count_routes.py)."""
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, MutableMapping
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -154,18 +155,37 @@ def test_a_count_sent_twice_is_written_once(
     assert expected(session, place.store.id) == {place.item.id: Decimal(2)}
 
 
+def boxes_refused(logs: list[MutableMapping[str, Any]]) -> list[list[str]]:
+    """The reasons of each count refused for its boxes, as logged
+    (inventory-tng-0k3a)."""
+    return [
+        each["reasons"]
+        for each in logs
+        if each["event"] == "count refused for its boxes"
+    ]
+
+
 def test_a_count_refuses_what_is_not_a_quantity(
     admin_client: TestClient, session: Session
 ) -> None:
+    """Logged with the place's id and a reason from a fixed list, never
+    what was typed (inventory-tng-0k3a)."""
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
     shown = count_form(admin_client.get(path))
     for typed, problem in (("lots", type_a_number()), ("1.5", WHOLE_UNITS)):
-        refused = admin_client.post(
-            path, data=shown | {f"counted_{place.item.id}": typed}
-        )
+        with capture_logs() as logs:
+            refused = admin_client.post(
+                path, data=shown | {f"counted_{place.item.id}": typed}
+            )
         assert refused.status_code == 400
         assert str(problem) in text(refused)
+        assert {
+            "event": "count refused for its boxes",
+            "location_id": place.store.id,
+            "reasons": [count_routes.BOX_PROBLEM],
+            "log_level": "info",
+        } in logs
     assert counts_written(session) == []
 
 
@@ -225,12 +245,16 @@ def test_a_count_named_twice_and_closed_meanwhile_says_both_alerts(
     form = at | {"key": str(uuid.uuid4()), f"opened_{made.id}": "300"}
     if twice:
         form |= {f"counted_{radio}": "3", f"counted_0{radio}": "2"}
-    refused = admin_client.post(f"{COUNTS}/{store}", data=form)
+    with capture_logs() as logs:
+        refused = admin_client.post(f"{COUNTS}/{store}", data=form)
     assert refused.status_code == 400
     assert (
         alerts_on(refused.text)
         == [str(count_routes.TWICE)] * twice + [str(RULES[CLOSED_MEANWHILE])] * closed
     )
+    # Closed meanwhile is logged as that; named twice has a line of its
+    # own, so its boxes are not logged again (inventory-tng-0k3a).
+    assert boxes_refused(logs) == ([[count_routes.CLOSED]] if closed else [])
     assert counts_written(session) == written
 
 
@@ -259,6 +283,8 @@ def test_something_else_here_listed_on_a_count_of_one_place_is_refused(
         "item_id": cable,
         "log_level": "info",
     } in logs
+    # Its line marked, but logged once, as listed (inventory-tng-0k3a).
+    assert boxes_refused(logs) == []
     page = read(refused.text)
     assert page.one("span", id=f"loose_{cable}-problem").text == str(TYPE_IT_HERE)
     assert (
