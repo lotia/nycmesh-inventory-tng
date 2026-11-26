@@ -177,7 +177,7 @@ def test_the_too_short_box_a_refused_switch_means_is_outlined(
 ) -> None:
     """Only that package's, tied to the words beside the unit; none on
     the page as first shown."""
-    cable, _reel = _packaged(session, radios, **package)
+    cable, reel = _packaged(session, radios, **package)
     add(session, ItemPackage(item_id=cable.id, name="Drum", size=Decimal(500)))
     assert _outlined(admin_client.get(f"{ITEMS}/{cable.id}").text) == []
     form = shown_item_form(cable, unit="each")
@@ -188,7 +188,9 @@ def test_the_too_short_box_a_refused_switch_means_is_outlined(
         return
     [box] = boxes
     assert box["aria-invalid"] == "true"
-    assert box["aria-describedby"] == "unit-problem"
+    # The problem first, then the box's unit (inventory-tng-0mor).
+    unit = f"unit-short_below-{reel.id}"
+    assert box["aria-describedby"] == f"unit-problem {unit}"
     assert box["value"] == str(package["short_below"])
 
 
@@ -353,7 +355,10 @@ def test_a_retired_package_too_short_to_use_below_a_fraction_comes_back_to_set(
     page = read(admin_client.get(done.headers["location"]).text)
     box = page.one("input", name="short_below").attrs
     assert box["value"] == "1.5"
-    assert (box["aria-invalid"], box["aria-describedby"]) == ("true", "short-to-set")
+    assert (box["aria-invalid"], box["aria-describedby"]) == (
+        "true",
+        f"short-to-set unit-short_below-{reel.id}",
+    )
     assert "autofocus" in box
     beside = page.one("span", id="short-to-set").text
     assert beside == "Set it to a whole number from 1 to 304."
@@ -427,7 +432,7 @@ def test_a_retired_package_holding_a_fraction_is_added_again_instead(
     assert form.one("input", name="package_name").attrs["value"] == ""
     holds = form.one("input", name="size").attrs
     assert holds["aria-invalid"] == "true"
-    assert holds["aria-describedby"] == "held-back"
+    assert holds["aria-describedby"] == "held-back unit-size"
     assert "autofocus" in holds
     assert (reel.retired_at, reel.size) == (NOW, Decimal("30.5"))
 

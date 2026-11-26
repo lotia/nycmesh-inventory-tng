@@ -37,6 +37,7 @@ from helpers.markup import (
     problem,
     read,
     table_rows,
+    unit_beside,
     words_on,
 )
 from helpers.rows import add, item_fields
@@ -642,7 +643,7 @@ def test_a_converted_item_is_recounted_by_its_amounts_and_package_sizes(
     assert "retired package" not in said
     fieldset = read(page.text).one("fieldset")
     assert fieldset.one("legend").text == "Reel"
-    assert "Holds in m; was 1000 ft" in words_on(fieldset)
+    assert "Holds was 1000 ft" in words_on(fieldset)
     assert box_values(page.text, f"size_{reel.id}") == ["1000"]
     assert box_values(page.text, f"short_below_{reel.id}") == ["10"]
     assert box_values(page.text, f"size_{spool.id}") == []
@@ -904,6 +905,39 @@ def _retired_box(session: Session) -> tuple[Item, ItemPackage, ItemPackage, Labe
     items.retire_package(session, box, datetime.now(UTC))
     session.flush()
     return cable, reel, box, on_box
+
+
+@pytest.mark.parametrize(("old", "new"), [("ft", "m"), ("m", "ft")])
+def test_each_size_asked_again_says_its_new_unit_after_its_box(
+    admin_client: TestClient, session: Session, old: str, new: str
+) -> None:
+    """A cable converted from `new` to `old`, then given a Reel in `old`,
+    is recounted back into `new`: the Reel's Holds and Too short to use
+    say the new unit after the box, and to a screen reader in its
+    description, not its name; the size it was stays in the hint
+    (decision 0019, Amounts; Ali, 2026-11-26, inventory-tng-0mor). An
+    item counted each is never converted, so never recounted so."""
+    cable = Place(session, cable_unit=new).cable
+    # Labelled, so converting it fixes its unit, as converted_reel's.
+    label = labels.make_for_item(session, cable.id)
+    assert label is not None
+    items.save(session, cable, item_fields(cable, unit=old), seen=None, recorded_in=new)
+    assert labels.revoke(session, label.id, datetime.now(UTC))
+    reel = items.add_package(session, cable, "Reel", Decimal(1000), shown_unit=old)
+    reel.short_below = Decimal(10)
+    session.flush()
+    page = read(_page(admin_client, cable.id, new).text)
+    assert unit_beside(page, page.one("input", name=f"size_{reel.id}")) == (
+        new,
+        [new],
+        f"Holds was 1000 {old}",
+    )
+    short = page.one("input", name=f"short_below_{reel.id}")
+    assert unit_beside(page, short) == (
+        new,
+        [new],
+        "Too short to use below; blank: none",
+    )
 
 
 def test_a_converted_items_retired_package_is_resized_and_stays_retired(

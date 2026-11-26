@@ -2,9 +2,11 @@
  * An amount's box says what it is counted in, right after it and to a
  * screen reader (inventory-tng-mdvz): on the adjustment form, the unit of
  * the item picked, which follows the pick (admin/hints.ts, followUnits);
- * on the count form, the item's unit. What each box says for each unit,
- * and for sealed packages, the backend tests check
- * (test_count_routes_box_units.py).
+ * on the count form, the item's unit. A box whose label wraps it says its
+ * unit after it too, in its description, not its name (inventory-tng-0mor).
+ * What each box says for each unit, and for sealed packages, the backend
+ * tests check (test_count_routes_box_units.py,
+ * test_items_routes_package_units.py).
  */
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
@@ -36,4 +38,20 @@ test("the adjustment and count forms say the unit beside the box", async ({
   await expect(counted).toHaveValue("20");
   await expect(counted).toHaveAccessibleDescription("m");
   await expect(page.locator(".with-unit", { has: counted })).toHaveText("m");
+});
+
+test("the item page's package boxes say the unit in their description", async ({
+  page,
+}) => {
+  await ownCable(page);
+  const adding = page.locator("#add-package");
+  const holds = adding.getByRole("textbox", { name: "Holds" });
+  await expect(holds).toHaveAccessibleName("Holds");
+  await expect(holds).toHaveAccessibleDescription("m");
+  const short = page.getByRole("textbox", { name: /^Too short to use/ });
+  await expect(short).toHaveAccessibleName(
+    "Too short to use below; blank: none",
+  );
+  await expect(short).toHaveAccessibleDescription("m");
+  await expect(page.locator(".with-unit", { has: short })).toHaveText("m");
 });

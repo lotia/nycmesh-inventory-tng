@@ -3269,8 +3269,7 @@ msgid "Reading of %(token)s"
 msgstr ""
 
 #: src/inventory_tng/templates/stock/length_checks.html
-#, python-format
-msgid "Really on it (%(unit)s)"
+msgid "Really on it"
 msgstr ""
 
 #: src/inventory_tng/templates/site_settings/settings.html
@@ -5204,8 +5203,7 @@ msgstr[1] ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 #: src/inventory_tng/templates/catalogue/unit_recount.html
-#, python-format
-msgid "below, in %(unit)s; blank: none"
+msgid "below; blank: none"
 msgstr ""
 
 #: src/inventory_tng/catalogue/units.py
@@ -5286,6 +5284,10 @@ msgstr ""
 msgid "feet"
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/item.html
+msgid "fixed once some has moved or been opened, or while it is labelled"
+msgstr ""
+
 #: src/inventory_tng/templates/places/locations.html
 msgid "for an area only"
 msgstr ""
@@ -5357,24 +5359,12 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/unit_recount.html
 #, python-format
-msgid "in %(new)s; was %(size)s %(old)s"
-msgstr ""
-
-#: src/inventory_tng/templates/catalogue/unit_recount.html
-#, python-format
 msgid "in %(unit)s; blank: none"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/unit_recount.html
 #, python-format
 msgid "in %(unit)s; blank: not said"
-msgstr ""
-
-#: src/inventory_tng/templates/catalogue/item.html
-#, python-format
-msgid ""
-"in %(unit)s; fixed once some has moved or been opened, or while it is "
-"labelled"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
@@ -5726,6 +5716,13 @@ msgstr ""
 
 #: src/inventory_tng/catalogue/units.py
 msgid "volume"
+msgstr ""
+
+#. the package's size before the recount, in its unit as it was, as "was 1000
+#. ft".
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid "was %(size)s %(old)s"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/items.html

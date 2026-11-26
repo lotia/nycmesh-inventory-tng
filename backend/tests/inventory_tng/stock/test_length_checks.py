@@ -28,7 +28,7 @@ from inventory_tng.stock import (
 from inventory_tng.stock.ledger import Entry, Form
 from inventory_tng.web import formatting
 
-from helpers.markup import box_values, forms, links, read, text, words_on
+from helpers.markup import box_values, forms, links, read, text, unit_beside, words_on
 from helpers.query_counts import counting
 from helpers.rows import add, tag
 from helpers.sign_in import new_admin_id
@@ -72,7 +72,26 @@ def test_the_check_page_hints_at_the_printed_length(
     registered_client.post(URL, json=report(spools, length(made, "250")))
     page = admin_client.get(LENGTHS).text
     assert str(formatting.PRINTED_LENGTH) in words_on(page)
-    assert read(page).all("input", aria_describedby=f"hint-{made.id}")
+    described = read(page).one("input", name="left").attrs["aria-describedby"]
+    assert f"hint-{made.id}" in described.split()
+
+
+@pytest.mark.parametrize("unit", ["m", "ft", "each"])
+def test_the_check_page_says_the_unit_after_the_box(
+    admin_client: TestClient, session: Session, unit: str
+) -> None:
+    """'Really on it [box] m': the unit after the box, and described to a
+    screen reader before the printed-length hint, not in the box's name
+    (decision 0019, Amounts; Ali, 2026-11-26, inventory-tng-0mor). An
+    item counted each is checked once below zero, as it has no length to
+    report."""
+    made = Spools(session, cable_unit=unit).opened()
+    made.below_zero_at = datetime.now(UTC)
+    session.flush()
+    page = admin_client.get(LENGTHS).text
+    box = read(page).one("input", name="left")
+    hint = [str(formatting.PRINTED_LENGTH)] if unit != "each" else []
+    assert unit_beside(page, box) == (unit, [unit, *hint], "Really on it")
 
 
 def test_the_check_page_writes_lengths_ungrouped_in_its_separator(

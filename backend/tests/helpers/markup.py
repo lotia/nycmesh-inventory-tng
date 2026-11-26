@@ -215,6 +215,20 @@ def problem(page: str | Element, field: str) -> str:
     return read(page).one("span", class_="problem", id=f"{field}-problem").text
 
 
+def unit_beside(page: str | Element, box: Element) -> tuple[str, list[str], str]:
+    """What an amount's box says beside it (decision 0019, Amounts): the
+    words right after it, in its .with-unit wrapper; the words of each
+    element describing it (aria-describedby), in order; and the spoken
+    words of the label around it, which name it."""
+    after = box.parent
+    assert isinstance(after, Element)
+    assert "with-unit" in after.classes
+    ids = box.attrs.get("aria-describedby", "").split()
+    label = box.find_parent("label")
+    assert isinstance(label, Element)
+    return after.text, [read(page).one("*", id=each).text for each in ids], label.spoken
+
+
 def alerts_on(page: str | Element) -> list[str]:
     """The words of each alert paragraph on the page, in order."""
     return [each.text for each in read(page).all("p", role="alert")]
