@@ -4,7 +4,7 @@
  */
 import { expect, type Locator } from "@playwright/test";
 import { test } from "./csp-violations";
-import { unique } from "./own-rows";
+import { ownPlace } from "./own-rows";
 import { prepared } from "./prepared";
 import { printFromHere, printLabels } from "./print-labels";
 
@@ -48,23 +48,12 @@ test("twelve fit a page of each paper", async ({ page, browserName }) => {
 test("a long name of the place it is part of never hides a place's own", async ({
   page,
 }) => {
-  const store = unique(
+  const store = await ownPlace(
+    page,
     "Store with a name long enough to fill a label ".repeat(3),
+    "Store",
   );
-  await page.goto("/admin/locations");
-  await page.getByLabel(/^Name/).fill(store);
-  await page.getByLabel(/^What it is/).selectOption({ label: "Store" });
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  // Its page, before leaving: going to another cancels the add if it is
-  // still being sent, and then no place is part of it.
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(store);
-  const area = unique("Shelf");
-  await page.goto("/admin/locations");
-  await page.getByLabel(/^Name/).fill(area);
-  await page.getByLabel(/^What it is/).selectOption({ label: "Area" });
-  await page.getByLabel(/^Part of/).selectOption({ label: store });
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(area);
+  const area = await ownPlace(page, "Shelf", "Area", store);
   await printFromHere(page, 1);
   // As wide as US Letter prints, less its margins: at a phone's width a
   // label is a third as wide as on paper, too narrow for some unique names

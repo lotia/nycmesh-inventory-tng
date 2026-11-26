@@ -34,11 +34,39 @@ async function named(page: Page, path: string, what: string): Promise<string> {
   return name;
 }
 
+/**
+ * Adds the row filled in as `name`, and waits for its page, headed by it:
+ * going to another page first cancels the add if it is still being sent.
+ */
+async function added(page: Page, name: string): Promise<void> {
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
+}
+
 /** A new volunteer, whose page is left open. Their name. */
 export async function ownVolunteer(page: Page): Promise<string> {
   const name = await named(page, "/admin/volunteers", "Volunteer");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
+  await added(page, name);
+  return name;
+}
+
+/**
+ * A new place of the kind labelled `kind`, named `what` and something
+ * unique, part of the place named `partOf` if given, whose page is left
+ * open. Its name.
+ */
+export async function ownPlace(
+  page: Page,
+  what: string,
+  kind: string,
+  partOf?: string,
+): Promise<string> {
+  const name = await named(page, "/admin/locations", what);
+  await page.getByLabel(/^What it is/).selectOption({ label: kind });
+  if (partOf !== undefined) {
+    await page.getByLabel(/^Part of/).selectOption({ label: partOf });
+  }
+  await added(page, name);
   return name;
 }
 
