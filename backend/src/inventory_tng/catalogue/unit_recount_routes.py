@@ -38,6 +38,12 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
 
+# The page after's address says the recount retired the item's packages
+# in the old unit, so offers to add them in the new one; without it, as
+# after an item converted before is recounted, it offers nothing, however
+# the item's stock has moved since.
+RETIRED_PACKAGES = "retired"
+
 
 def recount_title(item: str, unit: str) -> str:
     return gettext("Recount %(item)s in %(unit)s", item=item, unit=unit)
@@ -155,9 +161,11 @@ def recount(
         )
     assert done is not None  # Refused, or done.
     session.commit()
-    revoked = {"labels": _listed(done.revoked)} if done.revoked else {}
+    after = {"labels": _listed(done.revoked)} if done.revoked else {}
+    if not done.converted:
+        after["packages"] = RETIRED_PACKAGES
     return redirect(
-        UNIT_RECOUNTED.format(item_id=item_id), places=_listed(done.places), **revoked
+        UNIT_RECOUNTED.format(item_id=item_id), places=_listed(done.places), **after
     )
 
 
@@ -179,12 +187,14 @@ def recounted(
     item_id: int,
     places: str = "",
     labels: str = "",
+    packages: str = "",
 ) -> Response:
     """The page after a recount: the places it brought to zero, in its
     address, each linked to its count of the item; and the packages of
     the labels it revoked, also in its address, by label id: current
     ones, to print again, and retired ones, which can't be until they are
-    brought back."""
+    brought back; and, if its address says it retired the item's packages
+    (RETIRED_PACKAGES), a link to add them in the new unit."""
     found = session.get(Item, item_id)
     if found is None:
         return not_found()
@@ -204,8 +214,7 @@ def recounted(
             "title": recounted_title(found.name_shown, found.unit),
             "back_link": (item_path, found.name_shown),
             "item": found,
-            # Its packages kept, given new sizes: none to add (Planned.converted).
-            "converted": unit_changes.unit_fixed(session, found) == "converted",
+            "add_packages": packages == RETIRED_PACKAGES,
             "places": sorted(
                 current,
                 key=lambda each: (each.name.lower(), each.id),

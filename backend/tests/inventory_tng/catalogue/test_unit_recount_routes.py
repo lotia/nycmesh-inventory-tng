@@ -216,6 +216,7 @@ def test_recount_brings_each_place_to_zero_and_switches_the_unit(
     assert cable.unit_recounted_after == written[-1].id
     # A spool in ft takes the old one's name.
     items.add_package(session, cable, "Spool", Decimal(1000), shown_unit="ft")
+    # Reloaded once its packages in ft are added, it offers them still.
     after = admin_client.get(done.headers["location"])
     assert after.status_code == 200
     page = read(after.text)
@@ -624,6 +625,26 @@ def test_a_converted_item_with_no_labels_revokes_none(
     assert "labels=" not in done.headers["location"]
     after = admin_client.get(done.headers["location"])
     assert "revoked" not in words_on(after.text)
+
+
+def test_a_converted_items_page_after_offers_no_packages_once_stock_moves(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Reloaded once stock of it is received, the page after still says
+    what the recount did: its packages given new sizes, none to add."""
+    place, _, reel = converted_reel(session)
+    page = _page(admin_client, place.cable.id, "m")
+    done = admin_client.post(
+        unit_recount(place.cable.id, "m"),
+        data=_sent(page, **{f"size_{reel.id}": "300"}),
+    )
+    assert done.status_code == 303
+    received(
+        session, place, [{"item_id": place.cable.id, "quantity": "1", "unit": "m"}]
+    )
+    after = admin_client.get(done.headers["location"])
+    assert after.status_code == 200
+    assert "Add its packages" not in words_on(after.text)
 
 
 def test_a_converted_items_package_sizes_are_checked(

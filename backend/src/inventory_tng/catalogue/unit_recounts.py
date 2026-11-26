@@ -355,11 +355,14 @@ def recount(
 
 class Recounted(NamedTuple):
     """What is left to do after a recount: count the item again at the
-    places it brought to zero, by id, and print again the labels it
-    revoked, by id (queries.revoked_packages names their packages)."""
+    places it brought to zero, by id; print again the labels it revoked,
+    by id (queries.revoked_packages names their packages); and, unless
+    it gave the item's packages new sizes (`converted`, as planned),
+    add its packages in the new unit."""
 
     places: list[int]
     revoked: list[int]
+    converted: bool
 
 
 def _places_of(session: Session, item_id: int) -> set[int]:
@@ -440,7 +443,7 @@ def _recounted(
         label_ids=plan.revoking,
         vendor_offer_ids=[each.offer.id for each in plan.offers],
     )
-    return Recounted(places, plan.revoking)
+    return Recounted(places, plan.revoking, plan.converted)
 
 
 def _refuse_unless_as_seen(

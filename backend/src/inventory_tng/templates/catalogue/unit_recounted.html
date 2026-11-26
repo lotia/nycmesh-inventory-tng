@@ -10,7 +10,7 @@ do, in its unit now (Ali, 2026-11-25). -#}
 {% else %}
 <p>{% trans item=item.name_shown %}The records held none of {{ item }} at any place: nothing to count.{% endtrans %}</p>
 {% endif %}
-{% if not converted %}<p><a href="{{ item_path }}#add-package">{% trans unit=item.unit %}Add its packages in {{ unit }}{% endtrans %}</a></p>{% endif %}
+{% if add_packages %}<p><a href="{{ item_path }}#add-package">{% trans unit=item.unit %}Add its packages in {{ unit }}{% endtrans %}</a></p>{% endif %}
 {#- The packages whose labels it revoked, by name (Ali, 2026-11-25):
 those it gave a new size (catalogue/unit_recounts.py); a retired one's
 is printed only once it is brought back. #}

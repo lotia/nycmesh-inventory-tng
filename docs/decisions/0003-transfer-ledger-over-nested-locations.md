@@ -515,4 +515,6 @@ other unit, and retiring the item for a new one.
 - The page after links to a count of the item at each place, in the new
   unit, and to adding its packages in it. For an item converted before
   whose stock never moved, neither page says to count it or add its
-  packages, as nothing is counted or retired.
+  packages, as nothing is counted or retired. The page after takes all
+  this from its address, as the recount left the item, so reloaded once
+  stock has moved it still offers no packages to add (inventory-tng-mu57).

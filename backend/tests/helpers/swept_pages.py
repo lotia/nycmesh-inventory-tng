@@ -390,7 +390,7 @@ PAGES: dict[str, Page] = {
         worded={
             "after a guided recount": lambda w: (
                 f"/admin/items/{w.spools.cable.id}/unit-recounted"
-                f"?places={w.spools.store.id}&labels=2"
+                f"?places={w.spools.store.id}&labels=2&packages=retired"
             ),
         },
     ),
