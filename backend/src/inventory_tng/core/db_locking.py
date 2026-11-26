@@ -343,10 +343,19 @@ def relock(
     seen: Seen = None,
 ) -> None:
     """locked_row, for a row the session holds: the catalogue lock, then
-    the row, read again as locked into the same object. With `current`,
-    Gone unless the row, as locked, is current (True) or retired (False);
-    with `seen`, unchanged since then."""
+    the row, read again as locked into the same object. Gone if another
+    request deleted it meanwhile, as one may a reading rule
+    (inventory-tng-oxa0). With `current`, Gone unless the row, as locked,
+    is current (True) or retired (False); with `seen`, unchanged since
+    then."""
     found = locked_row(session, type(row), inspect(row).identity)
+    if found is None:
+        log.info(
+            "change refused: deleted meanwhile",
+            table=type(row).__tablename__,
+            row_id=getattr(row, "id"),  # noqa: B009
+        )
+        raise Gone
     assert found is row  # The session's own object, refreshed.
     retirable: Any = row
     if current is not None and (retirable.retired_at is None) != current:

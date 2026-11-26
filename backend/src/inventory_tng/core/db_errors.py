@@ -49,8 +49,8 @@ class RuleBroken(Exception):
 
 class Gone(Exception):
     """The row a change is for is no longer as the page found it, such as
-    retired meanwhile by another request: there is nothing here to change,
-    and a page answers not found (pages.ErrorPages)."""
+    retired or deleted meanwhile by another request: there is nothing here
+    to change, and a page answers not found (pages.ErrorPages)."""
 
 
 def enforce(broken: str | None, *, when: bool = True) -> None:

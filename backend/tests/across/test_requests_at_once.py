@@ -51,7 +51,7 @@ from inventory_tng.catalogue import (
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.core import db_locking
 from inventory_tng.core.db_base import Base
-from inventory_tng.core.db_errors import RuleBroken
+from inventory_tng.core.db_errors import Gone, RuleBroken
 from inventory_tng.core.db_locking import locked, locked_row
 from inventory_tng.core.db_sessions import (
     DbSession,
@@ -65,7 +65,7 @@ from inventory_tng.devices import devices, devices_routes
 from inventory_tng.devices.paths import DEVICES
 from inventory_tng.labels import labels
 from inventory_tng.models.admins import Admin, AdminPassword, AdminSession
-from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.catalogue import Category, Item, ItemPackage, ReadingRule
 from inventory_tng.models.core import SentForm
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
@@ -885,9 +885,11 @@ NOW = datetime.now(UTC)
 Write = Callable[[Session], object]
 
 
-def at_once(committed: Committed, first: Write, second: Write) -> str | None:
-    """The first written, and committed while the second waits: the rule
-    the second was refused by, if any."""
+def second_failed(
+    committed: Committed, first: Write, second: Write
+) -> BaseException | None:
+    """The first written, and committed while the second waits: what the
+    second raised, if anything."""
     one, two = committed.session(), committed.session()
     first(one)
     one.flush()
@@ -900,6 +902,12 @@ def at_once(committed: Committed, first: Write, second: Write) -> str | None:
     one.commit()
     error = worker.finished().error
     two.rollback()
+    return error
+
+
+def at_once(committed: Committed, first: Write, second: Write) -> str | None:
+    """second_failed: the rule the second was refused by, if any."""
+    error = second_failed(committed, first, second)
     if error is None:
         return None
     assert isinstance(error, RuleBroken), error
@@ -1145,6 +1153,40 @@ def test_a_name_saved_as_a_rule_changes_never_reads_as_another(
     else:
         assert isinstance(error, IntegrityError), error
         assert "uq_item_unit_key" in str(error.orig)
+
+
+def reading_rule(committed: Committed) -> int:
+    """A reading rule, committed, by a token no other test uses."""
+    rule = ReadingRule(token=tag(), reading=None)
+    made(committed, rule)
+    return rule.id
+
+
+def deleting_rule(rule_id: int) -> Write:
+    return doing(
+        ReadingRule, rule_id, lambda s, r: reading_rules.delete(s, r, seen=None)
+    )
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("second", ["save", "delete"])
+def test_a_reading_rule_deleted_meanwhile_is_gone_for_the_next_change(
+    committed: Committed, admins: Admins, second: str
+) -> None:
+    """A rule deleted while another administrator saves or deletes it:
+    the second waits for the catalogue lock, then finds no rule, and is
+    answered not found (Gone), not a server error (inventory-tng-oxa0)."""
+    ada, _, _ = admins
+    rule_id = reading_rule(committed)
+    saving = doing(
+        ReadingRule,
+        rule_id,
+        lambda s, r: reading_rules.change(s, r, units.Rule("Gbit/s"), ada, seen=None),
+    )
+    then = saving if second == "save" else deleting_rule(rule_id)
+    error = second_failed(committed, deleting_rule(rule_id), then)
+    assert isinstance(error, Gone), error
+    assert committed.session().get(ReadingRule, rule_id) is None
 
 
 def receiving(item: Item, store: Location, amount: str) -> Write:
