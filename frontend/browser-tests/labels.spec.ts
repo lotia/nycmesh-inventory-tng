@@ -55,6 +55,9 @@ test("a long name of the place it is part of never hides a place's own", async (
   await page.getByLabel(/^Name/).fill(store);
   await page.getByLabel(/^What it is/).selectOption({ label: "Store" });
   await page.getByRole("button", { name: "Add", exact: true }).click();
+  // Its page, before leaving: going to another cancels the add if it is
+  // still being sent, and then no place is part of it.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(store);
   const area = unique("Shelf");
   await page.goto("/admin/locations");
   await page.getByLabel(/^Name/).fill(area);
