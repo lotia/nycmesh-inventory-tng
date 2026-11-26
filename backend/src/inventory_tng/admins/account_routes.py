@@ -186,8 +186,10 @@ def rename_authenticator(
 ) -> Response:
     name = authenticator_name.strip()
     field = f"authenticator_{authenticator_id}"
+    # Refused, its box shows what was typed, beside its problem.
+    values = {field: name}
     if problem := accounts.authenticator_name_problem(name):
-        return _refused(request, session, signed, field, problem)
+        return _refused(request, session, signed, field, problem, values)
     found: list[bool] = []
     admin_id = signed.admin.id
 
@@ -197,7 +199,7 @@ def rename_authenticator(
         )
 
     if not unique(session, rename):
-        return _refused(request, session, signed, field, NAME_TAKEN)
+        return _refused(request, session, signed, field, NAME_TAKEN, values)
     if not found[0]:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
     return _done(signed, session, "renamed", section="authenticators")

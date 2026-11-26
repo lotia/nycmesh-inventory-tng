@@ -197,11 +197,10 @@ def change_reason(
         _, broken = refusal(session, change, "unique")
         problem = broken and forms.REASON_TAKEN
     if problem is not None:
+        # Its box shows what was typed, beside its problem.
+        field = f"reason_{reason_id}"
         return _page(
-            request,
-            session,
-            signed,
-            problems={f"reason_{reason_id}": problem},
+            request, session, signed, problems={field: problem}, values={field: name}
         )
     session.commit()
     notice = {"retire": "reason_retired", "restore": "restored"}

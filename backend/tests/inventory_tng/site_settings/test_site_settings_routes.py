@@ -183,6 +183,37 @@ def test_a_refused_reason_rename_is_tied_to_its_problem(
     assert described_and_invalid(box(other)) == (None, None)
 
 
+def test_a_refused_reason_rename_keeps_the_name_typed(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Refused for its own problem, its box holds what was typed, and
+    another reason's its stored name; refused as changed since shown, the
+    page is shown as it is now, its box holding the name stored
+    (inventory-tng-jlsi, inventory-tng-ryjv)."""
+    given = add(session, AdjustmentReason(name="Given away"))
+    other = add(session, AdjustmentReason(name="Lent out"))
+    add(session, AdjustmentReason(name="Donated"))
+    form = {"name": "Donated", "version": shown(given), "action": "rename"}
+    path = f"{SETTINGS}/reasons/{given.id}"
+
+    def names(page: str) -> list[list[str | None]]:
+        return [
+            box_values(
+                read(page).one("form", action=f"{SETTINGS}/reasons/{each}"), "name"
+            )
+            for each in (given.id, other.id)
+        ]
+
+    refused = admin_client.post(path, data=form)
+    assert refused.status_code == 400
+    assert names(refused.text) == [["Donated"], ["Lent out"]]
+    given.name = "Gifted"
+    session.flush()
+    stale = admin_client.post(path, data=form | {"name": "Dropped"})
+    assert stale.status_code == 409
+    assert names(stale.text) == [["Gifted"], ["Lent out"]]
+
+
 def test_sign_in_settings_ask_for_a_fresh_code(
     admin_client: TestClient, session: Session
 ) -> None:

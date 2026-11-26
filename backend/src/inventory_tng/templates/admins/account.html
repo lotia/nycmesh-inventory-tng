@@ -51,8 +51,9 @@
     <tr>
       <td>
         <form method="post" action="{{ paths.account }}/authenticators/{{ authenticator.id }}/name" class="actions">
-          {#- Its problem follows the form, so the box points at it. #}
-          <input name="authenticator_name" inputmode="text" value="{{ authenticator.name }}" maxlength="{{ limits.authenticator_name_max }}" aria-label="{% trans %}Name{% endtrans %}" required{{ described_by("authenticator_" ~ authenticator.id) }}>
+          {#- Its problem follows the form, so the box points at it;
+          refused, it shows what was typed. #}
+          <input name="authenticator_name" inputmode="text" value="{{ values.get('authenticator_' ~ authenticator.id, authenticator.name) }}" maxlength="{{ limits.authenticator_name_max }}" aria-label="{% trans %}Name{% endtrans %}" required{{ described_by("authenticator_" ~ authenticator.id) }}>
           <button>{% trans %}Rename{% endtrans %}<span class="sr-only"> {{ authenticator.name }}</span></button>
         </form>
         {% with name = "authenticator_" ~ authenticator.id %}{% include "_field_problem.html" %}{% endwith %}

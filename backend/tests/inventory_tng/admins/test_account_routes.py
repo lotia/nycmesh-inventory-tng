@@ -226,6 +226,37 @@ def test_a_refused_authenticator_rename_is_tied_to_its_problem(
     assert said == str(accounts.authenticator_name_problem(""))
 
 
+def test_a_refused_authenticator_rename_keeps_the_name_typed(
+    client: TestClient,
+    session: Session,
+    ada: tuple[Admin, str],
+) -> None:
+    """Refused, its box holds what was typed, and the other's its stored
+    name (inventory-tng-jlsi). Spare is committed, so the route's rollback
+    of the refused rename keeps it."""
+    admin, _ = ada
+    (first,) = accounts.authenticators(session, admin.id)
+    spare = accounts.add_authenticator(
+        session, TOTP_KEYS, admin.id, "Spare", authenticator_totp.new_totp_key(), 0
+    )
+    session.commit()
+    path = f"{ACCOUNT}/authenticators/{first.id}/name"
+
+    def names(page: str) -> list[list[str | None]]:
+        return [
+            box_values(
+                read(page).one("form", action=f"{ACCOUNT}/authenticators/{each}/name"),
+                "authenticator_name",
+            )
+            for each in (first.id, spare.id)
+        ]
+
+    for typed in ("Spare", "x" * (accounts.AUTHENTICATOR_NAME_MAX + 1)):
+        refused = client.post(path, data={"authenticator_name": typed})
+        assert refused.status_code == 400
+        assert names(refused.text) == [[typed], ["Spare"]]
+
+
 def test_recovery_codes_need_an_authenticator(
     client: TestClient, session: Session
 ) -> None:

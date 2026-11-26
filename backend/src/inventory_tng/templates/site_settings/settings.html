@@ -69,8 +69,9 @@
       <td>
         <form method="post" action="{{ here }}/reasons/{{ reason.id }}" class="actions">
           <input type="hidden" name="version" value="{{ reason.edit_version }}">
-          {#- Its problem follows the form, so the box points at it. #}
-          <input name="name" inputmode="text" value="{{ reason.name }}" maxlength="{{ name_max }}" aria-label="{% trans %}Reason{% endtrans %}" required{{ described_by(field) }}>
+          {#- Its problem follows the form, so the box points at it;
+          refused, it shows what was typed. #}
+          <input name="name" inputmode="text" value="{{ values.get(field, reason.name) }}" maxlength="{{ name_max }}" aria-label="{% trans %}Reason{% endtrans %}" required{{ described_by(field) }}>
           {% if reason.retired_at %}<span class="tag">{% trans %}Retired{% endtrans %}</span>{% endif %}
           <button name="action" value="rename">{% trans %}Rename{% endtrans %}<span class="sr-only"> {{ reason.name }}</span></button>
           {% if reason.retired_at %}
