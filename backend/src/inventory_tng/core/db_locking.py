@@ -354,17 +354,13 @@ def relock(
     unchanged(row, seen)
 
 
-def stale_since(
-    session: Session, row: Base, seen: Seen, *, current: bool | None = None
-) -> bool:
+def stale_since(session: Session, row: Base, seen: Seen) -> bool:
     """relock, for a form checked before its fields: whether the row
     changed since version `seen`, so a stale form says so before what is
-    wrong with what was typed (inventory-tng-hnta). Not stale, the locks
+    wrong with what was typed (inventory-tng-ryjv). Not stale, the locks
     are kept for the save, whose own check then passes."""
     _, broken = refusal(
-        session,
-        lambda: relock(session, row, current=current, seen=seen),
-        "changed_since_shown",
+        session, lambda: relock(session, row, seen=seen), "changed_since_shown"
     )
     return broken is not None
 
@@ -372,8 +368,9 @@ def stale_since(
 def stale_as_read(row: Base, seen: Seen) -> bool:
     """stale_since, taking no lock: for a row already locked, one whose
     save locks other rows before it (locked_row's order), so it may not be
-    locked first, as an item's save locks its open packages' places first
-    and a volunteer's their custody location, or one not locked as a
+    locked first, as an item's save locks its open packages' places first,
+    a volunteer's their custody location and a package's the items its
+    answers read again (items.reread), or one not locked as a
     catalogue row, as a device is. The row as this request read it:
     changed then, it stays changed, as versions only grow; read unchanged,
     the save checks it again under its lock, so a change in between is

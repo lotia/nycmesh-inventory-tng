@@ -35,7 +35,7 @@ from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS, unit_reco
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
 from inventory_tng.catalogue.unit_conversion import convertible
 from inventory_tng.core.db_errors import refusal, refusal_naming_index
-from inventory_tng.core.db_locking import stale_as_read, stale_since
+from inventory_tng.core.db_locking import stale_as_read
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
@@ -1083,8 +1083,13 @@ def save_package(
     seen = form_version(package_version)
     # Changed since it was shown: said before what is wrong with what was
     # typed, so the admin learns it once (inventory-tng-hnta). Not found
-    # if retired, as the save would be; checked again as it saves.
-    if stale_since(session, package, seen, current=True):
+    # if retired, as the save would be; both checked again as it saves.
+    # Not locked: the save's answers read names again first, locking their
+    # items before this package (_deciding, items.reread), as a stock save
+    # holds them (stock/ledger.py).
+    if package.retired_at is not None:
+        return not_found()
+    if stale_as_read(package, seen):
         if form.get(UNIT_SHOWN, package.unit) == package.unit or (
             not unit_changes.only_unit_changed(session, package, seen)
         ):
@@ -1092,7 +1097,7 @@ def save_package(
         # Only its item's unit switched, which moves its packages' versions
         # (inventory-tng-74f3): asked again in the new unit, as the other
         # package forms ask, keeping what was typed, at the version as
-        # locked, which only_unit_changed's history covers; a change after
+        # read, which only_unit_changed's history covers; a change after
         # it is refused as the form is sent again.
         _, problems = read()
         _asked_in_unit_now(

@@ -3,6 +3,7 @@ resizing them until they move, retiring and bringing them back, and
 whether opened ones are followed (docs/decisions/0020, Amendment)."""
 
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 
 import pytest
@@ -11,14 +12,16 @@ from httpx2 import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from inventory_tng.catalogue import items, queries
+from inventory_tng.catalogue import items, queries, reading_rules, units
 from inventory_tng.catalogue.forms import PACKAGE_TAKEN, SHORTER_THAN_WHOLE
 from inventory_tng.catalogue.items_routes import PACKAGE_RETIRED
 from inventory_tng.catalogue.paths import ITEMS
+from inventory_tng.core import db_locking
+from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import RuleBroken, attempt
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
-from inventory_tng.models.catalogue import Category, Item, ItemPackage
+from inventory_tng.models.catalogue import Category, Item, ItemPackage, ReadingRule
 from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
 from inventory_tng.web.forms import ABOVE_ZERO, RULES
@@ -135,6 +138,45 @@ def test_a_package_changed_since_says_so_before_what_is_wrong_with_its_size(
     assert problem(wrong.text, "size") == str(ABOVE_ZERO)
     assert "someone else saved this" not in text(wrong)
     assert box.name == "Carton"
+
+
+def test_a_package_saved_with_answers_locks_it_only_after_reading_again(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The answers' reading rules lock the items they read again
+    (items.reread), which a stock save holds before its packages: so the
+    package is not locked before them, or the two could deadlock."""
+    taken: list[str] = []
+    get_locked, decide = db_locking.get_locked, reading_rules.decide
+
+    def locking(session: Session, model: type[Base], ident: object) -> object:
+        if model is ItemPackage:
+            taken.append("package")
+        return get_locked(session, model, ident)
+
+    def deciding(
+        session: Session, chosen: Mapping[str, units.Rule], admin_id: int | None
+    ) -> list[ReadingRule]:
+        taken.append("rules")
+        return decide(session, chosen, admin_id)
+
+    monkeypatch.setattr(db_locking, "get_locked", locking)
+    monkeypatch.setattr(reading_rules, "decide", deciding)
+    item = new_item(session, radios)
+    box = add(session, ItemPackage(item_id=item.id, name="Box", size=Decimal(4)))
+    form = {
+        "package_name": "Box 10g",
+        "unit:g": "Gbit/s",
+        "size": "4",
+        "unit_shown": item.unit,
+        "package_version": shown(box),
+    }
+    saved = admin_client.post(f"{ITEMS}/{item.id}/packages/{box.id}", data=form)
+    assert saved.status_code == 303
+    assert taken == ["rules", "package"]
 
 
 def test_a_packages_labels_fix_its_size_until_revoked(
