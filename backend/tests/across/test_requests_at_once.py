@@ -1392,6 +1392,39 @@ def test_a_check_raised_while_a_unit_is_recounted(
     assert len(reader.scalars(select(OverRecorded)).all()) == raised
 
 
+@pytest.mark.concurrency
+def test_a_package_renamed_after_a_recount_read_its_plan_is_seen(
+    own_committed: Committed,
+) -> None:
+    """The recount's route reads its plan without locks first, so a stale
+    form says so before its amounts' problems (inventory-tng-0w7o). A
+    package renamed and committed after that read, before the recount
+    takes its locks, is still seen as changed: under them the plan reads
+    each package again, not as the session first loaded it. Never retired
+    and renamed over the rename, unseen."""
+    place, _, admin_id = _shown_for_recount(own_committed)
+    setup = own_committed.session()
+    cable = setup.get_one(Item, place.cable.id)
+    reel = items.add_package(setup, cable, "Reel", Decimal(100), shown_unit="m")
+    setup.commit()
+    seen = unit_recounts.planned(setup, cable).seen
+    two = own_committed.session()
+    found = two.get_one(Item, place.cable.id)
+    # Held, as the route holds its plan while it recounts.
+    read_first = unit_recounts.planned(two, found)
+    assert not unit_recounts.stale_as_read(found.id, read_first, seen)
+    one = own_committed.session()
+    package = one.get_one(ItemPackage, reel.id)
+    items.save_package(one, package, "Drum", Decimal(100), seen=None)
+    one.commit()
+    with pytest.raises(RuleBroken) as refused:
+        recount(two, found, "ft", seen=seen, admin_id=admin_id)
+    assert refused.value.rule == "changed_since_shown"
+    del read_first
+    two.rollback()
+    assert own_committed.session().get_one(ItemPackage, reel.id).name == "Drum"
+
+
 def _shown_converted(committed: Committed) -> tuple[Place, int, Write]:
     """A cable converted to ft, no stock moved, its Reel in ft
     (converted_reel), all committed; its Reel's id, and its recount into

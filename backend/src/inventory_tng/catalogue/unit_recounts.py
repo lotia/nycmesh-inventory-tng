@@ -187,11 +187,16 @@ def planned(session: Session, item: Item) -> Planned:
             .order_by(OpenPackage.id)
         )
     )
+    # Its packages read again as they are now, not as the session may hold
+    # them from the route's read before the locks (stale_as_read), so one
+    # renamed or resized in between is changed since (inventory-tng-0w7o;
+    # db_locking, on the identity map).
     every = list(
         session.scalars(
             select(ItemPackage)
             .where(ItemPackage.item_id == item.id)
             .order_by(ItemPackage.id)
+            .execution_options(populate_existing=True)
         )
     )
     # Converted before, no stock moved: asked again, not retired.
