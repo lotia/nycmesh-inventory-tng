@@ -3,7 +3,8 @@ length set, typed in the unit the form showed: an item switched to another
 unit since, the save is refused and the form asks again in the new one,
 nothing stored, never the number kept in the new unit (inventory-tng-74f3);
 anything else wrong with the number in any unit said with it
-(inventory-tng-hhlr)."""
+(inventory-tng-hhlr), on a package's size form too, though it is refused
+first as changed since (inventory-tng-hnta)."""
 
 from decimal import Decimal
 
@@ -22,7 +23,7 @@ from inventory_tng.stock.forms import now_counted_in
 from inventory_tng.web.forms import ABOVE_ZERO
 
 from helpers.items import new_item
-from helpers.markup import problem, read
+from helpers.markup import box_values, problem, read, text
 from helpers.rows import item_fields
 from helpers.stock import Spools
 
@@ -217,6 +218,43 @@ def test_a_package_amount_wrong_in_any_unit_says_so_with_its_unit_changed(
     again = admin_client.post(action, data=_hidden(refused.text, action) | typed)
     assert again.status_code == 400
     assert problem(again.text, box) == str(wrong)
+
+
+@pytest.mark.parametrize(
+    ("typed", "said"),
+    [("-5", f"{now_counted_in('ft')} {ABOVE_ZERO}"), ("300", now_counted_in("ft"))],
+)
+def test_a_package_resized_in_a_unit_left_since_says_so_first_with_any_problem(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    typed: str,
+    said: str,
+) -> None:
+    """The Reel's size form drawn in m, the cable switched to ft since,
+    which moves the package's version: Holds says the unit changed and,
+    for -5, that it must be above 0, at once, keeping what was typed, not
+    the size's problem alone and the refusal as changed since only after.
+    Sent again as drawn then, in ft, it is saved."""
+    cable, reel = _cable(session, radios)
+    action = f"{ITEMS}/{cable.id}/packages/{reel.id}"
+    drawn = _drawn(admin_client, cable, action)
+    assert drawn[UNIT_SHOWN] == "m"
+    _switch(session, cable)
+    refused = admin_client.post(
+        action, data=drawn | {"package_name": "Drum", "size": typed}
+    )
+    assert refused.status_code == 409
+    assert problem(refused.text, "size") == said
+    assert "someone else saved this" not in text(refused)
+    assert "Drum" in box_values(refused.text, "package_name")
+    assert typed in box_values(refused.text, "size")
+    again = _hidden(refused.text, action)
+    assert again[UNIT_SHOWN] == "ft"
+    fixed = {"package_name": "Drum", "size": "1000"}
+    assert admin_client.post(action, data=again | fixed).status_code == 303
+    session.refresh(reel)
+    assert (reel.name, reel.size, reel.unit) == ("Drum", Decimal(1000), "ft")
 
 
 def test_a_package_amount_wrong_only_in_the_unit_left_says_just_its_unit_changed(

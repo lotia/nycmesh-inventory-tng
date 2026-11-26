@@ -34,6 +34,7 @@ from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS, unit_reco
 from inventory_tng.catalogue.reading_rules import NOT_A_UNIT
 from inventory_tng.catalogue.unit_conversion import convertible
 from inventory_tng.core.db_errors import refusal, refusal_naming_index
+from inventory_tng.core.db_locking import relock
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
@@ -499,6 +500,7 @@ def _item_page(
     unit_declined_to: str | None = None,
     unit_example: queries.UnitChangeExample | None = None,
     fixed_by: FixedBy | None = None,
+    status_code: int | None = None,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
     `asking_unit`, the form sent back asks whether what was recorded was
@@ -514,7 +516,8 @@ def _item_page(
     amount the note gives as an example (queries.unit_change_example), if
     any. A retired item's No leaves it unset: its note links nothing.
     `fixed_by`, why its unit is fixed and its labels as the note read
-    them, so the page says the same; read here if not given."""
+    them, so the page says the same; read here if not given. Its status
+    is `status_code`, if given, else as admin_page says."""
     here = f"{ITEMS}/{item.id}"
     packages = queries.packages_of_item(session, item.id)
     view = View.read(here, OPEN_SORTING, asked, anchor=OPEN_PACKAGES)
@@ -584,7 +587,7 @@ def _item_page(
             **_name_field(session, similar),
             **_loose_said(request),
         },
-        status_code=409 if held_back else None,
+        status_code=409 if held_back else status_code,
     )
 
 
@@ -927,7 +930,8 @@ def _package(session: Session, item_id: int, package_id: int) -> ItemPackage | N
 SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
 # The unit a package form showed its amount in, the item's to add one or
 # the package's for its too-short length, compared as it is saved
-# (unit_changes.require_unit_shown).
+# (unit_changes.require_unit_shown); the package's for its size, to say a
+# form refused as changed since was so as its unit changed.
 UNIT_SHOWN = "unit_shown"
 
 
@@ -1046,16 +1050,51 @@ def save_package(
     found = session.get_one(Item, item_id)
     typed = forms.typed_name(session, package_name, form)
     name = typed.name
+    separator = decimal_separator(request)
     parsed, problems = forms.package_fields(
-        found,
-        name,
-        typed.asked,
-        size,
-        kept=package.size,
-        separator=decimal_separator(request),
+        found, name, typed.asked, size, kept=package.size, separator=separator
     )
+    # Beside the fields of the package it was sent for, with the units
+    # chosen, if any.
+    values = {
+        **form,
+        "package_id": str(package_id),
+        "package_name": name,
+        "size": size,
+        "package_version": package_version,
+    }
+    seen = form_version(package_version)
+    # Changed since it was shown: said before what is wrong with what was
+    # typed, so the admin learns it once (inventory-tng-hnta). Not found
+    # if retired, as the save would be; checked again as it saves.
+    _, stale = refusal(
+        session, lambda: relock(session, package, current=True, seen=seen), CHANGED
+    )
+    if stale and form.get(UNIT_SHOWN, package.unit) == package.unit:
+        return _item_page(request, session, signed, found, alert=RULES[CHANGED])
+    if stale:
+        # Its item's unit switched, which moves its packages' versions
+        # (inventory-tng-74f3): asked again in the new unit, as the other
+        # package forms ask, keeping what was typed, at its version now.
+        _asked_in_unit_now(
+            problems,
+            form,
+            "size",
+            package.unit,
+            required=forms.SIZE_REQUIRED,
+            separator=separator,
+        )
+        del values["package_version"]
+        return _item_page(
+            request,
+            session,
+            signed,
+            found,
+            problems=problems,
+            values=values,
+            status_code=409,
+        )
     if parsed is not None and not problems:
-        seen = form_version(package_version)
         _, broken = refusal(
             session,
             _deciding(
@@ -1087,15 +1126,6 @@ def save_package(
             problems["package_name"] = forms.read_alike(session, typed)
         else:  # SHORT_UNDER_SIZE, or PACKAGE_WHOLE: its item made each.
             problems["size"] = RULES[broken]
-    # Beside the fields of the package it was sent for, with the units
-    # chosen, if any.
-    values = {
-        **form,
-        "package_id": str(package_id),
-        "package_name": name,
-        "size": size,
-        "package_version": package_version,
-    }
     return _item_page(request, session, signed, found, problems=problems, values=values)
 
 

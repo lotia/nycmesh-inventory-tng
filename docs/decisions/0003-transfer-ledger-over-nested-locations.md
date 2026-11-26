@@ -276,7 +276,7 @@ open package (inventory-tng-fs50); a count form the unit of every item and the s
 of every package it shows; an adjustment the unit of every item it offers;
 an open package's count confirmed its item's unit; on an item's page, a
 package added its item's unit, and a too-short length typed its package's
-(inventory-tng-74f3). The save compares them
+(inventory-tng-74f3), as does a package's size edited. The save compares them
 with the catalogue while holding the items and packages, as it does to
 write, so no change slips between. One changed since is refused, nothing
 written, and asked again in the new ones: the batch's line is refused
@@ -290,7 +290,10 @@ too, so it says the same beside each box of one changed since
 package forms say after those words what is wrong with the number in
 any unit, such as "Use a number above 0.", so both are fixed at once,
 but not what depends on the unit, as the number is typed again in the
-new one (inventory-tng-hhlr). Bring it back that brings the area back
+new one (inventory-tng-hhlr). A package's size form, which the switch
+makes changed since, says so before anything else wrong with what was
+typed, so the admin is told once: its unit changed as above, otherwise
+the page as it is now (inventory-tng-hnta). Bring it back that brings the area back
 answers 200 even so, as it saved no amount for the words to refuse (Ali,
 2026-11-23, inventory-tng-itfm). We rejected converting
 what was shown into what is now: a unit switched because it was wrong may

@@ -21,10 +21,10 @@ from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.stock import open_packages
-from inventory_tng.web.forms import RULES
+from inventory_tng.web.forms import ABOVE_ZERO, RULES
 
 from helpers.items import NOW, new_item, same_size_twins, shown_item_form
-from helpers.markup import box_values, checked, forms, read, text, words_on
+from helpers.markup import box_values, checked, forms, problem, read, text, words_on
 from helpers.rows import add, history, shown
 from helpers.stock import Spools, retire
 
@@ -108,6 +108,33 @@ def test_a_package_is_renamed_and_resized_until_it_moves(
     labelled = text(send(box, "Carton", "30"))
     assert str(RULES["package_size_labelled"]) in labelled
     assert send(box, "Crate", "25").status_code == 303
+
+
+def test_a_package_changed_since_says_so_before_what_is_wrong_with_its_size(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """A Box's form drawn before another admin renamed it Carton, -5 typed:
+    refused at once as changed since, above the page, which shows it as
+    it is now, not the size's problem first and the refusal only once that
+    is fixed (inventory-tng-hnta). Not changed, -5 says only what is wrong
+    with it."""
+    item = new_item(session, radios)
+    box = add(session, ItemPackage(item_id=item.id, name="Box", size=Decimal(4)))
+    action = f"{ITEMS}/{item.id}/packages/{box.id}"
+    typed = {"package_name": "Bag", "size": "-5", "unit_shown": "each"}
+    drawn = shown(box)
+    box.name = "Carton"
+    session.flush()
+    stale = admin_client.post(action, data=typed | {"package_version": drawn})
+    assert stale.status_code == 409
+    assert str(RULES["changed_since_shown"]) in text(stale)
+    assert not read(stale.text).all("span", class_="problem")
+    assert "Carton" in box_values(stale.text, "package_name")
+    wrong = admin_client.post(action, data=typed | {"package_version": shown(box)})
+    assert wrong.status_code == 400
+    assert problem(wrong.text, "size") == str(ABOVE_ZERO)
+    assert "someone else saved this" not in text(wrong)
+    assert box.name == "Carton"
 
 
 def test_a_packages_labels_fix_its_size_until_revoked(

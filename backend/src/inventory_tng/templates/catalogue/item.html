@@ -184,6 +184,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
           </label>
           {% with typed = sent.get('package_name', package.name) %}{% include "catalogue/_units_read.html" %}{% endwith %}
           {% if package.id not in sizes_fixed %}
+          <input type="hidden" name="unit_shown" value="{{ package.unit }}">
           <label>{{ holds }} <span class="hint">{% trans unit=package.unit %}in {{ unit }}; fixed once some has moved or been opened, or while it is labelled{% endtrans %}</span>
             <input name="size" inputmode="{{ package.unit | keyboard }}" value="{{ sent.get('size', package.size | box_amount(decimal)) }}" required>
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
