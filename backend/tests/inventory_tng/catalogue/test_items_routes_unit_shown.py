@@ -1,7 +1,9 @@
 """A package's amount on the item page, its size added or its too-short
 length set, typed in the unit the form showed: an item switched to another
 unit since, the save is refused and the form asks again in the new one,
-nothing stored, never the number kept in the new unit (inventory-tng-74f3)."""
+nothing stored, never the number kept in the new unit (inventory-tng-74f3);
+anything else wrong with the number in any unit said with it
+(inventory-tng-hhlr)."""
 
 from decimal import Decimal
 
@@ -16,6 +18,7 @@ from inventory_tng.catalogue.items_routes import UNIT_SHOWN
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.stock.forms import now_counted_in
+from inventory_tng.web.forms import ABOVE_ZERO
 
 from helpers.items import new_item
 from helpers.markup import problem, read
@@ -52,10 +55,17 @@ def _cable(session: Session, radios: Category) -> tuple[Item, ItemPackage]:
 def _to_ft(session: Session, cable: Item, *, recorded_in: str | None = None) -> None:
     """Another administrator's switch to ft, saved: free while nothing
     fixes its unit, else converting, answered Yes (`recorded_in`)."""
-    fields = item_fields(cable, unit="ft")
+    _switch(session, cable, "ft", recorded_in=recorded_in)
+
+
+def _switch(
+    session: Session, cable: Item, unit: str, *, recorded_in: str | None = None
+) -> None:
+    """Another administrator's switch to `unit`, saved."""
+    fields = item_fields(cable, unit=unit)
     items.save(session, cable, fields, seen=None, recorded_in=recorded_in)
     session.flush()
-    assert cable.unit == "ft"
+    assert cable.unit == unit
 
 
 @pytest.mark.parametrize("converting", [False, True])
@@ -175,3 +185,50 @@ def test_a_package_form_refused_otherwise_says_its_unit_changed_too(
     refused = admin_client.post(settings, data=drawn_settings | not_whole)
     assert refused.status_code == 400
     assert problem(refused.text, "short_below") == now_counted_in("ft")
+
+
+@pytest.mark.parametrize("box", ["size", "short_below"])
+def test_a_package_amount_wrong_in_any_unit_says_so_with_its_unit_changed(
+    admin_client: TestClient, session: Session, radios: Category, box: str
+) -> None:
+    """-5 typed in m, the cable in ft since: beside Holds on the add form,
+    or Too short to use on the package's own, the unit changed is said
+    first and the number's own problem after, so both are fixed at once;
+    typed again in ft, only the number's problem is left."""
+    cable, reel = _cable(session, radios)
+    add = f"{ITEMS}/{cable.id}/packages"
+    action = add if box == "size" else f"{add}/{reel.id}/settings"
+    drawn = _drawn(admin_client, cable, action)
+    _to_ft(session, cable)
+    others = {"package_name": "Drum"} if box == "size" else {"minimum_sealed": ""}
+    typed = others | {box: "-5"}
+    refused = admin_client.post(action, data=drawn | typed)
+    assert refused.status_code == 400
+    assert problem(refused.text, box) == f"{now_counted_in('ft')} {ABOVE_ZERO}"
+    again = admin_client.post(action, data=_hidden(refused.text, action) | typed)
+    assert again.status_code == 400
+    assert problem(again.text, box) == str(ABOVE_ZERO)
+
+
+def test_a_package_amount_wrong_only_in_the_unit_left_says_just_its_unit_changed(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """What is wrong only as read in the new unit is not said with it, as
+    the number is to be typed again in that unit: 2.5 typed in m, the cable
+    counted each since, is not said to be not whole; 400 typed in m beside
+    a Reel of 305 ft is not said to be longer than a whole one."""
+    cable, reel = _cable(session, radios)
+    add = f"{ITEMS}/{cable.id}/packages"
+    settings = f"{add}/{reel.id}/settings"
+    drawn_add = _drawn(admin_client, cable, add)
+    drawn_settings = _drawn(admin_client, cable, settings)
+    _to_ft(session, cable)
+    long = {"short_below": "400", "minimum_sealed": ""}
+    refused = admin_client.post(settings, data=drawn_settings | long)
+    assert refused.status_code == 400
+    assert problem(refused.text, "short_below") == now_counted_in("ft")
+    _switch(session, cable, "each")
+    fraction = {"package_name": "Drum", "size": "2.5"}
+    refused = admin_client.post(add, data=drawn_add | fraction)
+    assert refused.status_code == 400
+    assert problem(refused.text, "size") == now_counted_in("each")

@@ -37,7 +37,7 @@ from inventory_tng.core.db_errors import refusal, refusal_naming_index
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
-from inventory_tng.core.phrases import Words, lazy_gettext, ngettext
+from inventory_tng.core.phrases import Separator, Words, lazy_gettext, ngettext
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -926,14 +926,27 @@ UNIT_SHOWN = "unit_shown"
 
 
 def _asked_in_unit_now(
-    problems: dict[str, Words], form: Mapping[str, str], box: str, unit: str
+    problems: dict[str, Words],
+    form: Mapping[str, str],
+    box: str,
+    unit: str,
+    *,
+    required: Words | None = None,
+    separator: Separator,
 ) -> None:
     """A package form drawn again, for whatever reason, its amount in `box`
     typed in a unit other than `unit`, the one it is in now: said beside
     it, so the number is checked, not saved again in the new unit as the
-    form now shows it."""
-    if form.get(UNIT_SHOWN, "") != unit:
-        problems[box] = now_counted_in(unit)
+    form now shows it. Anything else wrong with it in any unit is said
+    after, so both are fixed at once; what depends on the unit is not, as
+    the number is to be typed again in the new one (inventory-tng-hhlr)."""
+    if form.get(UNIT_SHOWN, "") == unit:
+        return
+    said = now_counted_in(unit)
+    other = forms.unit_free_problem(
+        form.get(box, ""), required=required, separator=separator
+    )
+    problems[box] = said if other is None else f"{said} {other}"
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages")
@@ -951,8 +964,9 @@ def add_package(
         return not_found()
     typed = forms.typed_name(session, package_name, form)
     name = typed.name
+    separator = decimal_separator(request)
     parsed, problems = forms.package_fields(
-        found, name, typed.asked, size, separator=decimal_separator(request)
+        found, name, typed.asked, size, separator=separator
     )
     if parsed is not None and not problems:
         package, broken = refusal(
@@ -989,7 +1003,14 @@ def add_package(
                 if broken == items.READ_ALIKE
                 else forms.PACKAGE_TAKEN
             )
-    _asked_in_unit_now(problems, form, "size", found.unit)
+    _asked_in_unit_now(
+        problems,
+        form,
+        "size",
+        found.unit,
+        required=forms.SIZE_REQUIRED,
+        separator=separator,
+    )
     # With the units chosen, if any: not a package's own form's (package_id).
     values = {**form, "package_name": name, "size": size}
     return _item_page(request, session, signed, found, problems=problems, values=values)
@@ -1179,12 +1200,9 @@ def package_settings(
     if package is None:
         return not_found()
     found = session.get_one(Item, item_id)
+    separator = decimal_separator(request)
     short, minimum, problems = forms.package_settings_fields(
-        package,
-        found.unit,
-        short_below,
-        minimum_sealed,
-        separator=decimal_separator(request),
+        package, found.unit, short_below, minimum_sealed, separator=separator
     )
     # Beside the fields of the package it was sent for.
     values = {
@@ -1223,7 +1241,9 @@ def package_settings(
             unit_changes.UNIT_CHANGED: now_counted_in(package.unit),
         }.get(broken, forms.SHORTER_THAN_WHOLE)
     if short_below and short_below.strip():  # A length typed, in a unit.
-        _asked_in_unit_now(problems, form, "short_below", package.unit)
+        _asked_in_unit_now(
+            problems, form, "short_below", package.unit, separator=separator
+        )
     return _item_page(request, session, signed, found, problems=problems, values=values)
 
 

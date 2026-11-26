@@ -448,6 +448,18 @@ def short_problem(short: Decimal | str | None, size: Decimal | None) -> Words | 
     return None
 
 
+def unit_free_problem(
+    text: str, *, required: Words | None, separator: Separator
+) -> Words | None:
+    """What is wrong with a package amount typed in a unit its item or
+    package has left since, if anything, whatever unit it is read in:
+    blank when `required`, unreadable, too big or not above zero. Not
+    whether it is whole, or shorter than its package: those are checked
+    in the new unit once it is typed again (inventory-tng-hhlr)."""
+    read = quantity(text, positive=True, required=required, separator=separator)
+    return read if isinstance(read, str) else None
+
+
 def alias_problem(
     session: Session, item: Item, typed: Typed, broken: str | None
 ) -> Words:

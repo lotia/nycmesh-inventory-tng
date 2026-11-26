@@ -286,7 +286,11 @@ counted in ft. Check the amount and save again." A form shown again
 for anything else while keeping what was typed (Bring it back on a count,
 a save refused by another rule) is shown in the units and sizes now
 too, so it says the same beside each box of one changed since
-(inventory-tng-dcqp), a box it could not read too. Bring it back that
+(inventory-tng-dcqp), a box it could not read too. The item page's
+package forms say after it what is wrong with the number in any unit,
+such as "Use a number above 0.", so both are fixed at once, but not what
+depends on the unit, as the number is typed again in the new one
+(inventory-tng-hhlr). Bring it back that
 brings the area back answers 200 even so, as it saved no amount for the
 words to refuse (Ali, 2026-11-23, inventory-tng-itfm). We rejected converting
 what was shown into what is now: a unit switched because it was wrong may
