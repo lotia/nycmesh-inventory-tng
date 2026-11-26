@@ -2,6 +2,7 @@
 {% from "_table.html" import table %}
 {% from "stock/_views.html" import views %}
 {% from "_listing.html" import sizes, sort_heading, pager, only_one %}
+{% from "stock/_described_by.html" import described_by with context %}
 {#- Why one marked checked is right as it is: one reason, and words for
 another way. Kept as sent with its problem, if `sent` from this form: a
 refusal's alert, when drawn, is where it was sent from. #}
@@ -81,7 +82,7 @@ with an adjustment. Mark checked if you already fixed it.{% endtrans %}</p>
         {#- Its unit right after it, and in its description (decision 0019,
         Amounts; inventory-tng-4vn8); refused, its problem first, and marked
         invalid, as on the count form (inventory-tng-h3tw). #}
-        <span class="with-unit"><input id="{{ name }}" name="count" inputmode="{{ each.unit | keyboard }}" required value="{{ values.get(name, was) }}" data-was="{{ was }}" aria-describedby="{% if problems.get(name) %}{{ name }}-problem {% endif %}unit-{{ name }} {{ name }}-was"{% if problems.get(name) %} aria-invalid="true"{% endif %}>
+        <span class="with-unit"><input id="{{ name }}" name="count" inputmode="{{ each.unit | keyboard }}" required value="{{ values.get(name, was) }}" data-was="{{ was }}"{{ described_by(name, ["unit-" ~ name, name ~ "-was"]) }}>
           <span id="unit-{{ name }}">{{ each.unit }}</span></span>
         {% include "_field_problem.html" %}
         <p class="hint" id="{{ name }}-was"{% if values.get(name, was) == was %} hidden{% endif %}>{% trans words=whole.words %}Was {{ words }}{% endtrans %}</p>

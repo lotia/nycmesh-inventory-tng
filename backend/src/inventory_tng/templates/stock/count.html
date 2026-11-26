@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
+{% from "stock/_described_by.html" import described_by with context %}
 {% block main %}
 {#- Under the alert, more: areas emptied and others retired at once
 (stock/count_gone_areas.py), or a refused count's unit or size changed
@@ -42,16 +43,6 @@ counts them (inventory-tng-mdvz). A sealed box's label already says
 row's box leaves it out of aria-describedby, an arrival's label hides it. #}
 {% macro counted_in(item, row) -%}
 {%- if row.sealed %}{#- Translators: follows the box where the number of an item's sealed packages is typed, as in "2 sealed". #}{% trans %}sealed{% endtrans %}{% else %}{{ item.unit }}{% endif -%}
-{%- endmacro %}
-{#- A box's aria-describedby, the ids in `described`, and, refused, its
-problem (_field_problem.html) first, so a screen reader hears why it was
-refused, and aria-invalid (inventory-tng-h3tw). A box whose problem sits
-inside its label (`labelled`) hears it in its name already, so is only
-marked invalid. #}
-{% macro described_by(name, described=[], labelled=false) -%}
-{%- set refused = problems.get(name) -%}
-{%- set ids = ([name ~ "-problem"] if refused and not labelled else []) + described -%}
-{%- if ids %} aria-describedby="{{ ids | join(' ') }}"{% endif %}{% if refused %} aria-invalid="true"{% endif -%}
 {%- endmacro %}
 {#- A place's lines on the count form: its items, each by its total or by
 form (0020). Those of an item moved there from an area gone from the form
