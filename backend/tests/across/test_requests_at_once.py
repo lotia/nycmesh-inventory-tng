@@ -42,11 +42,14 @@ from inventory_tng.admins.paths import ADMINS
 from inventory_tng.catalogue import (
     categories,
     items,
+    items_routes,
     reading_rules,
     unit_changes,
     unit_recounts,
     units,
 )
+from inventory_tng.catalogue.paths import ITEMS
+from inventory_tng.core import db_locking
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_locking import locked, locked_row
@@ -58,7 +61,8 @@ from inventory_tng.core.db_sessions import (
 )
 from inventory_tng.core.mail import Message, Notify
 from inventory_tng.core.settings import RateLimits
-from inventory_tng.devices import devices
+from inventory_tng.devices import devices, devices_routes
+from inventory_tng.devices.paths import DEVICES
 from inventory_tng.labels import labels
 from inventory_tng.models.admins import Admin, AdminPassword, AdminSession
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
@@ -87,7 +91,7 @@ from inventory_tng.stock.balance import balance
 from inventory_tng.stock.ledger import Entry, Form, insert_transaction
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS, LENGTHS, USED_UP
-from inventory_tng.volunteers import volunteers
+from inventory_tng.volunteers import volunteers, volunteers_routes
 from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.single_use_forms import FIELD
 
@@ -102,7 +106,7 @@ from helpers.concurrency import (
 from helpers.devices import new_device
 from helpers.mail import NO_MAIL, SentMail
 from helpers.over_recorded import correct_check
-from helpers.rows import item_fields, tag
+from helpers.rows import item_fields, shown, tag
 from helpers.sign_in import (
     PASSWORD,
     TOTP_KEYS,
@@ -2663,3 +2667,81 @@ def test_the_catalogue_route_reads_one_snapshot(
     client.cookies.set(devices.COOKIE, token)
     assert client.get("/api/catalogue").status_code == 200
     assert seen == [("repeatable read", "on")]
+
+
+def _unlocked_forms(
+    session: Session,
+) -> dict[str, tuple[object, str, dict[str, str], Base, str, str]]:
+    """Each form checked first by db_locking.stale_as_read, which takes no
+    lock: the route's module, where it is sent, what it sends but its
+    version, its row, and a column another administrator saves meanwhile
+    with its new value."""
+    radios = Category(name="Radios")
+    session.add(radios)
+    session.flush()
+    item = Item(name="LiteBeam", category_id=radios.id)
+    ada = Volunteer(name="Ada")
+    session.add_all([item, ada])
+    device, _ = new_device(session)
+    session.flush()
+    return {
+        "item": (
+            items_routes,
+            f"{ITEMS}/{item.id}",
+            {"category_id": str(radios.id), "unit": "each", "name": "LiteBeam 5AC"},
+            item,
+            "notes",
+            "Outdoor only",
+        ),
+        "volunteer": (
+            volunteers_routes,
+            f"{VOLUNTEERS}/{ada.id}",
+            {"name": "Ada L", "email": ""},
+            ada,
+            "email",
+            "ada@example.org",
+        ),
+        "device": (
+            devices_routes,
+            f"{DEVICES}/{device.id}",
+            {"label": "Store tablet"},
+            device,
+            "label",
+            "Lost",
+        ),
+    }
+
+
+@pytest.mark.end_to_end
+@pytest.mark.parametrize("name", ["item", "volunteer", "device"])
+def test_a_save_after_the_unlocked_check_is_still_refused(
+    committed: Committed,
+    admins: Admins,
+    real_client: tuple[TestClient, SentMail],
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+) -> None:
+    """Another administrator's save, committed after stale_as_read found
+    the form current and before the route locks the row: the save checks
+    the version again under its lock, read afresh, so it is refused and the
+    other's change kept, not lost (inventory-tng-ryjv)."""
+    client, _ = real_client
+    signed_in_as_ben(committed, client, admins[2])
+    setup = committed.session()
+    module, path, sends, row, column, meanwhile = _unlocked_forms(setup)[name]
+    setup.commit()
+    model, row_id, version = type(row), getattr(row, "id"), shown(row)  # noqa: B009
+    unlocked = db_locking.stale_as_read
+
+    def saved_meanwhile(found: Base, seen: int | None) -> bool:
+        stale = unlocked(found, seen)
+        other = committed.session()
+        setattr(other.get_one(model, row_id), column, meanwhile)
+        other.commit()
+        return stale
+
+    monkeypatch.setattr(module, "stale_as_read", saved_meanwhile)
+    refused = client.post(path, data=sends | {"version": version})
+    assert refused.status_code == 409
+    after = committed.session().get_one(model, row_id)
+    assert getattr(after, column) == meanwhile
