@@ -203,21 +203,23 @@ def by_form(
     found = None
     if form.get(FOUND_PACKAGE, "").strip():
         package = session.get(ItemPackage, row_id(form[FOUND_PACKAGE]) or 0)
-        unit = session.get_one(Item, package.item_id).unit if package else "m"
-        left = quantity(
-            form.get(FOUND_LEFT, ""),
-            positive=True,
-            unit=unit,
-            required=HOW_MUCH_LEFT,
-            separator=separator,
-        )
         if package is None:
+            # What is left is not read, so not counted refused
+            # (inventory-tng-ndrg).
             problems[FOUND_PACKAGE] = NO_SUCH_PACKAGE
-        elif isinstance(left, str):
-            problems[FOUND_LEFT] = left
         else:
-            assert left is not None  # Required, so a problem if blank.
-            found = (package, left)
+            left = quantity(
+                form.get(FOUND_LEFT, ""),
+                positive=True,
+                unit=session.get_one(Item, package.item_id).unit,
+                required=HOW_MUCH_LEFT,
+                separator=separator,
+            )
+            if isinstance(left, str):
+                problems[FOUND_LEFT] = left
+            else:
+                assert left is not None  # Required, so a problem if blank.
+                found = (package, left)
     return ByForm(lines, close, found), problems
 
 

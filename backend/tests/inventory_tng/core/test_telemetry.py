@@ -46,6 +46,7 @@ from inventory_tng.models.stock import (
 )
 from inventory_tng.scan import page_builds, page_telemetry_api
 from inventory_tng.stock import counts, ledger, moments, open_packages, over_recorded
+from inventory_tng.stock.count_forms import NO_SUCH_PACKAGE
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web import security_headers
 
@@ -54,7 +55,7 @@ from helpers.csp_reports import SHAPES
 from helpers.devices import new_device
 from helpers.items import shown_item_form, unit_answered
 from helpers.mail import NO_MAIL, FailingMail, SentMail
-from helpers.markup import hidden_fields
+from helpers.markup import hidden_fields, text
 from helpers.pools import small_database
 from helpers.rows import add, breaks, item_fields, shown, tag
 from helpers.sign_in import (
@@ -1043,6 +1044,31 @@ def test_counts_no_other_separator_for_an_open_package_closed_on_a_count(
     assert answer.status_code == 303
     session.refresh(made)
     assert made.closed_at is not None
+    assert added(reader, name, before) == {}
+    assert "number refused" not in [each["event"] for each in logs]
+
+
+def test_counts_no_other_separator_for_a_found_package_of_no_such_package(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """ "1,5" left on an open package found of no such package, on an
+    English page: what is left is not read, so the form says only that
+    there is no such package and no number is counted or logged refused
+    (inventory-tng-ndrg)."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.numbers.other_separator"
+    before = counted(reader, name)
+    spools = Spools(session)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    form = count_form_at(client, spools.store.id) | {
+        "found_package_id": "999999",
+        "found_left": "1,5",
+    }
+    with capture_logs() as logs:
+        answer = client.post(f"{COUNTS}/{spools.store.id}", data=form)
+    assert answer.status_code == 400
+    assert str(NO_SUCH_PACKAGE) in text(answer)
     assert added(reader, name, before) == {}
     assert "number refused" not in [each["event"] for each in logs]
 
