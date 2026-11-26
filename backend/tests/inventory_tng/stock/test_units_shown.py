@@ -23,7 +23,6 @@ from inventory_tng.stock.count_forms import (
     NO_SUCH_OPEN_PACKAGE,
     NO_SUCH_PACKAGE,
     ON_THE_FORM_TWICE,
-    TOO_MANY,
     TYPE_IT_HERE,
     WHOLE_PACKAGES,
     changed_words,
@@ -590,31 +589,34 @@ HOLDS_305 = "This package now holds 305 m. Check the count and save again."
 
 
 @pytest.mark.parametrize(
-    ("typed", "other", "said"),
+    ("typed", "said"),
     [
-        ("x", None, f"{HOLDS_305} A whole number of packages."),
-        ("1", NO_SUCH_PACKAGE, f"{HOLDS_305} No such package."),
-        ("99999999", TOO_MANY, HOLDS_305),
-        ("3", None, HOLDS_305),
+        ("x", f"{HOLDS_305} A whole number of packages."),
+        ("99999999", HOLDS_305),
+        ("3", HOLDS_305),
     ],
-    ids=["not-whole", "no-such-package", "too-many", "resized-alone"],
+    ids=["not-whole", "too-many", "resized-alone"],
 )
 def test_a_sealed_box_wrong_otherwise_says_so_after_its_new_size(
-    session: Session, typed: str, other: Words | None, said: str
+    admin_client: TestClient, session: Session, typed: str, said: str
 ) -> None:
-    """A sealed box of a package resized since shown says its new size,
+    """A sealed box of a package shown at another size says its new size,
     then what else is wrong with it at any size (Ali, 2026-11-25,
     inventory-tng-ehfu); not too many, which depends on the size, as the
-    count is typed again at the new one. Resized alone, the size alone."""
+    count is typed again at the new one. Resized alone, the size alone.
+    A held package's size is fixed but by a unit change, which says the
+    unit instead, so only a form saying another size reaches this."""
     spools = Spools(session)
     cable, spool, store = spools.cable.id, spools.spool.id, spools.store.id
     field = f"sealed_{cable}_{spool}"
-    others = {field: other} if other else {}
-    resized = Now({}, {spool: (Decimal(305), "m")})
-    words = changed_words(
-        session, {field: typed}, store, [store], resized, separator=".", others=others
-    )
-    assert words == {field: said}
+    form = count_form_at(admin_client, store) | {
+        "sizes": f"{spool}:300",
+        field: typed,
+    }
+    response = admin_client.post(f"{COUNTS}/{store}", data=form)
+    assert response.status_code == 400
+    assert problem(response.text, field) == said
+    assert counts_written(session) == []
 
 
 # An adjustment, and an open package's count confirmed.
