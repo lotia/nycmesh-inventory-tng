@@ -31,6 +31,7 @@ from inventory_tng.web.forms import RULES
 from helpers.markup import (
     Element,
     address,
+    alerts_on,
     box_values,
     hidden_fields,
     problem,
@@ -467,6 +468,31 @@ def test_amounts_are_checked(admin_client: TestClient, session: Session) -> None
     assert refused.status_code == 400
     assert problem(refused.text, "minimum") == "Use 0 or more."
     assert problem(refused.text, f"per_order_{offer.id}") == "Use a number above 0."
+    assert alerts_on(refused.text) == []
+    assert spools.cable.unit == "m"
+
+
+def test_a_stale_form_says_so_before_its_amounts_problems(
+    admin_client: TestClient, session: Session
+) -> None:
+    """The bead's example (inventory-tng-0w7o): -5 typed as Reorder at
+    while another admin receives stock of the item. Refused as changed at
+    once, the page shown as it is now with -5 kept, not only what is
+    wrong with -5. Logged once, by id."""
+    spools = Spools(session)
+    page = _page(admin_client, spools.cable.id)
+    spools.receive(uuid.uuid4())
+    with capture_logs() as logs:
+        refused = admin_client.post(
+            unit_recount(spools.cable.id, "ft"), data=_sent(page, minimum="-5")
+        )
+    assert refused.status_code == 409
+    assert alerts_on(refused.text) == [str(RULES["changed_since_shown"])]
+    assert read(refused.text).all("span", class_="problem") == []
+    assert box_values(refused.text, "minimum") == ["-5"]
+    assert [
+        each["reason"] for each in logs if each["event"] == "unit recount refused"
+    ] == ["changed"]
     assert spools.cable.unit == "m"
 
 

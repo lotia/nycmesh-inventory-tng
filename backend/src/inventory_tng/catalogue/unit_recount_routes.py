@@ -124,6 +124,13 @@ def recount(
     unit = form.get("unit", "")
     if unit not in unit_recounts.units_open(session, found):
         return redirect(f"{ITEMS}/{item_id}")
+    # Changed since it was shown: said before what is wrong with the
+    # amounts (unit_recounts.stale_as_read), what was typed kept.
+    seen = form.get("seen", "")
+    if unit_recounts.stale_as_read(session, found, seen):
+        return _page(
+            request, session, signed, found, unit, values=form, alert=RULES[CHANGED]
+        )
     # The offers and packages as now: one added or retired since is
     # refused as changed.
     offers = [each.offer.id for each in queries.current_offers(session, item_id)]
@@ -142,7 +149,7 @@ def recount(
             found,
             unit,
             amounts,
-            seen=form.get("seen", ""),
+            seen=seen,
             key=form_key(form.get("key", "")) or uuid.uuid4(),
             admin_id=signed.admin.id,
             at=now(),

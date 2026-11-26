@@ -233,6 +233,22 @@ def planned(session: Session, item: Item) -> Planned:
     )
 
 
+def stale_as_read(session: Session, item: Item, seen: str) -> bool:
+    """Whether a recount of the item, as the records are read now, does
+    otherwise than its page said (`seen`, Planned.seen), so a stale form
+    says so before what is wrong with its amounts (inventory-tng-0w7o).
+    Read without locks, as its page is: recount takes them in the
+    ledger's order, which a lock taken first here could break, and holds
+    none while a page of problems is shown. Safe: read changed, the
+    records changed after the page showed `seen` (or no page did); read
+    unchanged, recount reads the plan again under its locks, so a change
+    in between is refused then."""
+    if planned(session, item).seen == seen:
+        return False
+    log.info("unit recount refused", item_id=item.id, reason="changed")
+    return True
+
+
 def resized_of(session: Session, item: Item) -> list[ItemPackage]:
     """The packages a recount of the item asks the size of again, in
     order (Planned.resized): if a conversion before, and no stock moved,
