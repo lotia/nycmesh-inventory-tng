@@ -35,7 +35,7 @@ from helpers.markup import (
     table_rows,
     words_on,
 )
-from helpers.rows import add
+from helpers.rows import add, item_fields
 from helpers.sign_in import new_admin_id
 from helpers.stock import (
     Place,
@@ -100,7 +100,6 @@ def test_the_page_says_beforehand_all_it_will_do(
     page = _page(admin_client, cable.id)
     said = words_on(page.text)
     assert f"Recount {cable.name} in ft" in said
-    assert "was never really in m: nothing is recalculated" in said
     assert table_rows(page.text) == [
         [spools.store.name, "610 m"],
         [spools.van.name, "-5 m"],
@@ -114,6 +113,48 @@ def test_the_page_says_beforehand_all_it_will_do(
     assert box_values(page.text, "on_order") == ["50"]
     assert box_values(page.text, f"per_order_{_offer(session, cable.id).id}") == ["305"]
     assert "Units per order from https://example.org" in said
+
+
+OTHER_LENGTH = {"m": "ft", "ft": "m"}
+
+
+def _stock_moved(session: Session, unit: str) -> Item:
+    """A cable in `unit` whose stock moved: two spools received."""
+    return Spools(session, cable_unit=unit).cable
+
+
+def _converted_into(session: Session, unit: str) -> Item:
+    """A cable converted into `unit` from the other length, no stock
+    moved: labelled, so changing its unit converts."""
+    cable = Place(session, cable_unit=OTHER_LENGTH[unit]).cable
+    assert labels.make_for_item(session, cable.id) is not None
+    items.save(
+        session, cable, item_fields(cable, unit=unit), seen=None, recorded_in=cable.unit
+    )
+    return cable
+
+
+@pytest.mark.parametrize("made", [_stock_moved, _converted_into])
+@pytest.mark.parametrize("old", ["m", "ft"])
+def test_the_page_opens_with_when_to_use_it(
+    admin_client: TestClient,
+    session: Session,
+    made: Callable[[Session, str], Item],
+    old: str,
+) -> None:
+    """The two paragraphs before its steps, word for word (Ali, 2026-11-25,
+    inventory-tng-qety)."""
+    cable = made(session, old)
+    page = _page(admin_client, cable.id, OTHER_LENGTH[old])
+    steps = read(page.text).one("ol")
+    opening = [
+        each.text for each in reversed(steps.find_previous_siblings("p", limit=2))
+    ]
+    use = (
+        f"Use this when the amounts recorded for {cable.name} were never really"
+        f" in {old}. Nothing is recalculated from {old}."
+    )
+    assert opening == [use, "In one change, which can't be undone, it:"]
 
 
 def _offer(session: Session, item_id: int) -> VendorOffer:

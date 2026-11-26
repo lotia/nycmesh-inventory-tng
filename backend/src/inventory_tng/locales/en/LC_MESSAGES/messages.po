@@ -1713,13 +1713,6 @@ msgid ""
 "is followed until used up. A package that says otherwise keeps its own."
 msgstr ""
 
-#: src/inventory_tng/templates/catalogue/unit_recount.html
-#, python-format
-msgid ""
-"For when what was recorded of %(item)s was never really in %(old)s: "
-"nothing is recalculated. In one change, which can't be undone, it:"
-msgstr ""
-
 #: src/inventory_tng/admins/reset_routes.py
 #: src/inventory_tng/templates/admins/sign_in.html
 msgid "Forgot your password?"
@@ -1962,6 +1955,13 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/reading_seed.html
 msgid "In"
+msgstr ""
+
+#. introduces the numbered list of what the guided recount does, each step
+#. completing "it:", as "writes off, in m, all the records hold of it at each
+#. place".
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+msgid "In one change, which can't be undone, it:"
 msgstr ""
 
 #: src/inventory_tng/templates/_listing.html
@@ -4762,6 +4762,15 @@ msgstr ""
 #: src/inventory_tng/admins/accounts.py
 #, python-format
 msgid "Use at most %(max)s characters."
+msgstr ""
+
+#. when to use the guided recount; %(item)s is the item's name, %(old)s its
+#. unit now, as "m", which the recount changes.
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+#, python-format
+msgid ""
+"Use this when the amounts recorded for %(item)s were never really in "
+"%(old)s. Nothing is recalculated from %(old)s."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
