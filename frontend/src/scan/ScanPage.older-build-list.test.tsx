@@ -42,6 +42,7 @@ import {
 } from "../testing/scan-page";
 import { refusingWrites } from "../testing/storage";
 import {
+  CART,
   FROM,
   INSTALL_NUMBER,
   NOT_REMOVED as NOT_REMOVED_PHRASE,
@@ -840,6 +841,75 @@ describe("what an older build left", () => {
     );
     expect(within(listing()).queryByText(FIVE)).toBeNull();
     within(listing()).getByText(THREE);
+  });
+
+  /** The list's space, kept blank once its last entry went: the form's
+   * first child, or something else once it has gone. */
+  const keptSpace = () =>
+    document.querySelector("form")?.firstElementChild as HTMLElement;
+  const cartHeading = () => screen.getByRole("heading", { name: say(CART) });
+  /** One entry, the 3 m from an open package and the `more` lines before
+   * it, in a list 240 px high, which `take` then takes away. That the
+   * list's space stays blank until taps are taken again, tapped there puts
+   * focus back on the Cart heading, and then goes (Ali, 2026-11-27,
+   * inventory-tng-lm1b). */
+  async function expectSpaceKept(
+    take: () => Promise<void> | void,
+    more: object[] = [],
+  ) {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const tall = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ height: 240 } as DOMRect);
+    leaveSavesAlike(["3"]);
+    const [only] = JSON.parse(
+      localStorage.getItem("inventory.outbox.v3") ?? "[]",
+    );
+    only.body.lines.unshift(...more);
+    keep("inventory.outbox.v3", [only]);
+    open();
+    await ready();
+    await take();
+    expect(screen.queryByText(HEADING)).toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(cartHeading()));
+    const space = keptSpace();
+    expect(space.getAttribute("aria-hidden")).toBe("true");
+    expect(space.style.height).toBe("240px");
+    expect(space.textContent).toBe("");
+    // A tap on nothing there, which took focus to the page: it comes back.
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.click(space, { detail: 1 });
+    expect(document.activeElement).toBe(cartHeading());
+    await vi.advanceTimersByTimeAsync(500);
+    expect(keptSpace()).not.toBe(space);
+    expect(document.contains(space)).toBe(false);
+    tall.mockRestore();
+  }
+
+  test("the last line's Discard, taking the last entry away, keeps the list's space blank a moment, and focuses the Cart heading (inventory-tng-lm1b)", async () => {
+    await expectSpaceKept(() => {
+      fireEvent.click(discardOf(THREE));
+    });
+  });
+
+  test("the last entry's Discard, confirmed, keeps the list's space blank a moment, and focuses the Cart heading (inventory-tng-lm1b)", async () => {
+    await expectSpaceKept(() => {
+      fireEvent.click(lastDiscard());
+      fireEvent.click(lastDiscard());
+    });
+  });
+
+  test("Add to cart on the last entry keeps the list's space blank a moment, and focuses the Cart heading (inventory-tng-lm1b)", async () => {
+    await expectSpaceKept(
+      async () => {
+        fireEvent.click(
+          within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
+        );
+        await screen.findByText(ADDED_BACK);
+      },
+      // The entry fills a cart too, with radios beside its line.
+      [{ item_id: 100, quantity: "8", unit: "each", package_id: 1000 }],
+    );
   });
 
   test("discarding asks first, on the page; kept, nothing goes", async () => {

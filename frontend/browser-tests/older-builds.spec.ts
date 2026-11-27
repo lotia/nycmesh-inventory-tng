@@ -532,3 +532,54 @@ test("a double tap on a Discard that takes its entry away leaves the next entry,
   // Focus on the heading of the entry that moved up.
   await expect(listing.locator("#older-0")).toBeFocused();
 });
+
+test("a double tap on a Discard that takes the last entry away leaves the form below as it was, and focuses the Cart heading (inventory-tng-lm1b)", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  const itemId = itemIdOf(page);
+  await page.goto("/scan");
+  await leave(page, [
+    { item_id: itemId, quantity: "3", open_package_key: crypto.randomUUID() },
+  ]);
+  await page.reload();
+
+  const listing = listingOf(page);
+  const box = await lineDiscard(
+    listing,
+    `${cable}: 3 m from an open package`,
+  ).boundingBox();
+  if (box === null) {
+    throw new Error("the line's Discard is not shown");
+  }
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  const form = page.locator("form").first();
+  const before = await form.evaluate((it) =>
+    JSON.stringify(Object.fromEntries(new FormData(it as HTMLFormElement))),
+  );
+  await page.touchscreen.tap(x, y);
+  await page.waitForTimeout(150);
+  await page.touchscreen.tap(x, y);
+  await expect(listing).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Cart" })).toBeFocused();
+  // Once the space has gone, a form control is where the finger was: the
+  // second tap would have landed on it.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        ({ x, y }) =>
+          document
+            .elementFromPoint(x, y)
+            ?.closest("input, select, button, textarea, label") != null,
+        { x, y },
+      ),
+    )
+    .toBe(true);
+  expect(
+    await form.evaluate((it) =>
+      JSON.stringify(Object.fromEntries(new FormData(it as HTMLFormElement))),
+    ),
+  ).toBe(before);
+  await expect(page.getByRole("heading", { name: "Cart" })).toBeFocused();
+});

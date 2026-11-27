@@ -765,7 +765,14 @@ export function CartForm({
 
   return (
     <form onSubmit={save}>
-      <OlderList older={older} catalogue={catalogue} onPutBack={putInCart} />
+      <OlderList
+        older={older}
+        catalogue={catalogue}
+        onPutBack={putInCart}
+        // Not scrolled to: the page moving would put something new under
+        // the finger (inventory-tng-lm1b).
+        focusAfter={() => cartHeading.current?.focus({ preventScroll: true })}
+      />
       {checkName.value && name !== undefined && (
         <div role="alert" class={CAUTION_BOX}>
           <div>{sayParts(ARE_YOU, { name: <strong>{name}</strong> })}</div>

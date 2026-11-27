@@ -24,6 +24,7 @@ import {
 } from "./older-builds";
 import { toCart, withRetired } from "./older-to-cart";
 import { indexOf } from "./search";
+import { SETTLE_MS, useKeptSpace } from "./settling";
 
 /** An older build's cart, filled for each kind (olderKind). */
 const CART_KIND_WORDS: Record<Kind, MessageDescriptor> = {
@@ -82,7 +83,9 @@ export const KEPT_ON_NOT_SENT = msg`Kept on this device {when}, not sent.`;
  * without asking: focus then goes to its entry's heading, and taps on the
  * entry's buttons wait a moment (SETTLE_MS). A tap that takes its entry
  * away makes every entry's buttons wait, and focus goes to the heading of
- * the entry that moved up, or of the list. One holding an item retired
+ * the entry that moved up, or of the list; the last entry taken away,
+ * the list's space stays blank a moment (useKeptSpace), and focus goes to
+ * what follows (`focusAfter`). One holding an item retired
  * since, and out of the catalogue, names it from the catalogue's retired
  * items, and goes in the cart only once that line is discarded.
  */
@@ -90,11 +93,14 @@ export function OlderList({
   older,
   catalogue,
   onPutBack,
+  focusAfter,
 }: {
   older: OlderStore;
   catalogue: Catalogue;
   /** Put one back in the cart: why not, if it was not. */
   onPutBack: (each: Older) => NotPut | null;
+  /** Focus what follows the list, once nothing is listed. */
+  focusAfter: () => void;
 }) {
   // The one whose discarding is being confirmed, and what one tap said.
   const discarding = useSignal<string | null>(null);
@@ -107,6 +113,8 @@ export function OlderList({
   // gone from place `at`, the one at that place once `on` is not listed.
   const refocus = useRef<{ on: string; at: number | null } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const list = useRef<HTMLElement>(null);
+  const kept = useKeptSpace();
   const listed = older.listed.value;
   // Each in words once, not on every change to the cart beside it.
   const shown = useMemo(() => {
@@ -142,9 +150,17 @@ export function OlderList({
   /** Where `on` is listed, or -1. */
   const placeOf = (on: string) =>
     shown.findIndex(({ each }) => olderId(each) === on);
-  /** Focus the heading of the entry at `at`, or the list's if none is. */
-  const focusPlace = (at: number) =>
-    (document.getElementById(`older-${at}`) ?? heading.current)?.focus();
+  /** Focus the heading of the entry at `at`, or the list's if none is,
+   * or, none listed, what follows the list (Ali, 2026-11-27,
+   * inventory-tng-lm1b). */
+  const focusPlace = (at: number) => {
+    const to = document.getElementById(`older-${at}`) ?? heading.current;
+    if (to === null) {
+      focusAfter();
+    } else {
+      to.focus();
+    }
+  };
   // After a line's Discard, focus goes to its entry's heading, not to the
   // page; if a tap took the entry away, to the heading of the one that
   // moved up in its place, or of the list if none did (Ali, 2026-11-27,
@@ -163,7 +179,7 @@ export function OlderList({
     focusPlace(want.at ?? n);
   }, [shown]);
   if (shown.length === 0) {
-    return null;
+    return kept.space(focusAfter);
   }
   /** A tap on one of `on`'s buttons, ignored just after a line of it was
    * discarded, or just after a tap took any entry away: the second tap of
@@ -186,11 +202,16 @@ export function OlderList({
         }
         return;
       }
+      // Measured before the tap redraws the list, drawn as it was tapped.
+      const tall = (list.current as HTMLElement).getBoundingClientRect().height;
       tap();
       if (!older.listed.value.some((each) => olderId(each) === on)) {
         const at = placeOf(on);
         entryGone.current = { when: performance.now(), at };
         refocus.current = { on, at };
+        if (older.listed.value.length === 0) {
+          kept.keep(tall);
+        }
       }
     };
   /** What to tell the volunteer, under `on`, of its Discard, or a line's,
@@ -207,7 +228,7 @@ export function OlderList({
               : ("discard_not_kept" as const),
         };
   return (
-    <section>
+    <section ref={list}>
       <h2 ref={heading} tabIndex={-1}>
         {say(CHECKED_OUT)}
       </h2>
@@ -350,11 +371,6 @@ export const CART_NOT_EMPTY = msg`Record or discard the current cart before addi
 export const NOT_KEPT = msg`This browser can't keep the cart. Clear local data, reload the page and try again.`;
 /** The browser would not keep a discard. */
 export const NOT_DISCARDED = msg`Unable to discard. Clear your site data to remove.`;
-
-/** How long after a line's Discard taps on its entry's buttons are
- * ignored, and after a tap took an entry away taps on every entry's, in
- * milliseconds. */
-const SETTLE_MS = 500;
 
 /** Add to cart, tapped on one changed in another tab since it was listed
  * (Ali, inventory-tng-8gj). */
