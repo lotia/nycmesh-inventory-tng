@@ -44,3 +44,15 @@ test("does not show again on pageshow when nothing changed", () => {
   window.dispatchEvent(new Event("pageshow"));
   expect(shows).toBe(2);
 });
+
+test("shows on pageshow a tick put back, which leaves the value as it was", () => {
+  document.body.innerHTML = `<input type="checkbox" name="tick">`;
+  const tick = document.querySelector("input") as HTMLInputElement;
+  let ticks = 0;
+  follow(document, [tick], () => {
+    ticks += 1;
+  });
+  tick.checked = true;
+  window.dispatchEvent(new Event("pageshow"));
+  expect(ticks).toBe(2);
+});

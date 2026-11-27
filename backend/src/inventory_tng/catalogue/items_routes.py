@@ -128,6 +128,10 @@ SHOWN_FREE = {"yes": True, "no": False}
 # as it is now: ALERTS, and a unit fixed or freed since it was shown, by
 # its cause.
 ITEM_ALERTS = ALERTS | unit_changes.SINCE_SHOWN_RULES
+# Those of them said above the form sent back, what was typed kept, as
+# their words ask to check the unit and Reorder at and save again: all
+# but a save changed since, whose form is shown afresh.
+UNIT_SINCE_ALERTS = unit_changes.SINCE_SHOWN_RULES - {CHANGED}
 
 
 class _AskFirst(Exception):
@@ -792,6 +796,22 @@ def item(
     )
 
 
+def _unit_since(session: Session, item: Item, form: Mapping[str, str]) -> Words | None:
+    """The words of SINCE_SHOWN's rule when the item form, sent back for
+    what was typed before its save could check (items.save), changes the
+    unit fixed or freed since it was shown: the page sent back says
+    Reorder at's unit as it is now, so a number typed for the other is
+    not saved in it unnoticed (inventory-tng-zhnd)."""
+    if form.get("unit", item.unit) == item.unit:
+        return None
+    why = unit_changes.unit_fixed(session, item)
+    if not unit_changes.fixed_otherwise(why, SHOWN_FREE.get(form.get(UNIT_FREE, ""))):
+        return None
+    reason, rule = unit_changes.SINCE_SHOWN[why]
+    log.info("unit fixed otherwise than shown", item_id=item.id, reason=reason)
+    return RULES[rule]
+
+
 def _short_to_set(
     session: Session, item: Item, package_id: int | None
 ) -> ItemPackage | None:
@@ -888,6 +908,17 @@ def save_item(
                 form_sent_back=ItemForm.ITEM,
                 similar=asked or (),
             )
+        if broken in UNIT_SINCE_ALERTS:
+            return _item_page(
+                request,
+                session,
+                signed,
+                found,
+                problems=problems,
+                values=form,
+                form_sent_back=ItemForm.ITEM,
+                alert=RULES[broken],
+            )
         if broken in ITEM_ALERTS:
             alert = RULES[broken]
             return _item_page(request, session, signed, found, alert=alert)
@@ -910,6 +941,7 @@ def save_item(
             problems=problems,
             values=form,
             form_sent_back=ItemForm.ITEM,
+            alert=_unit_since(session, found, form),
         )
     _decided(session, typed, item_id=item_id)
     session.commit()

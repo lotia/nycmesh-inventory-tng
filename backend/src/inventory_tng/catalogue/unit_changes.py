@@ -230,9 +230,14 @@ def require_fixed_as_shown(
     the number typed in another unit than the page said, and keep or
     convert what is recorded otherwise (inventory-tng-zhnd). None for no
     form, as a command's."""
-    if shown_free is None or shown_free == (why is None):
-        return
-    _refused(item_id, *SINCE_SHOWN[why])
+    if fixed_otherwise(why, shown_free):
+        _refused(item_id, *SINCE_SHOWN[why])
+
+
+def fixed_otherwise(why: UnitFixed | None, shown_free: bool | None) -> bool:
+    """Whether an item fixed by `why` (None, free) is fixed or free
+    otherwise than its form showed it (`shown_free`; None, no form)."""
+    return shown_free is not None and shown_free != (why is None)
 
 
 def _refused(item_id: int, reason: str, rule: str) -> None:

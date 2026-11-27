@@ -758,7 +758,7 @@ def change_password(
 ) -> None:
     """A new password, from the session `row`: every other session of
     theirs ends, and any unused reset link. The caller has checked it
-    (password_problem) and commits."""
+    (password_problems) and commits."""
     set_password(session, row.admin_id, password, now, keep=row.id)
 
 
@@ -771,7 +771,8 @@ def set_password(
     keep: int | None = None,
 ) -> None:
     """A new password: their sessions end, all but `keep`, and any unused
-    reset link. The caller has checked it (password_problem) and commits."""
+    reset link. The caller has checked it (password_problems, or
+    password_problem for a command's) and commits."""
     _set_password(session, admin_id, password, now)
     ended = end_sessions(session, admin_id, now, keep=keep)
     void_reset_links(session, admin_id, now)
@@ -1091,7 +1092,7 @@ def use_reset_link(
     session: Session, link: ResetLink, password: str, now: datetime
 ) -> None:
     """Does what the link was made for: a new password (checked by the caller
-    with password_problem), and, if it says so, its authenticators and
+    with password_problems), and, if it says so, its authenticators and
     recovery codes gone, so a new one is set up at sign-in while TOTP is
     required. Every session of theirs ends. The caller commits."""
     set_actor(session, f"admin:{link.admin_id}")

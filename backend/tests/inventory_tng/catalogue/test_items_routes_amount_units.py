@@ -200,6 +200,50 @@ def test_reorder_at_typed_while_labelled_is_refused_once_they_are_revoked(
     )
 
 
+def test_a_unit_fixed_since_keeps_what_was_typed_beside_its_alert(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Drawn while the cable's unit was free; a label printed before Save:
+    refused, saying so above the form sent back, so the part number and
+    Reorder at typed are kept, Reorder at saying m, the unit it is read in
+    now, to check before saving again."""
+    cable = new_item(session, radios, "Cat6 cable", unit="m")
+    labelled(session, cable, 0)
+    sent = shown_item_form(cable, unit="ft", minimum="10", part_number="C6-OUT")
+    refused = admin_client.post(f"{ITEMS}/{cable.id}", data=sent | {UNIT_FREE: "yes"})
+    assert refused.status_code == 409
+    assert str(RULES["item_unit_labelled_since_shown"]) in text(refused)
+    page = read(refused.text)
+    form = page.one("form", action=f"{ITEMS}/{cable.id}")
+    assert form.one("input", name="part_number").attrs["value"] == "C6-OUT"
+    assert form.one("input", name="minimum").attrs["value"] == "10"
+    assert _reorder_at(page, cable.id) == ("m", "decimal", None)
+    assert _unit_free(page, cable.id) == "no"
+
+
+def test_a_unit_fixed_since_is_said_when_sent_back_for_another_box(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Drawn while the cable's unit was free, its unit changed to ft,
+    Reorder at 10 and its name emptied; stock received in m before Save.
+    Refused for its name before its save could check the unit, the page
+    sent back says m after Reorder at, as the 10 would now be read, and
+    says stock moved, so the change is not saved unnoticed in m."""
+    place = Place(session)
+    cable = place.cable
+    received(session, place, [{"item_id": cable.id, "quantity": "305", "unit": "m"}])
+    sent = shown_item_form(cable, unit="ft", minimum="10", name="")
+    refused = admin_client.post(f"{ITEMS}/{cable.id}", data=sent | {UNIT_FREE: "yes"})
+    assert refused.status_code == 409
+    assert str(RULES["item_unit_moved_since_shown"]) in text(refused)
+    page = read(refused.text)
+    assert marked({"name": page.one("input", name="name")})[1] == ["name"]
+    assert _reorder_at(page, cable.id) == ("m", "decimal", None)
+    unchanged = shown_item_form(cable, unit="ft", minimum="10", name="")
+    again = admin_client.post(f"{ITEMS}/{cable.id}", data=unchanged | {UNIT_FREE: "no"})
+    assert str(RULES["item_unit_moved_since_shown"]) not in text(again)
+
+
 @pytest.mark.parametrize("unit", ["m", "ft", "each"])
 def test_each_package_amount_says_its_unit_after_its_box(
     admin_client: TestClient, session: Session, radios: Category, unit: str

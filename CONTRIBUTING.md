@@ -879,6 +879,14 @@ utilities. When you style a page:
   when the browser puts a value back on Back; a codebase test refuses
   another input or change listener, but for the search box's suggestions
   (`combobox.ts`), which follow only what is typed.
+- A box refused for what was typed shows its problem with
+  `_field_problem.html` and is marked with the `described_by` macro
+  (`_described_by.html`): aria-invalid, and described by its problem
+  unless that sits in its label. Where a page has several forms, the
+  route says which was sent back (`sent_back`, which `admin_page` sets
+  when values are given; the item page's `form_sent_back`), and only that
+  form's boxes are marked. Codebase tests refuse a box left unmarked, and
+  a template guessing the form from what `values` holds.
 - A page that prints a QR code puts a `.printable` in its `main`: the
   `print_controls` macro (`_print_controls.html`: the paper and a Print
   button), then a `.print-sheet` for each page, what prints

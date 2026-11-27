@@ -1,7 +1,7 @@
 """A box refused for what was typed is marked invalid on every
 administrator page, and only in the form sent back: the same box in
-another form of the page is not (decision 0019, _described_by.html;
-inventory-tng-gjuq).
+another form of the page is not (CONTRIBUTING.md, Styles;
+_described_by.html; inventory-tng-gjuq).
 
 Each refusal below is one form of a page sent wrong. Its page is read
 the same way for each: every box a problem is said for, the boxes inside

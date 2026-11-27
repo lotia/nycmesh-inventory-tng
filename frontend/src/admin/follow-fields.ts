@@ -24,7 +24,7 @@ export function follow(
   show: () => void,
 ): void {
   const followed = [...fields];
-  const values = () => followed.map((field) => field.value);
+  const values = () => followed.map(held);
   let shown: string[] = [];
   const update = () => {
     shown = values();
@@ -42,4 +42,13 @@ export function follow(
     }
   });
   update();
+}
+
+/** What `field` holds: a box's or a list's value, or whether a checkbox or
+ * radio is ticked, which its value does not say. */
+function held(field: Field): string {
+  return field instanceof HTMLInputElement &&
+    (field.type === "checkbox" || field.type === "radio")
+    ? String(field.checked)
+    : field.value;
 }

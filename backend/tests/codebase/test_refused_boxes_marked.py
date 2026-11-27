@@ -1,7 +1,7 @@
 """A box whose problem a template shows is marked invalid when refused
-(decision 0019, _described_by.html; inventory-tng-gjuq): every box in a
-label that holds a field's problem calls described_by, directly or by a
-variable set from it, and a box that names a problem in an
+(CONTRIBUTING.md, Styles; _described_by.html; inventory-tng-gjuq): every
+box in a label that holds a field's problem calls described_by, directly
+or by a variable set from it, and a box that names a problem in an
 aria-describedby written by hand is aria-invalid with it.
 
 tests/across/test_refused_boxes.py sends each form wrong and reads the
