@@ -195,7 +195,10 @@ def change_reason(
         else:
             adjustment_reasons.rename(session, reason, name, seen=seen)
 
-    problem = name_problem(name)
+    # Only a rename uses the name, so only a rename is refused for it; a
+    # retire or bring-back never is for what its box holds
+    # (inventory-tng-j4ao).
+    problem = name_problem(name) if action == "rename" else None
     if problem is None:
         _, broken = refusal(session, change, "unique")
         problem = broken and forms.REASON_TAKEN

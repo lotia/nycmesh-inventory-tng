@@ -235,26 +235,48 @@ def test_a_refused_new_reason_keeps_the_name_typed(
     assert new_box(admin_client.get(SETTINGS).text) == [""]
 
 
-@pytest.mark.parametrize("action", ["retire", "restore"])
-def test_a_refused_retire_or_bring_back_shows_the_name_stored(
-    admin_client: TestClient, session: Session, action: str
+@pytest.mark.parametrize("typed", ["Borrowed", "x" * (NAME_MAX + 1)])
+def test_a_refused_bring_back_shows_the_name_stored(
+    admin_client: TestClient, session: Session, typed: str
 ) -> None:
-    """Refused, a Retire or Bring it back shows the reason's stored name,
-    not what was typed in its box: it did not use it, and the box kept
-    would refuse it again (inventory-tng-jlsi). Bring it back is refused
-    as another current reason has its name; Retire, as the box held a
-    name too long."""
+    """Refused as another current reason has its name, a Bring it back
+    shows the reason's stored name, not what was typed in its box: it did
+    not use it, and the box kept would refuse it again
+    (inventory-tng-jlsi)."""
     given = add(session, AdjustmentReason(name="Lent out"))
-    typed = "x" * (NAME_MAX + 1)
-    if action == "restore":
-        given.retired_at = datetime.now(UTC)
-        add(session, AdjustmentReason(name="Lent out"))
-        typed = "Borrowed"
-    form = {"name": typed, "version": shown(given), "action": action}
+    given.retired_at = datetime.now(UTC)
+    add(session, AdjustmentReason(name="Lent out"))
+    form = {"name": typed, "version": shown(given), "action": "restore"}
     refused = admin_client.post(f"{SETTINGS}/reasons/{given.id}", data=form)
     assert refused.status_code == 400
+    assert text(refused).count(str(REASON_TAKEN)) == 1
     box = read(refused.text).one("form", action=f"{SETTINGS}/reasons/{given.id}")
     assert box_values(box, "name") == ["Lent out"]
+
+
+@pytest.mark.parametrize("typed", ["", "Donated", "x" * (NAME_MAX + 1), "℃" * NAME_MAX])
+def test_retire_and_bring_back_ignore_the_name_box(
+    admin_client: TestClient, session: Session, typed: str
+) -> None:
+    """Retire and Bring it back do not use the name in the box, so are
+    never refused for it, blank, taken or too long; a rename with the same
+    name is (inventory-tng-j4ao)."""
+    given = add(session, AdjustmentReason(name="Lent out"))
+    add(session, AdjustmentReason(name="Donated"))
+    path = f"{SETTINGS}/reasons/{given.id}"
+
+    def send(action: str) -> int:
+        form = {"name": typed, "version": shown(given), "action": action}
+        return admin_client.post(path, data=form).status_code
+
+    assert send("retire") == 303
+    assert given.retired_at is not None
+    assert send("restore") == 303
+    assert given.retired_at is None
+    assert given.name == "Lent out"
+    if typed:  # A blank rename keeps the name stored.
+        assert send("rename") == 400
+        assert given.name == "Lent out"
 
 
 def test_sign_in_settings_ask_for_a_fresh_code(
