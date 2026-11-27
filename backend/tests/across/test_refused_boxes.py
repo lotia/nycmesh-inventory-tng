@@ -181,6 +181,27 @@ def _package_added(session: Session, make_client: MakeClient) -> Sent:
     return Sent(_ada(session, make_client), path, data, marked)
 
 
+def _box(session: Session) -> ItemPackage:
+    item = _item(session)
+    return session.scalars(select(ItemPackage).filter_by(item_id=item.id)).one()
+
+
+def _package_saved(session: Session, make_client: MakeClient) -> Sent:
+    """In the package's own form, not in Add a package, which shares its
+    box names."""
+    box = _box(session)
+    path = f"{ITEMS}/{box.item_id}/packages/{box.id}"
+    data = {"package_version": shown(box), "package_name": "", "size": "1"}
+    return Sent(_ada(session, make_client), path, data, ("package_name",))
+
+
+def _package_settings(session: Session, make_client: MakeClient) -> Sent:
+    box = _box(session)
+    path = f"{ITEMS}/{box.item_id}/packages/{box.id}/settings"
+    data = {"minimum_sealed": "x"}
+    return Sent(_ada(session, make_client), path, data, ("minimum_sealed",))
+
+
 def _category_added(session: Session, make_client: MakeClient) -> Sent:
     return Sent(_ada(session, make_client), CATEGORIES, {"name": ""}, ("name",))
 
@@ -329,6 +350,8 @@ REFUSALS: dict[str, Callable[[Session, MakeClient], Sent]] = {
     "item saved": _item_saved,
     "alias added": _alias_added,
     "package added": _package_added,
+    "package saved": _package_saved,
+    "package settings": _package_settings,
     "category added": _category_added,
     "category renamed": _category_renamed,
     "category retired": _category_retired,

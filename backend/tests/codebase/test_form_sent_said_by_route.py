@@ -8,7 +8,10 @@ import re
 
 from helpers.source import TEMPLATES
 
-# Exact markup on purpose: the rule is about what templates write.
+# Exact markup on purpose: the rule is about what templates write. It
+# finds a quoted key tested for in `values`, the guess templates made;
+# other guesses, such as values.get('version') as a condition, are left
+# to review.
 GUESS = re.compile(r"""['"][\w-]+['"]\s+(?:not\s+)?in\s+values\b""")
 
 

@@ -21,13 +21,14 @@ what was typed and are marked refused, as several share box names
 (inventory-tng-1rmm). A refused bring-back puts its problem on the name
 with no form sent, so it marks nothing (inventory-tng-qwjj). #}
 {% set item_sent = sent_form == "item" %}
+{% set item_values = values if item_sent else {} %}
 <form method="post" action="{{ here }}">
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
-  <input type="hidden" name="version" value="{{ values.get('version', item.edit_version) }}">
-  {% with default = item.name, again = _("A different item? Save it again."), sent_back = item_sent %}{% include "catalogue/_item_name.html" %}{% endwith %}
+  <input type="hidden" name="version" value="{{ item_values.get('version', item.edit_version) }}">
+  {% with default = item.name, again = _("A different item? Save it again."), sent_back = item_sent, values = item_values %}{% include "catalogue/_item_name.html" %}{% endwith %}
   <label>{% trans %}Category{% endtrans %}
     <select name="category_id" required{{ described_by("category_id", labelled=true, sent=item_sent) }}>
-      {% set chosen = values.get('category_id', item.category_id | string) %}
+      {% set chosen = item_values.get('category_id', item.category_id | string) %}
       {% for category in categories %}
       <option value="{{ category.id }}" {% if chosen == category.id | string %}selected{% endif %}>{{ category.name }}</option>
       {% endfor %}
@@ -50,7 +51,7 @@ with no form sent, so it marks nothing (inventory-tng-qwjj). #}
     <span class="hint">{#- Translators: %(until)s says why, as "until both its printed labels are revoked"; %(revoke)s is the link to revoke them, as "Revoke its 2 labels". #}{% trans until=until_revoked(labels_printed), revoke=revoke_link(labels_printed, its_labels) %}only another length {{ until }}: its recorded amounts are recalculated. {{ revoke }} to change it without recalculating its amounts.{% endtrans %}</span>
     {% endif %}
     <select name="unit"{{ unit_refused }}>
-      {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
+      {% for unit in units %}<option {% if item_values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% elif unit_fixed %}
     {% if unit_fixed == "moved" %}
@@ -70,7 +71,7 @@ with no form sent, so it marks nothing (inventory-tng-qwjj). #}
     (hints.followUnits): with the unit free, it is read in the unit
     chosen. #}
     <select name="unit"{{ unit_refused }}>
-      {% for unit in units %}<option data-unit="{{ unit }}" {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
+      {% for unit in units %}<option data-unit="{{ unit }}" {% if item_values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% endif %}
     {#- Answered No (Ali, 2026-11-25, inventory-tng-aknv): after what a
@@ -104,7 +105,7 @@ with no form sent, so it marks nothing (inventory-tng-qwjj). #}
   setting its keypad: while the unit can change freely, the one sent,
   followed as another is chosen; fixed, the item's own, converted from
   (inventory-tng-zhnd). #}
-  {% set read_in = values.get('unit') if not unit_fixed and values.get('unit') in units else item.unit %}
+  {% set read_in = item_values.get('unit') if not unit_fixed and item_values.get('unit') in units else item.unit %}
   {#- Which of the two it said, the save refused if no longer so. #}
   <input type="hidden" name="{{ unit_free }}" value="{{ 'no' if unit_fixed else 'yes' }}">
   {% for name, label, hint in [
@@ -121,7 +122,7 @@ with no form sent, so it marks nothing (inventory-tng-qwjj). #}
   {% set described = ["unit-" ~ name] if amount else [] %}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
     {% set stored = item[name] | box_amount(decimal) if amount else item[name] %}
-    {% if amount %}<span class="with-unit">{% endif %}<input name="{{ name }}" inputmode="{{ read_in | keyboard if amount else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}"
+    {% if amount %}<span class="with-unit">{% endif %}<input name="{{ name }}" inputmode="{{ read_in | keyboard if amount else 'text' }}" value="{{ item_values.get(name, stored if stored is not none else '') }}"
       {{- described_by(name, described, labelled=true, sent=item_sent) }}>
     {%- if amount %}
       <span id="unit-{{ name }}" aria-hidden="true"{% if not unit_fixed %} data-unit-of="unit"{% endif %}>{{ read_in }}</span></span>
@@ -129,12 +130,12 @@ with no form sent, so it marks nothing (inventory-tng-qwjj). #}
     {% include "_field_problem.html" %}
   </label>
   {% if name == "part_number" %}
-  {% with manufacturer = values.get('manufacturer', item.manufacturer or ''), part_number = values.get('part_number', item.part_number or '') %}{% include "catalogue/_web_search.html" %}{% endwith %}
+  {% with manufacturer = item_values.get('manufacturer', item.manufacturer or ''), part_number = item_values.get('part_number', item.part_number or '') %}{% include "catalogue/_web_search.html" %}{% endwith %}
   {% endif %}
   {% endfor %}
   {#- The item's form sent back: the box as sent; any other form's page,
   such as a package refused, shows the item's own. #}
-  {% set tracking = values.get('track_opened') == 'on' if item_sent else item.track_opened %}
+  {% set tracking = item_values.get('track_opened') == 'on' if item_sent else item.track_opened %}
   <label class="flex items-center gap-2 font-normal">
     <input type="checkbox" name="track_opened" {% if tracking %}checked{% endif %}
       {%- if followed_now.item and not retired %} aria-describedby="followed-now"{% endif %}>
@@ -152,7 +153,7 @@ with no form sent, so it marks nothing (inventory-tng-qwjj). #}
   Yes converts what is recorded, No converts nothing (Ali, 2026-11-24). #}
   <div role="alert" id="unit-question">
     <p>{% trans unit=item.unit %}Were the recorded amounts really in {{ unit }}?{% endtrans %}</p>
-    <p class="hint">{% trans new=values.get('unit'), old=item.unit %}Yes recalculates its stock, Reorder at, what is on order and its vendor offers in {{ new }}. Past movements stay in {{ old }}.{% endtrans %}</p>
+    <p class="hint">{% trans new=item_values.get('unit'), old=item.unit %}Yes recalculates its stock, Reorder at, what is on order and its vendor offers in {{ new }}. Past movements stay in {{ old }}.{% endtrans %}</p>
     <input type="hidden" name="{{ recorded_in }}" value="{{ item.unit }}">
     <div class="actions">
       {#- No first, so Enter in a field converts nothing; shown after Yes. #}

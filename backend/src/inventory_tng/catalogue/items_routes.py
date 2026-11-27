@@ -410,8 +410,10 @@ NEW_PACKAGE_FORM = "new_package"
 
 
 def _package_form(package_id: int) -> str:
-    """A package's own forms, its name and size and its settings, which
-    share no box name, as `sent_form` names them."""
+    """A package's own forms, its name and size and its settings, as
+    `sent_form` names them: one name for both, as no box either reads
+    back from what was sent has a name the other's has (each sends a
+    hidden unit_shown, never read back)."""
     return f"package-{package_id}"
 
 
