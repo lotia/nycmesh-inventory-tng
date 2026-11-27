@@ -973,6 +973,28 @@ def test_a_refused_size_is_marked_invalid_and_keeps_its_unit(
     }
 
 
+@pytest.mark.parametrize("refused", ["minimum", "on_order", "per_order"])
+def test_a_refused_amount_is_marked_invalid(
+    admin_client: TestClient, session: Session, refused: str
+) -> None:
+    """Reorder at, On order or Units per order sent as "lots": only that
+    box is marked invalid, and described by nothing, as its problem is in
+    its label (inventory-tng-h3tw's rule; inventory-tng-qwjj)."""
+    cable = _spools(session).cable
+    names = {
+        "minimum": "minimum",
+        "on_order": "on_order",
+        "per_order": f"per_order_{_offer(session, cable.id).id}",
+    }
+    page = _recount(admin_client, cable.id, **{names[refused]: "lots"})
+    assert page.status_code == 400
+    assert problem(page.text, names[refused])
+    assert {
+        which: described_and_invalid(read(page.text).one("input", name=name))
+        for which, name in names.items()
+    } == {which: (None, "true" if which == refused else None) for which in names}
+
+
 def test_a_converted_items_retired_package_is_resized_and_stays_retired(
     admin_client: TestClient, session: Session
 ) -> None:

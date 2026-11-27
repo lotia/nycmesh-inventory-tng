@@ -15,12 +15,17 @@ has no box to change: added again instead (Ali, 2026-11-23). #}
 take the {{ left }} {{ unit }} left, until it runs out.{% endtrans %}{% else %}{% trans %}It can't be received.
 None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
 {% endif %}
+{#- The item's form sent back (it has a version): only then are the
+page's problems its own, so only then is a refused box marked invalid
+(inventory-tng-qwjj); a refused bring-back puts its problem on the name
+with nothing sent. #}
+{% set item_sent = 'version' in values %}
 <form method="post" action="{{ here }}">
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
   <input type="hidden" name="version" value="{{ values.get('version', item.edit_version) }}">
-  {% with default = item.name, again = _("A different item? Save it again.") %}{% include "catalogue/_item_name.html" %}{% endwith %}
+  {% with default = item.name, again = _("A different item? Save it again."), sent_back = item_sent %}{% include "catalogue/_item_name.html" %}{% endwith %}
   <label>{% trans %}Category{% endtrans %}
-    <select name="category_id" required>
+    <select name="category_id" required{% if item_sent %}{{ described_by("category_id", labelled=true) }}{% endif %}>
       {% set chosen = values.get('category_id', item.category_id | string) %}
       {% for category in categories %}
       <option value="{{ category.id }}" {% if chosen == category.id | string %}selected{% endif %}>{{ category.name }}</option>
@@ -28,6 +33,9 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     </select>
     {% with name = "category_id" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
+  {#- A unit change answered No (recount_to) says what to do instead
+  beside the unit kept: nothing typed was refused, so it is not marked. #}
+  {% set unit_refused = described_by("unit", labelled=true) if item_sent and not recount_to else "" %}
   <label>{% trans %}Unit{% endtrans %}
     {#- Fixed, an item in a length may still change to another, converting
     what is recorded once its question is answered Yes (Ali, 2026-11-24). #}
@@ -40,7 +48,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {#- Answered No, the note below links to revoke them: the link once. #}
     <span class="hint">{#- Translators: %(until)s says why, as "until both its printed labels are revoked"; %(revoke)s is the link to revoke them, as "Revoke its 2 labels". #}{% trans until=until_revoked(labels_printed), revoke=revoke_link(labels_printed, its_labels) %}only another length {{ until }}: its recorded amounts are recalculated. {{ revoke }} to change it without recalculating its amounts.{% endtrans %}</span>
     {% endif %}
-    <select name="unit">
+    <select name="unit"{{ unit_refused }}>
       {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% elif unit_fixed %}
@@ -57,7 +65,7 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
     {% endif %}
     <input type="hidden" name="unit" value="{{ item.unit }}">
     {% else %}
-    <select name="unit">
+    <select name="unit"{{ unit_refused }}>
       {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% endif %}
@@ -98,7 +106,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   ] %}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
     {% set stored = item[name] | box_amount(decimal) if name == "minimum" else item[name] %}
-    <input name="{{ name }}" inputmode="{{ values.get('unit', item.unit) | keyboard if name == 'minimum' else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}">
+    <input name="{{ name }}" inputmode="{{ values.get('unit', item.unit) | keyboard if name == 'minimum' else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}"
+      {%- if item_sent %}{{ described_by(name, labelled=true) }}{% endif %}>
     {% include "_field_problem.html" %}
   </label>
   {% if name == "part_number" %}
@@ -154,7 +163,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   {% if not retired %}
   {% set sent = values if 'alias_name' in values else {} %}
   <form method="post" action="{{ here }}/aliases" class="actions">
-    <label>{% trans %}Alias{% endtrans %} <input name="alias_name" inputmode="text" value="{{ sent.get('alias_name', '') }}" maxlength="{{ name_max }}" required>
+    <label>{% trans %}Alias{% endtrans %} <input name="alias_name" inputmode="text" value="{{ sent.get('alias_name', '') }}" maxlength="{{ name_max }}" required
+      {%- if sent %}{{ described_by("alias_name", labelled=true) }}{% endif %}>
       {% if sent %}{% with name = "alias_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = sent.get('alias_name', '') %}{% include "catalogue/_units_read.html" %}{% endwith %}
@@ -180,7 +190,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
         <form method="post" action="{{ here }}/packages/{{ package.id }}" class="actions">
           <input type="hidden" name="package_version" value="{{ sent.get('package_version', package.edit_version) }}">
           <label>{% trans %}Name{% endtrans %}
-            <input name="package_name" inputmode="text" value="{{ sent.get('package_name', package.name) }}" required>
+            <input name="package_name" inputmode="text" value="{{ sent.get('package_name', package.name) }}" required
+              {%- if sent %}{{ described_by("package_name", labelled=true) }}{% endif %}>
             {% if sent %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% with typed = sent.get('package_name', package.name) %}{% include "catalogue/_units_read.html" %}{% endwith %}
@@ -245,7 +256,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
           </label>
           {% endif %}
           <label>{% trans %}Keep sealed{% endtrans %} <span class="hint">{% trans %}in the stores; blank: no minimum{% endtrans %}</span>
-            <input name="minimum_sealed" inputmode="numeric" value="{{ sent.get('minimum_sealed', keep) }}">
+            <input name="minimum_sealed" inputmode="numeric" value="{{ sent.get('minimum_sealed', keep) }}"
+              {%- if sent %}{{ described_by("minimum_sealed", labelled=true) }}{% endif %}>
             {% if sent %}{% with name = "minimum_sealed" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <button>{% trans %}Save{% endtrans %}<span class="sr-only"> {{ package.name_shown }}</span></button>
@@ -267,7 +279,8 @@ None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
   {% set new = values if adding else {} %}
   <form method="post" action="{{ here }}/packages" class="actions" id="add-package">
     <input type="hidden" name="unit_shown" value="{{ item.unit }}">
-    <label>{% trans %}Package{% endtrans %} <input name="package_name" inputmode="text" value="{{ new.get('package_name', '') }}" placeholder="{% trans %}Box{% endtrans %}" required>
+    <label>{% trans %}Package{% endtrans %} <input name="package_name" inputmode="text" value="{{ new.get('package_name', '') }}" placeholder="{% trans %}Box{% endtrans %}" required
+      {%- if adding %}{{ described_by("package_name", labelled=true) }}{% endif %}>
       {% if adding %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = new.get('package_name', ''), sent = new %}{% include "catalogue/_units_read.html" %}{% endwith %}

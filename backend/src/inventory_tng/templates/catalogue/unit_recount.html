@@ -49,14 +49,14 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
     (on_order, _("On order"), item.on_order, _("in %(unit)s; blank: none", unit=unit)),
   ] %}
   <label>{{ label }} <span class="hint">{{ hint }}</span>
-    <input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, stored | box_amount(decimal) if stored is not none else '') }}">
+    <input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, stored | box_amount(decimal) if stored is not none else '') }}"{{ described_by(name, labelled=true) }}>
     {% include "_field_problem.html" %}
   </label>
   {% endfor %}
   {% for each in plan.offers %}
   {% set name = per_order ~ each.offer.id %}
   <label>{#- Translators: %(vendor)s is a vendor's name, or the address of its offer when it names none. #}{% trans vendor=each.named %}Units per order from {{ vendor }}{% endtrans %} <span class="hint">{% trans unit=unit %}in {{ unit }}; blank: not said{% endtrans %}</span>
-    <input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, each.offer.units_per_order | box_amount(decimal) if each.offer.units_per_order is not none else '') }}">
+    <input name="{{ name }}" inputmode="{{ unit | keyboard }}" value="{{ values.get(name, each.offer.units_per_order | box_amount(decimal) if each.offer.units_per_order is not none else '') }}"{{ described_by(name, labelled=true) }}>
     {% include "_field_problem.html" %}
   </label>
   {% endfor %}

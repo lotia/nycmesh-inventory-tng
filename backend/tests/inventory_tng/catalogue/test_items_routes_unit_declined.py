@@ -22,7 +22,7 @@ from inventory_tng.web.forms import CHANGED, RULES
 
 from helpers.items import unit_answered
 from helpers.labels import labelled
-from helpers.markup import problem, read, text
+from helpers.markup import described_and_invalid, problem, read, text
 from helpers.rows import add
 from helpers.stock import Place, Spools, converted_reel, received, retire, write
 
@@ -161,6 +161,10 @@ def test_stock_moved_gives_a_place_and_links_to_the_recount(
     note = read(page).one("span", id="unit-problem")
     note.one("a", f"recount it in {into}", href=unit_recount(cable.id, into))
     assert note.all("a", href=item_labels(cable.id)) == []
+    # Nothing typed was refused: the unit kept is not marked invalid
+    # (inventory-tng-qwjj).
+    unit_box = read(page).one("select", name="unit")
+    assert described_and_invalid(unit_box) == (None, None)
 
 
 def _installed(session: Session, unit: str = "m") -> Item:

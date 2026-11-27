@@ -24,9 +24,31 @@ from inventory_tng.core.db_errors import attempt
 from inventory_tng.models.catalogue import CURRENT_ALIAS, Category, Item, ItemAlias
 
 from helpers.items import NOW, item_form, items_named, new_item, shown_item_form
-from helpers.markup import links, problem, read, text
+from helpers.markup import described_and_invalid, links, problem, read, text
 from helpers.rows import add, history, item_fields, shown
 from helpers.stock import retire
+
+
+def test_a_refused_alias_is_marked_invalid(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Refused for what was typed, the Alias box is marked invalid,
+    described by nothing, as its problem is in its label; the item's own
+    name box is not (inventory-tng-h3tw's rule; inventory-tng-qwjj)."""
+    item = new_item(session, radios)
+    refused = admin_client.post(
+        f"{ITEMS}/{item.id}/aliases", data={"alias_name": "- ?"}
+    )
+    assert refused.status_code == 400
+    assert problem(refused.text, "alias_name")
+    page = read(refused.text)
+    alias = page.one("form", action=f"{ITEMS}/{item.id}/aliases")
+    name = page.one("form", action=f"{ITEMS}/{item.id}")
+    assert described_and_invalid(alias.one("input", name="alias_name")) == (
+        None,
+        "true",
+    )
+    assert described_and_invalid(name.one("input", name="name")) == (None, None)
 
 
 def aliased(session: Session, item: Item, *names: str) -> list[ItemAlias]:

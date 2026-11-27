@@ -27,9 +27,66 @@ from inventory_tng.stock import open_packages
 from inventory_tng.web.forms import ABOVE_ZERO, CHANGED, RULES
 
 from helpers.items import NOW, new_item, same_size_twins, shown_item_form
-from helpers.markup import box_values, checked, forms, problem, read, text, words_on
+from helpers.markup import (
+    box_values,
+    checked,
+    described_and_invalid,
+    forms,
+    problem,
+    read,
+    text,
+    words_on,
+)
 from helpers.rows import add, history, shown
 from helpers.stock import Spools, retire
+
+
+@pytest.mark.parametrize(
+    ("sent_to", "box"),
+    [
+        ("box", "package_name"),
+        ("box settings", "minimum_sealed"),
+        ("add", "package_name"),
+    ],
+)
+def test_a_refused_package_box_is_marked_invalid(
+    admin_client: TestClient, session: Session, radios: Category, sent_to: str, box: str
+) -> None:
+    """A package's name or Keep sealed, or Add package's name, refused for
+    what was typed: only that form's box is marked invalid, described by
+    nothing, as its problem is in its label; the same boxes of the other
+    forms are not (inventory-tng-h3tw's rule; inventory-tng-qwjj)."""
+    item = new_item(session, radios)
+    packages = {
+        "box": add(session, ItemPackage(item_id=item.id, name="Box", size=Decimal(4))),
+        "bag": add(session, ItemPackage(item_id=item.id, name="Bag", size=Decimal(2))),
+    }
+    here = f"{ITEMS}/{item.id}"
+    boxes = {"add": (f"{here}/packages", "package_name")}
+    for which, package in packages.items():
+        boxes[which] = (f"{here}/packages/{package.id}", "package_name")
+        boxes[f"{which} settings"] = (
+            f"{here}/packages/{package.id}/settings",
+            "minimum_sealed",
+        )
+    box_package = packages["box"]
+    sent = {
+        "box": {"size": "4", "package_version": shown(box_package)},
+        "box settings": {},
+        "add": {"size": "3"},
+    }[sent_to]
+    refused = admin_client.post(
+        boxes[sent_to][0], data=sent | {box: "- ?", "unit_shown": "each"}
+    )
+    assert refused.status_code == 400
+    assert problem(refused.text, box)
+    page = read(refused.text)
+    assert {
+        which: described_and_invalid(
+            page.one("form", action=at).one("input", name=name)
+        )
+        for which, (at, name) in boxes.items()
+    } == {which: (None, "true" if which == sent_to else None) for which in boxes}
 
 
 def test_packages(admin_client: TestClient, session: Session, radios: Category) -> None:

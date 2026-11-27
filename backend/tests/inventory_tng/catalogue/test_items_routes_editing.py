@@ -38,6 +38,7 @@ from inventory_tng.web.forms import NAME_MAX, RULES, name_up_to
 from helpers.items import NOW, item_form, new_item, shown_item_form
 from helpers.markup import (
     box_values,
+    described_and_invalid,
     hidden_fields,
     links,
     options,
@@ -580,6 +581,85 @@ def test_an_item_comes_back_only_into_a_current_category(
     assert refused.status_code == 400
     assert "Its category is retired" in text(refused)
     assert item.retired_at is not None
+
+
+# The item form's boxes, by their tag.
+ITEM_BOXES = {
+    "name": "input",
+    "category_id": "select",
+    "unit": "select",
+    "manufacturer": "input",
+    "part_number": "input",
+    "old_code": "input",
+    "minimum": "input",
+    "notes": "input",
+    "ordering_notes": "input",
+}
+
+
+def _item_boxes_invalid(page: str, item: Item) -> dict[str, str | None]:
+    """Each box of the item's own form, by name: its aria-invalid. Each
+    problem is in its box's label, so none is described by anything."""
+    form = read(page).one("form", action=f"{ITEMS}/{item.id}")
+    marked = {}
+    for name, tag in ITEM_BOXES.items():
+        described, marked[name] = described_and_invalid(form.one(tag, name=name))
+        assert described is None
+    return marked
+
+
+@pytest.mark.parametrize(
+    ("sent", "refused"),
+    [
+        (
+            {"name": "", "category_id": "0", "unit": "parsecs", "minimum": "lots"},
+            {"name", "category_id", "unit", "minimum"},
+        ),
+        ({"manufacturer": "Ubiquiti", "part_number": "LBE"}, {"part_number"}),
+    ],
+)
+def test_a_refused_item_box_is_marked_invalid(
+    admin_client: TestClient,
+    session: Session,
+    radios: Category,
+    sent: dict[str, str],
+    refused: set[str],
+) -> None:
+    """Refused for what was typed, each box of the item's form is marked
+    invalid, its problem heard in its label, and no other is
+    (inventory-tng-h3tw's rule; inventory-tng-qwjj). A part number taken
+    is said beside it, not the manufacturer's."""
+    add(
+        session,
+        Item(
+            name="Other",
+            category_id=radios.id,
+            manufacturer="Ubiquiti",
+            part_number="LBE",
+        ),
+    )
+    item = new_item(session, radios)
+    page = admin_client.post(f"{ITEMS}/{item.id}", data=shown_item_form(item, **sent))
+    assert page.status_code == 400
+    assert all(problem(page.text, name) for name in refused)
+    marked = _item_boxes_invalid(page.text, item)
+    assert {name for name, invalid in marked.items() if invalid} == refused
+    assert set(marked.values()) == {"true", None}
+
+
+def test_a_refused_bring_back_marks_no_item_box(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Refused as its category is retired, a bring-back's problem is beside
+    the name, but nothing typed was refused, so no box is marked."""
+    item = new_item(session, radios)
+    admin_client.post(f"{ITEMS}/{item.id}/retire")
+    radios.retired_at = radios.created_at
+    session.flush()
+    refused = admin_client.post(f"{ITEMS}/{item.id}/restore")
+    assert refused.status_code == 400
+    assert problem(refused.text, "name")
+    assert set(_item_boxes_invalid(refused.text, item).values()) == {None}
 
 
 def test_an_edit_with_a_problem_changes_nothing(
