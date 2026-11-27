@@ -30,8 +30,8 @@ from helpers.items import NOW, new_item, same_size_twins, shown_item_form
 from helpers.markup import (
     box_values,
     checked,
-    described_and_invalid,
     forms,
+    marked,
     problem,
     read,
     text,
@@ -72,12 +72,12 @@ def test_a_refused_package_box_is_marked_invalid(
     assert refused.status_code == 400
     page = read(refused.text)
     assert problem(page, refused_box)
-    assert {
-        which: described_and_invalid(
-            page.one("form", action=at).one("input", name=name)
-        )
-        for which, (at, name) in boxes.items()
-    } == {which: (None, "true" if which == sent_to else None) for which in boxes}
+    assert marked(
+        {
+            which: page.one("form", action=at).one("input", name=name)
+            for which, (at, name) in boxes.items()
+        }
+    ) == (dict.fromkeys(boxes), [sent_to])
 
 
 def test_packages(admin_client: TestClient, session: Session, radios: Category) -> None:

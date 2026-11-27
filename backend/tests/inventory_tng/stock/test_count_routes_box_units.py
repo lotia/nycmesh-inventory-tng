@@ -13,7 +13,13 @@ from inventory_tng.stock.paths import COUNTS
 from inventory_tng.web.formatting import PRINTED_LENGTH
 from inventory_tng.web.forms import type_a_number
 
-from helpers.markup import Element, read, said_beside, units_offered
+from helpers.markup import (
+    Element,
+    described_and_invalid,
+    read,
+    said_beside,
+    units_offered,
+)
 from helpers.stock import Place, Spools, count_form_at, received, to_feet
 
 
@@ -177,5 +183,4 @@ def test_a_refused_box_whose_problem_is_in_its_label_is_marked_invalid(
     label = box.find_parent("label")
     assert isinstance(label, Element)
     assert type_a_number() in label.spoken
-    assert box.attrs["aria-describedby"] == "unit-extra_quantity"
-    assert invalid(page, "extra_quantity")
+    assert described_and_invalid(box) == ("unit-extra_quantity", "true")

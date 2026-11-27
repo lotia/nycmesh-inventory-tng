@@ -17,7 +17,14 @@ from inventory_tng.stock.ledger import LOOSE, Entry, Form
 from inventory_tng.stock.moments import expected
 from inventory_tng.stock.paths import COUNTS
 
-from helpers.markup import Element, problem, read, text, unit_beside
+from helpers.markup import (
+    Element,
+    described_and_invalid,
+    problem,
+    read,
+    text,
+    unit_beside,
+)
 from helpers.rows import add
 from helpers.stock import Spools, count_form, held_by_form, retire, write
 from helpers.store_areas import Store, area, counts_at, field
@@ -210,10 +217,10 @@ def test_a_fix_that_is_no_number_is_said_beside_its_box(
     # Its problem is under its label, so describes it before its unit
     # (inventory-tng-h3tw, inventory-tng-4mcj).
     box = details.one("input", name=moved.arrived())
-    assert box.attrs["aria-describedby"] == (
-        f"{moved.arrived()}-problem unit-{moved.arrived()}"
+    assert described_and_invalid(box) == (
+        f"{moved.arrived()}-problem unit-{moved.arrived()}",
+        "true",
     )
-    assert box.attrs["aria-invalid"] == "true"
     assert expected(session, moved.there.id) == {moved.item: Decimal(2)}
 
 

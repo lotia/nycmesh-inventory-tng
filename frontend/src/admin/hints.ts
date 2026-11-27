@@ -125,6 +125,7 @@ export function followTyped(document: Document): void {
  * fires no input (inventory-tng-2t5h).
  */
 export function followWas(document: Document): void {
+  const shows: (() => void)[] = [];
   for (const field of document.querySelectorAll<HTMLInputElement>(
     "input[data-was]",
   )) {
@@ -136,7 +137,12 @@ export function followWas(document: Document): void {
       showDescribing(field, was, field.value !== field.dataset.was);
     };
     field.addEventListener("input", show);
-    document.defaultView?.addEventListener("pageshow", show);
+    shows.push(show);
     show();
   }
+  document.defaultView?.addEventListener("pageshow", () => {
+    for (const show of shows) {
+      show();
+    }
+  });
 }

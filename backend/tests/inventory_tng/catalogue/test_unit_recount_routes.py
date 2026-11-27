@@ -33,8 +33,8 @@ from helpers.markup import (
     address,
     alerts_on,
     box_values,
-    described_and_invalid,
     hidden_fields,
+    marked,
     problem,
     read,
     table_rows,
@@ -959,18 +959,14 @@ def test_a_refused_size_is_marked_invalid_and_keeps_its_unit(
     reel.short_below = Decimal(10)
     session.flush()
     sent = _sent(_page(admin_client, cable.id), **{f"{refused}_{reel.id}": "lots"})
-    page = admin_client.post(unit_recount(cable.id, "ft"), data=sent)
-    assert page.status_code == 400
-    assert problem(page.text, f"{refused}_{reel.id}")
-    assert {
-        name: described_and_invalid(
-            read(page.text).one("input", name=f"{name}_{reel.id}")
-        )
-        for name in ("size", "short_below")
-    } == {
-        name: (f"unit-{name}_{reel.id}", "true" if name == refused else None)
-        for name in ("size", "short_below")
-    }
+    sent_back = admin_client.post(unit_recount(cable.id, "ft"), data=sent)
+    assert sent_back.status_code == 400
+    page = read(sent_back.text)
+    assert problem(page, f"{refused}_{reel.id}")
+    names = {name: f"{name}_{reel.id}" for name in ("size", "short_below")}
+    assert marked(
+        {which: page.one("input", name=name) for which, name in names.items()}
+    ) == ({which: f"unit-{name}" for which, name in names.items()}, [refused])
 
 
 def test_reorder_at_on_order_and_units_per_order_say_the_new_unit_after_the_box(
@@ -1019,13 +1015,9 @@ def test_a_refused_amount_is_marked_invalid(
     assert sent.status_code == 400
     page = read(sent.text)
     assert problem(page, names[refused])
-    assert {
-        which: described_and_invalid(page.one("input", name=name))
-        for which, name in names.items()
-    } == {
-        which: (f"unit-{name}", "true" if which == refused else None)
-        for which, name in names.items()
-    }
+    assert marked(
+        {which: page.one("input", name=name) for which, name in names.items()}
+    ) == ({which: f"unit-{name}" for which, name in names.items()}, [refused])
 
 
 def test_a_converted_items_retired_package_is_resized_and_stays_retired(

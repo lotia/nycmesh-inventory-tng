@@ -27,6 +27,7 @@ from helpers.markup import (
     box_values,
     described_and_invalid,
     hidden_fields,
+    marked,
     options,
     read,
     text,
@@ -179,9 +180,11 @@ def test_a_refused_reason_rename_is_tied_to_its_problem(
         )
 
     problem = f"reason_{given.id}-problem"
-    assert described_and_invalid(box(given)) == (problem, "true")
+    assert marked({"given": box(given), "other": box(other)}) == (
+        {"given": problem, "other": None},
+        ["given"],
+    )
     assert page.one("*", id=problem).text == str(REASON_TAKEN)
-    assert described_and_invalid(box(other)) == (None, None)
 
 
 def test_a_refused_reason_rename_keeps_the_name_typed(
@@ -198,10 +201,9 @@ def test_a_refused_reason_rename_keeps_the_name_typed(
     path = f"{SETTINGS}/reasons/{given.id}"
 
     def names(page: str) -> list[list[str | None]]:
+        whole = read(page)
         return [
-            box_values(
-                read(page).one("form", action=f"{SETTINGS}/reasons/{each}"), "name"
-            )
+            box_values(whole.one("form", action=f"{SETTINGS}/reasons/{each}"), "name")
             for each in (given.id, other.id)
         ]
 

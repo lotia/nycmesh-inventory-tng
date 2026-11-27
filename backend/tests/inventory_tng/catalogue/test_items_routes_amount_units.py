@@ -16,7 +16,7 @@ from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Category, ItemPackage
 
 from helpers.items import new_item
-from helpers.markup import described_and_invalid, problem, read, unit_beside
+from helpers.markup import marked, problem, read, unit_beside
 from helpers.rows import add, shown
 
 
@@ -90,8 +90,8 @@ def test_a_refused_package_amount_is_marked_invalid_and_keeps_its_unit(
     }[sent_to]
     refused = admin_client.post(action, data=data | {box: "lots", "unit_shown": "m"})
     assert refused.status_code == 400
-    assert problem(refused.text, box)
     page = read(refused.text)
+    assert problem(page, box)
     boxes = {
         "reel": (own, "size", f"unit-size-{reel.id}"),
         "reel settings": (settings, "short_below", f"unit-short_below-{reel.id}"),
@@ -103,12 +103,9 @@ def test_a_refused_package_amount_is_marked_invalid_and_keeps_its_unit(
         ),
         "add": (f"{here}/packages", "size", "unit-size"),
     }
-    assert {
-        which: described_and_invalid(
-            page.one("form", action=at).one("input", name=name)
-        )
-        for which, (at, name, _) in boxes.items()
-    } == {
-        which: (unit, "true" if which == sent_to else None)
-        for which, (_, _, unit) in boxes.items()
-    }
+    assert marked(
+        {
+            which: page.one("form", action=at).one("input", name=name)
+            for which, (at, name, _) in boxes.items()
+        }
+    ) == ({which: unit for which, (_, _, unit) in boxes.items()}, [sent_to])

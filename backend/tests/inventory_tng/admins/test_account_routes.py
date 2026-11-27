@@ -243,9 +243,10 @@ def test_a_refused_authenticator_rename_keeps_the_name_typed(
     path = f"{ACCOUNT}/authenticators/{first.id}/name"
 
     def names(page: str) -> list[list[str | None]]:
+        whole = read(page)
         return [
             box_values(
-                read(page).one("form", action=f"{ACCOUNT}/authenticators/{each}/name"),
+                whole.one("form", action=f"{ACCOUNT}/authenticators/{each}/name"),
                 "authenticator_name",
             )
             for each in (first.id, spare.id)

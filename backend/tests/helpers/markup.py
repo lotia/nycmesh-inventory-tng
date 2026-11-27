@@ -240,6 +240,15 @@ def described_and_invalid(box: Element) -> tuple[str | None, str | None]:
     return box.attrs.get("aria-describedby"), box.attrs.get("aria-invalid")
 
 
+def marked(boxes: dict[str, Element]) -> tuple[dict[str, str | None], list[str]]:
+    """Each box's aria-describedby (None where unset), and which boxes are
+    marked invalid, in the order given."""
+    return (
+        {which: box.attrs.get("aria-describedby") for which, box in boxes.items()},
+        [which for which, box in boxes.items() if box.attrs.get("aria-invalid")],
+    )
+
+
 def alerts_on(page: str | Element) -> list[str]:
     """The words of each alert paragraph on the page, in order."""
     return [each.text for each in read(page).all("p", role="alert")]

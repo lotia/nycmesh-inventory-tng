@@ -180,10 +180,11 @@ def change_reason(
     if reason is None:
         return not_found()
     action = action if action in {"retire", "restore"} else "rename"
+    renaming = action == "rename"
     seen = form_version(version)
     # A rename changed since it was shown: said before what is wrong with
     # the name (inventory-tng-ryjv). The reason is locked above.
-    if action == "rename" and stale_as_read(reason, seen):
+    if renaming and stale_as_read(reason, seen):
         return _changed(request, session, signed)
     name = name.strip() or reason.name
 
@@ -198,7 +199,7 @@ def change_reason(
     # Only a rename uses the name, so only a rename is refused for it; a
     # retire or bring-back never is for what its box holds
     # (inventory-tng-j4ao).
-    problem = name_problem(name) if action == "rename" else None
+    problem = name_problem(name) if renaming else None
     if problem is None:
         _, broken = refusal(session, change, "unique")
         problem = broken and forms.REASON_TAKEN
@@ -207,7 +208,7 @@ def change_reason(
         # retire or bring-back refused, the name stored, as it did not use
         # what was typed (inventory-tng-jlsi).
         field = f"reason_{reason_id}"
-        typed = {field: name} if action == "rename" else {}
+        typed = {field: name} if renaming else {}
         return _page(request, session, signed, problems={field: problem}, values=typed)
     session.commit()
     notice = {"retire": "reason_retired", "restore": "restored"}

@@ -791,8 +791,8 @@ def count(
         others=sent.problems,
     )
     problems |= words
-    # Shown otherwise by `said`, as a sealed row of a package held nowhere
-    # has no box for words beside.
+    # Read from `said`, not `words`: a sealed row of a package held nowhere
+    # is shown otherwise with no box to put words beside.
     if said:
         reasons.append("shown_otherwise")
     # Every alert is said above the form, each in its own words: why it was
