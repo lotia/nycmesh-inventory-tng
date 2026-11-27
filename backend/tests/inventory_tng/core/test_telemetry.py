@@ -617,6 +617,39 @@ def test_counts_the_moves_fixed_on_a_count_form(
         assert counted(reader, name)[(("direction", direction),)] == before + 1
 
 
+def test_counts_count_forms_refused_by_reason(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Counted at once, as a refusal writes nothing to commit: by each
+    reason a form is refused for, once, from the form or as it was saved
+    (inventory-tng-w7xt)."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    place = stocked(session)
+    radio, cable = f"counted_{place.item.id}", f"counted_{place.cable.id}"
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form_at(client, place.store.id)
+    name = "inventory.counts.refused"
+    before = counted(reader, name)
+    sent = (
+        (form | {radio: "lots"}, 400),
+        (form | {radio: "3", f"counted_0{place.item.id}": "2", cable: "lots"}, 400),
+        (form | {radio: "4", "seen": str(int(form["seen"]) - 1)}, 409),
+        (form | {radio: "2"}, 303),
+        (form | {radio: "3"}, 303),
+    )
+    for data, status in sent:
+        answer = client.post(path, data=data, follow_redirects=False)
+        assert answer.status_code == status
+    assert added(reader, name, before) == {
+        (("reason", "box_problem"),): 2,
+        (("reason", "named_twice"),): 1,
+        (("reason", "changed_since_shown"),): 1,
+        (("reason", "sent_again"),): 1,
+    }
+
+
 def recorded_by_kind(reader: InMemoryMetricReader) -> tuple[int, int]:
     """inventory.counts.recorded's totals so far: counts, adjustments."""
     totals = counted(reader, "inventory.counts.recorded")
