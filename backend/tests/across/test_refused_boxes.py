@@ -93,11 +93,29 @@ def _area_added(session: Session, make_client: MakeClient) -> Sent:
     return Sent(_ada(session, make_client), LOCATIONS, data, ("parent_id",))
 
 
+def _area_added_under_a_van(session: Session, make_client: MakeClient) -> Sent:
+    """Refused by the database's rule for a parent, said by Part of."""
+    van = add(session, Location(name="Van", kind="vehicle"))
+    data = {"name": "Glovebox", "kind": "area", "parent_id": str(van.id)}
+    return Sent(_ada(session, make_client), LOCATIONS, data, ("parent_id",))
+
+
 def _location_saved(session: Session, make_client: MakeClient) -> Sent:
     hub = add(session, Location(name="Hub", kind="store"))
     data = {"name": "", "time_zone": "", "version": shown(hub)}
     path = f"{LOCATIONS}/{hub.id}"
     return Sent(_ada(session, make_client), path, data, ("name",))
+
+
+def _area_moved_into_itself(session: Session, make_client: MakeClient) -> Sent:
+    """Refused by the database's rule for a parent, said by Part of, not
+    by the name."""
+    hub = add(session, Location(name="Hub", kind="store"))
+    shelf = add(session, Location(name="Shelf", kind="area", parent_id=hub.id))
+    bin_ = add(session, Location(name="Bin", kind="area", parent_id=shelf.id))
+    data = {"name": "Shelf", "parent_id": str(bin_.id), "version": shown(shelf)}
+    path = f"{LOCATIONS}/{shelf.id}"
+    return Sent(_ada(session, make_client), path, data, ("parent_id",))
 
 
 def _location_retired(session: Session, make_client: MakeClient) -> Sent:
@@ -276,7 +294,9 @@ REFUSALS: dict[str, Callable[[Session, MakeClient], Sent]] = {
     "volunteer saved": _volunteer_saved,
     "location added": _location_added,
     "area added": _area_added,
+    "area added under a van": _area_added_under_a_van,
     "location saved": _location_saved,
+    "area moved into itself": _area_moved_into_itself,
     "location retired": _location_retired,
     "codes made": _codes_made,
     "devices listed": _devices_listed,

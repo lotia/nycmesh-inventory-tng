@@ -22,7 +22,13 @@ from inventory_tng.labels import labels
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import STORE_KINDS, Location
 from inventory_tng.places import locations, queries
-from inventory_tng.places.forms import KINDS, TAKEN, new_place, place_change
+from inventory_tng.places.forms import (
+    KINDS,
+    TAKEN,
+    new_place,
+    place_change,
+    refused_field,
+)
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.places.queries import changeable
 from inventory_tng.volunteers.queries import volunteer_names
@@ -104,10 +110,9 @@ def _location_page(
     session: Session,
     signed: SignedIn,
     location: Location,
-    problem: Words | None = None,
+    problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
     alert: Words | None = None,
-    field: str = "name",
 ) -> HTMLResponse:
     areas = queries.current_areas_of(session, location.id)
     return admin_page(
@@ -127,7 +132,7 @@ def _location_page(
             "zones": zones(location.time_zone),
             # What it takes when it has no zone of its own.
             "inherited": zone_at(session, location.parent_id),
-            "problems": {field: problem} if problem else None,
+            "problems": problems,
             "values": values,
             "alert": alert,
         },
@@ -161,7 +166,7 @@ def add_location(
             session, lambda: locations.add(session, name, kind, under)
         )
     if broken:
-        problems["name"] = rule_words(broken, TAKEN)
+        problems[refused_field(broken)] = rule_words(broken, TAKEN)
     if location is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
@@ -199,9 +204,9 @@ def save_location(
         return _location_page(request, session, signed, found, alert=RULES[CHANGED])
     name = name.strip()
     broken = None
-    parent, problem = place_change(session, found, name, parent_id)
+    parent, problems = place_change(session, found, name, parent_id)
 
-    if problem is None:
+    if not problems:
         under = parent.id if parent else None
         zone = time_zone or None
 
@@ -212,19 +217,16 @@ def save_location(
         if broken in ALERTS:
             alert = RULES[broken]
             return _location_page(request, session, signed, found, alert=alert)
-        problem = broken and rule_words(broken, TAKEN)
-    if problem is not None:
+        if broken:
+            problems[refused_field(broken)] = rule_words(broken, TAKEN)
+    if problems:
         values = {
             "name": name,
             "parent_id": parent_id,
             "time_zone": time_zone,
             "version": version,
         }
-        # A refused zone is said by the zone; anything else by the name.
-        field = "time_zone" if broken == "location_time_zone" else "name"
-        return _location_page(
-            request, session, signed, found, problem, values, field=field
-        )
+        return _location_page(request, session, signed, found, problems, values)
     session.commit()
     return redirect(f"{LOCATIONS}/{location_id}", notice="saved")
 
@@ -238,8 +240,8 @@ def retire_location(
         return not_found()
     _, broken = attempt(session, lambda: locations.retire(session, found, now()))
     if broken:
-        problem = rule_words(broken, TAKEN)
-        return _location_page(request, session, signed, found, problem)
+        problems = {"name": rule_words(broken, TAKEN)}
+        return _location_page(request, session, signed, found, problems)
     session.commit()
     return redirect(LOCATIONS, notice="retired", undo=str(location_id))
 
@@ -253,6 +255,7 @@ def restore_location(
         return not_found()
     _, broken = attempt(session, lambda: locations.restore(session, found))
     if broken:
-        return _location_page(request, session, signed, found, RULES[broken])
+        problems = {"name": RULES[broken]}
+        return _location_page(request, session, signed, found, problems)
     session.commit()
     return redirect(f"{LOCATIONS}/{location_id}", notice="restored")

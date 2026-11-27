@@ -26,10 +26,11 @@ the name with nothing sent. #}
   </label>
   {% if location.kind == "area" %}
   <label>{% trans %}Part of{% endtrans %}
-    <select name="parent_id" required>
+    <select name="parent_id" required{% if location_sent %}{{ described_by("parent_id", labelled=true) }}{% endif %}>
       {% set chosen = values.get('parent_id', location.parent_id | string) %}
       {% for parent in parents %}<option value="{{ parent.id }}" {% if chosen == parent.id | string %}selected{% endif %}>{{ parent.name }}</option>{% endfor %}
     </select>
+    {% with name = "parent_id" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   {% endif %}
   <label>{% trans %}Time zone{% endtrans %} <span class="hint">{% trans %}what its times are shown in; times already recorded keep theirs{% endtrans %}</span>

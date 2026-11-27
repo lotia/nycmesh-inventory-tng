@@ -6,7 +6,9 @@ aria-describedby written by hand is aria-invalid with it.
 
 tests/across/test_refused_boxes.py sends each form wrong and reads the
 page; this rule holds for a template no test sends yet, such as a new
-page's."""
+page's. It cannot see a box whose problem is shown outside its label
+and which names no problem at all: a problem beside no box (a section's)
+looks the same. Such a box is the route test's to catch."""
 
 import re
 from pathlib import Path

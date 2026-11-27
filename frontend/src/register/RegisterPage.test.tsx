@@ -101,6 +101,33 @@ test("a refusal is explained, and the phrase stays to correct", async () => {
   expect(window.location.search).toBe("?code=x");
 });
 
+test.each([
+  ["a refused phrase", () => json({ reason: "unknown" }, 400), "x", true],
+  ["a blank phrase", registered, "%20", true],
+  ["too many tries", () => json({ reason: "rate_limited" }, 429), "x", false],
+  [
+    "an unavailable database",
+    () => json({ reason: "database_unavailable" }, 503),
+    "x",
+    false,
+  ],
+])(
+  "the phrase is marked invalid only when refused: %s",
+  async (_name, reply, typed, marked) => {
+    // Said by the alert the box points at (inventory-tng-gjuq); a refusal
+    // that is not about the phrase leaves it unmarked.
+    const { api } = answering(reply);
+    openAt(`/register?code=${typed}`);
+    render(<RegisterPage api={api} />);
+    fireEvent.submit(button());
+    const alert = await screen.findByRole("alert");
+    expect(phrase().getAttribute("aria-invalid")).toBe(marked ? "true" : null);
+    expect(phrase().getAttribute("aria-describedby")).toBe(
+      marked ? alert.id : null,
+    );
+  },
+);
+
 test("trying again clears the last refusal while it waits", async () => {
   const second = deferred();
   const replies = [json({ reason: "expired" }, 400)];

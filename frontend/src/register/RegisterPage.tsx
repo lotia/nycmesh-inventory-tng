@@ -2,6 +2,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren, TargetedSubmitEvent } from "preact";
+import { useId } from "preact/hooks";
 import { type Api, makeApi } from "../api/client";
 import { Field } from "../shared/Field";
 import { say } from "../shared/i18n";
@@ -41,6 +42,15 @@ function problem(outcome: Outcome | null): MessageDescriptor | null {
     : PROBLEMS[outcome.kind];
 }
 
+/** Whether `outcome` refuses the phrase as typed, so its box is marked
+ * invalid (inventory-tng-gjuq): not too many tries, nor no answer. */
+function phraseRefused(outcome: Outcome | null): boolean {
+  return (
+    outcome?.kind === "blank" ||
+    (outcome?.kind === "refused" && outcome.reason !== "rate_limited")
+  );
+}
+
 /** The page a registration QR code opens: /register?code=<phrase>. */
 export function RegisterPage({
   api = API,
@@ -56,6 +66,7 @@ export function RegisterPage({
   const outcome = useSignal<Outcome | null>(null);
   // Batches saved here before registering, sent now (decision 0009).
   const waiting = useSignal(0);
+  const problemId = useId();
 
   async function submit(event: TargetedSubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,6 +107,7 @@ export function RegisterPage({
   }
 
   const message = problem(outcome.value);
+  const refused = phraseRefused(outcome.value);
   return (
     <Page>
       <p>{say(WHAT_REGISTERING_DOES)}</p>
@@ -110,6 +122,8 @@ export function RegisterPage({
               autoComplete="off"
               autoCapitalize="none"
               spellcheck={false}
+              aria-invalid={refused || undefined}
+              aria-describedby={refused ? problemId : undefined}
               value={code.value}
               onInput={(event) => {
                 code.value = event.currentTarget.value;
@@ -121,7 +135,11 @@ export function RegisterPage({
           {say(sending.value ? REGISTERING : REGISTER)}
         </button>
       </form>
-      {message !== null && <p role="alert">{say(message)}</p>}
+      {message !== null && (
+        <p role="alert" id={problemId}>
+          {say(message)}
+        </p>
+      )}
     </Page>
   );
 }
