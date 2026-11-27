@@ -195,21 +195,9 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   2026-11-13, inventory-tng-0su); an entry with nothing to put back
   offers only Discard. One that says lines could not be read stays once
   its last listed line goes, until its own Discard, so the note is not
-  lost unseen. After a line's Discard, focus goes to the entry's heading,
-  not the page, so the volunteer keeps their place, and taps on the
-  entry's buttons are ignored for half a second, so a double tap's second
-  cannot discard the line that moves up (Ali, 2026-11-13). We rejected
-  asking before each line's Discard, which slows every one.
-  When a tap takes the entry itself away (its last line's Discard, its
-  own Discard confirmed, or Add to cart), every entry's taps are ignored
-  as long, and focus goes to the heading of the entry that moved up, or
-  the list's if none did (Ali, 2026-11-27, inventory-tng-ensw).
-  When it takes the last entry away, the list's space stays blank as
-  long, so the cart form below does not move up under the finger, and
-  focus goes to the Cart heading; a tap in that space puts focus back
-  there (Ali, 2026-11-27, inventory-tng-lm1b). None of these focus
-  moves scrolls the heading into view, as the page moving would put
-  something new under the finger (Ali, 2026-11-27).
+  lost unseen. A double tap's second tap discards nothing that moved up
+  under the finger, as 0019 (Double taps) has every page's taps behave.
+  We rejected asking before each line's Discard, which slows every one.
   A save keeps its batch key while its lines go, as
   one put back and changed in the cart does: an older tab may have sent
   it as it was, and the key then has the server take it once. We
@@ -338,10 +326,8 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   difference is recorded, "These are in your cart", if shown, is hidden
   in the same way, not removed, keeping its room. We rejected
   listing the newest last, which changes the order volunteers see.
-  A Dismiss guards a double tap just as a tap that takes an older
-  list's entry away does, above (Ali, 2026-11-27, inventory-tng-34ns).
-  We rejected asking before a refused save's Dismiss, which slows every
-  one.
+  Dismiss, as every tap, follows 0019 (Double taps). We rejected asking
+  before a refused save's Dismiss, which slows every one.
   A save refused (422) whose problems name lines offers "Record the
   rest" (Ali, 2026-11-20, inventory-tng-clvh): it puts the save's other
   lines in an empty cart, under a key made from the save's, and the

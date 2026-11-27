@@ -4,7 +4,7 @@
 Mesh's look) · amended 2026-11-12 (packages renamed and brought back),
 2026-11-15 (lists sort, filter and choose their page size), 2026-11-25
 (amount boxes say their unit), 2026-11-26 (a unit inside a box's label
-is in its description)
+is in its description), 2026-11-27 (double taps)
 
 ## Context
 
@@ -68,6 +68,35 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   the browser: retire anyway, or go back.
 - **Confirmation pages stay pages**: the danger button first, then a link
   to keep things as they are. No sticky footers.
+
+### Double taps
+
+- **A tap never moves what is under the finger** (Ali, 2026-11-27,
+  inventory-tng-r3jx). A double tap's second tap lands a moment after
+  the first. When the first takes away or shrinks something with
+  controls below it, they move up, and the second lands on one never
+  meant. So such a tap keeps that space blank, or has the page ignore
+  taps, for `SETTLE_MS` (`frontend/src/shared/settling.ts`).
+- **Focus moves without scrolling**, to the heading of what moved up,
+  the list's heading, or the control the removed content was about;
+  never to a box or list whose keyboard or picker would open. A tap
+  that asks to go somewhere far from it scrolls there, as Change goes
+  to Your name, and taps then wait too, as everything moved.
+- **An ignored tap** puts focus back on that target; an ignored key's
+  press leaves focus where the volunteer moved it.
+- **Where:** the scan page keeps the space of its name check, a place's
+  question, and an older or outbox list's last entry
+  (`scan/settling-hooks.tsx`); those lists' entries ignore their own
+  taps. Every other such tap ignores all of the page's taps
+  (`ignoreTaps`): a cart line's Remove and Undo, a change to the cart
+  that takes its notes away, Discard cart confirmed or kept, Record once
+  queued, the camera's Done, an item picked in the search, Try again,
+  Change, Back to camera, the camera line's Upgrade, the register page
+  once registered, and the administrator pages' retire question closed.
+  `backend/tests/codebase/test_focus_and_settling.py` refuses focus
+  moved, or a tap told from a key's press, anywhere else.
+- We rejected deciding each place apart, as each fix found another (Ali,
+  2026-11-27).
 
 ### Amounts
 
