@@ -57,8 +57,11 @@ function showDescribing(field: Element, words: HTMLElement, shown: boolean) {
  * typed in: "m" beside How much on the adjustment form, once a cable in m
  * is picked (inventory-tng-mdvz), and in the box's description, which
  * names the words (inventory-tng-4mcj). The words carry `data-unit-of`,
- * the select's name; each option, `data-unit`. Without this, the unit
- * shows only in the option's words, as "Cable (m)".
+ * the select's name; each option, `data-unit`, and, where its keypad
+ * differs by unit, `data-inputmode`, which the box they describe takes:
+ * Reorder at on the item page, read in the unit chosen while it can
+ * change (inventory-tng-zhnd). Without this, the unit shows only in the
+ * option's words, as "Cable (m)".
  */
 export function followUnits(document: Document): void {
   for (const words of document.querySelectorAll<HTMLElement>(
@@ -70,9 +73,19 @@ export function followUnits(document: Document): void {
     if (select === null) {
       continue;
     }
+    // The box the words describe, whose keypad follows the unit too
+    // where the options give one (data-inputmode).
+    const box = words.id
+      ? document.querySelector<HTMLInputElement>(
+          `input[aria-describedby~="${words.id}"]`,
+        )
+      : null;
     follow(document, [select], () => {
-      words.textContent =
-        select.options[select.selectedIndex]?.dataset.unit ?? "";
+      const picked = select.options[select.selectedIndex];
+      words.textContent = picked?.dataset.unit ?? "";
+      if (box !== null && picked?.dataset.inputmode) {
+        box.inputMode = picked.dataset.inputmode;
+      }
     });
   }
 }

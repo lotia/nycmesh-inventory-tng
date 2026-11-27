@@ -65,8 +65,11 @@ with nothing sent. #}
     {% endif %}
     <input type="hidden" name="unit" value="{{ item.unit }}">
     {% else %}
+    {#- Reorder at follows each option's unit and keypad
+    (hints.followUnits): with the unit free, it is read in the unit
+    chosen. #}
     <select name="unit"{{ unit_refused }}>
-      {% for unit in units %}<option {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
+      {% for unit in units %}<option data-unit="{{ unit }}" data-inputmode="{{ unit | keyboard }}" {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% endif %}
     {#- Answered No (Ali, 2026-11-25, inventory-tng-aknv): after what a
@@ -96,6 +99,11 @@ with nothing sent. #}
     {% with name = "unit" %}{% include "_field_problem.html" %}{% endwith %}
     {% endif %}
   </label>
+  {#- The unit Reorder at is read in (items.save), shown after it and
+  setting its keypad: while the unit can change freely, the one sent,
+  followed as another is chosen; fixed, the item's own, converted from
+  (inventory-tng-zhnd). #}
+  {% set read_in = values.get('unit') if not unit_fixed and values.get('unit') in units else item.unit %}
   {% for name, label, hint in [
     ("manufacturer", _("Manufacturer"), ""),
     ("part_number", _("Part number"), ""),
@@ -110,10 +118,10 @@ with nothing sent. #}
   {% set described = ["unit-" ~ name] if amount else [] %}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
     {% set stored = item[name] | box_amount(decimal) if amount else item[name] %}
-    {% if amount %}<span class="with-unit">{% endif %}<input name="{{ name }}" inputmode="{{ values.get('unit', item.unit) | keyboard if amount else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}"
+    {% if amount %}<span class="with-unit">{% endif %}<input name="{{ name }}" inputmode="{{ read_in | keyboard if amount else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}"
       {%- if item_sent %}{{ described_by(name, described, labelled=true) }}{% elif described %} aria-describedby="{{ described | join(' ') }}"{% endif %}>
     {%- if amount %}
-      <span id="unit-{{ name }}" aria-hidden="true">{{ item.unit }}</span></span>
+      <span id="unit-{{ name }}" aria-hidden="true"{% if not unit_fixed %} data-unit-of="unit"{% endif %}>{{ read_in }}</span></span>
     {%- endif %}
     {% include "_field_problem.html" %}
   </label>

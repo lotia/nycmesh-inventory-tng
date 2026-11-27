@@ -4,7 +4,8 @@ Amounts; Ali, 2026-11-26): the item's Reorder at (inventory-tng-h39f), a
 package's Holds and Too short to use, and the Add package form's Holds
 (inventory-tng-0mor). Refused for what was
 typed, such a box is marked invalid, its problem heard in its label
-(inventory-tng-h3tw's rule; inventory-tng-qyf6)."""
+(inventory-tng-h3tw's rule; inventory-tng-qyf6). Sent back with its unit
+changed, Reorder at says the unit it is read in (inventory-tng-zhnd)."""
 
 from decimal import Decimal
 
@@ -15,9 +16,10 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue.paths import ITEMS
 from inventory_tng.models.catalogue import Category, ItemPackage
 
-from helpers.items import new_item
-from helpers.markup import marked, problem, read, unit_beside
+from helpers.items import new_item, shown_item_form
+from helpers.markup import Element, marked, problem, read, unit_beside
 from helpers.rows import add, shown
+from helpers.stock import Place, received
 
 
 @pytest.mark.parametrize("unit", ["m", "ft", "each"])
@@ -33,6 +35,68 @@ def test_reorder_at_says_its_unit_after_its_box(
         [unit],
         "Reorder at total across stores; blank never reorders",
     )
+
+
+def _reorder_at(page: Element, item_id: int) -> tuple[str, str, str | None]:
+    """Reorder at's unit, said after its box and in its description; its
+    keypad; and the select whose unit it follows in the browser
+    (hints.followUnits), if any."""
+    box = page.one("form", action=f"{ITEMS}/{item_id}").one("input", name="minimum")
+    unit, described, _ = unit_beside(page, box)
+    assert described == [unit]
+    follows = page.one("span", id="unit-minimum").attrs.get("data-unit-of")
+    return unit, box.attrs["inputmode"], follows
+
+
+def test_reorder_at_sent_back_says_the_unit_sent_while_it_can_change(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """The bead's example: an item in m with no records, its unit changed
+    to each, Reorder at 2 and its name emptied. Refused for its name, the
+    page says each after Reorder at, with each's keypad, as the 2 is
+    saved in each once the name is put right."""
+    item = new_item(session, radios, name="Cable", unit="m")
+    assert _reorder_at(read(admin_client.get(f"{ITEMS}/{item.id}").text), item.id) == (
+        "m",
+        "decimal",
+        "unit",
+    )
+    sent = shown_item_form(item, unit="each", minimum="2")
+    refused = admin_client.post(f"{ITEMS}/{item.id}", data=sent | {"name": ""})
+    assert refused.status_code == 400
+    page = read(refused.text)
+    assert _reorder_at(page, item.id) == ("each", "numeric", "unit")
+    options = page.one("select", name="unit").all("option")
+    assert {each.text: each.attrs["data-inputmode"] for each in options} == {
+        "m": "decimal",
+        "ft": "decimal",
+        "each": "numeric",
+    }
+    assert all(each.attrs["data-unit"] == each.text for each in options)
+    assert admin_client.post(f"{ITEMS}/{item.id}", data=sent).status_code == 303
+    session.refresh(item)
+    assert (item.unit, item.minimum) == ("each", Decimal(2))
+
+
+def test_reorder_at_sent_back_says_the_item_unit_while_it_is_fixed(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Stock has moved in m, so a change to ft converts a Reorder at typed
+    with it from m (unit_changes.convert): refused for its name, and asked
+    whether its amounts were in m, the page says m after Reorder at, and
+    it follows no select."""
+    place = Place(session)
+    received(
+        session, place, [{"item_id": place.cable.id, "quantity": "305", "unit": "m"}]
+    )
+    cable = place.cable
+    sent = shown_item_form(cable, unit="ft", minimum="10")
+    refused = admin_client.post(f"{ITEMS}/{cable.id}", data=sent | {"name": ""})
+    assert refused.status_code == 400
+    assert _reorder_at(read(refused.text), cable.id) == ("m", "decimal", None)
+    asked = admin_client.post(f"{ITEMS}/{cable.id}", data=sent)
+    assert asked.status_code == 200
+    assert _reorder_at(read(asked.text), cable.id) == ("m", "decimal", None)
 
 
 @pytest.mark.parametrize("unit", ["m", "ft", "each"])

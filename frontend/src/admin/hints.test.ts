@@ -223,6 +223,37 @@ test("the unit of the item picked follows its box", () => {
   expect(document.getElementById("lonely")?.textContent).toBe("kept");
 });
 
+test("Reorder at's unit and keypad follow the item's unit chosen", () => {
+  document.body.innerHTML = `
+    <select name="unit">
+      <option data-unit="m" data-inputmode="decimal" selected>m</option>
+      <option data-unit="each" data-inputmode="numeric">each</option>
+    </select>
+    <input name="minimum" inputmode="decimal" aria-describedby="unit-minimum"><span id="unit-minimum" aria-hidden="true" data-unit-of="unit">m</span>`;
+  followUnits(document);
+  const box = document.querySelector("input") as HTMLInputElement;
+  const words = document.getElementById("unit-minimum") as HTMLElement;
+  pick("each");
+  expect(words.textContent).toBe("each");
+  expect(box.inputMode).toBe("numeric");
+  pick("m");
+  expect(words.textContent).toBe("m");
+  expect(box.inputMode).toBe("decimal");
+});
+
+test("a box whose item's options give no keypad keeps its own", () => {
+  document.body.innerHTML = `
+    <select name="item_id">
+      <option value="1" data-unit="each">Radio (each)</option>
+    </select>
+    <input name="amount" inputmode="decimal" aria-describedby="unit-amount"><span id="unit-amount" data-unit-of="item_id"></span>`;
+  followUnits(document);
+  pick("1");
+  expect((document.querySelector("input") as HTMLInputElement).inputMode).toBe(
+    "decimal",
+  );
+});
+
 test("the unit of an item picked when the page is shown is there at once", () => {
   document.body.innerHTML = `
     <select name="item_id">
