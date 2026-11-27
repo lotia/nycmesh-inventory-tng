@@ -111,7 +111,7 @@ with nothing sent. #}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
     {% set stored = item[name] | box_amount(decimal) if amount else item[name] %}
     {% if amount %}<span class="with-unit">{% endif %}<input name="{{ name }}" inputmode="{{ values.get('unit', item.unit) | keyboard if amount else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}"
-      {%- if item_sent %}{{ described_by(name, described, labelled=true) }}{% elif amount %} aria-describedby="unit-{{ name }}"{% endif %}>
+      {%- if item_sent %}{{ described_by(name, described, labelled=true) }}{% elif described %} aria-describedby="{{ described | join(' ') }}"{% endif %}>
     {%- if amount %}
       <span id="unit-{{ name }}" aria-hidden="true">{{ item.unit }}</span></span>
     {%- endif %}
