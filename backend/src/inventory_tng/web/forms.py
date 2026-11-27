@@ -60,6 +60,27 @@ RULES = {
     "item_unit_labelled": lazy_gettext(
         "Its unit is fixed, as a label has been printed for it."
     ),
+    # Translators: refused as stock of the item moved after its page was
+    # drawn, which fixes its unit. "Reorder at" is the box's label.
+    "item_unit_moved_since_shown": lazy_gettext(
+        "Not saved: stock of this item moved after you opened this page, so "
+        "changing its unit now asks how to convert what is recorded. Check the "
+        "unit and Reorder at, then save again."
+    ),
+    # Translators: refused as a label of the item was printed after its page
+    # was drawn, which fixes its unit. "Reorder at" is the box's label.
+    "item_unit_labelled_since_shown": lazy_gettext(
+        "Not saved: a label of this item was printed after you opened this "
+        "page, so changing its unit now asks how to convert what is recorded. "
+        "Check the unit and Reorder at, then save again."
+    ),
+    # Translators: refused as the item's labels were revoked after its page
+    # was drawn, which frees its unit. "Reorder at" is the box's label.
+    "item_unit_revoked_since_shown": lazy_gettext(
+        "Not saved: this item's labels were revoked after you opened this "
+        "page, so its unit can now change freely. Check the unit and Reorder "
+        "at, then save again."
+    ),
     "item_unit_checks_waiting": lazy_gettext(
         "Settle its lines in Recorded more than moved first: they are in its unit now."
     ),

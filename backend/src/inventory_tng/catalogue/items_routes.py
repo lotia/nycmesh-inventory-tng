@@ -123,6 +123,10 @@ RECORDED_IN = "unit_asked"
 # (unit_changes.require_fixed_as_shown).
 UNIT_FREE = "unit_free"
 SHOWN_FREE = {"yes": True, "no": False}
+# The refusals of a save of the item that say, as an alert above its page
+# as it is now: ALERTS, and a unit fixed or freed since it was shown, by
+# its cause.
+ITEM_ALERTS = ALERTS | {rule for _, rule in unit_changes.SINCE_SHOWN.values()}
 
 
 class _AskFirst(Exception):
@@ -141,7 +145,8 @@ def _change_or_note[T](
 ) -> tuple[T | None, str | None]:
     """Makes the change to `fields`: what it did, and None; or, if it
     breaks a unique index or one of REFUSED_FIELDS' rules, None, and the
-    rule, which `problems` then says beside its field; or one of ALERTS;
+    rule, which `problems` then says beside its field; or one of
+    ITEM_ALERTS;
     or, given `asked` and every rule allowing it, CLOSE when other items'
     names or aliases are close to its (docs/decisions/0021), those items
     put in `asked`, and nothing of it kept."""
@@ -169,7 +174,7 @@ def _change_or_note[T](
             items.PACKAGES_WHOLE,
             unit_changes.UNIT_UNCONFIRMED,
             *REFUSED_FIELDS,
-            *ALERTS,
+            *ITEM_ALERTS,
         )
     except _AskFirst:
         log.debug("close names asked about", item_id=item_id, found=len(asked or ()))
@@ -852,7 +857,7 @@ def save_item(
             return _item_page(
                 request, session, signed, found, values=form, similar=asked or ()
             )
-        if broken in ALERTS:
+        if broken in ITEM_ALERTS:
             alert = RULES[broken]
             return _item_page(request, session, signed, found, alert=alert)
         if broken == unit_changes.UNIT_UNCONFIRMED and not problems:

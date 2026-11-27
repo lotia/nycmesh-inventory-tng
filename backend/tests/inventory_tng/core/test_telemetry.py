@@ -1361,8 +1361,17 @@ def test_counts_unit_changes_refused_by_why(
             fields = item_fields(item, unit=unit, **more)
             with breaks(session, rule):
                 items.save(session, item, fields, seen=None, recorded_in=item.unit)
+        # Forms drawn while their unit was free; each fixed now, by its cause.
+        for item, rule in (
+            (moved, "item_unit_moved_since_shown"),
+            (labelled, "item_unit_labelled_since_shown"),
+            (converted, "changed_since_shown"),
+        ):
+            with breaks(session, rule):
+                fields = item_fields(item, unit="ft")
+                items.save(session, item, fields, seen=None, shown_free=True)
         # Its form drawn while its unit was fixed; free now.
-        with breaks(session, "changed_since_shown"):
+        with breaks(session, "item_unit_revoked_since_shown"):
             items.save(
                 session, free, item_fields(free, unit="ft"), seen=None, shown_free=False
             )
@@ -1372,7 +1381,10 @@ def test_counts_unit_changes_refused_by_why(
         (("reason", "converted"),): 1,
         (("reason", "checks_waiting"),): 1,
         (("reason", "out_of_range"),): 1,
-        (("reason", "changed_since_shown"),): 1,
+        (("reason", "moved_since_shown"),): 1,
+        (("reason", "labelled_since_shown"),): 1,
+        (("reason", "converted_since_shown"),): 1,
+        (("reason", "revoked_since_shown"),): 1,
     }
     assert [
         (line["item_id"], line["reason"], line["log_level"])
@@ -1384,7 +1396,10 @@ def test_counts_unit_changes_refused_by_why(
         (converted.id, "converted", "info"),
         (waiting.id, "checks_waiting", "info"),
         (huge.id, "out_of_range", "info"),
-        (free.id, "changed_since_shown", "info"),
+        (moved.id, "moved_since_shown", "info"),
+        (labelled.id, "labelled_since_shown", "info"),
+        (converted.id, "converted_since_shown", "info"),
+        (free.id, "revoked_since_shown", "info"),
     ]
 
 

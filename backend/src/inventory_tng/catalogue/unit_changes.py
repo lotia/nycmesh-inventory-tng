@@ -71,6 +71,19 @@ UNIT_CHECKS_WAITING = "item_unit_checks_waiting"
 # below its size there (QUANTITY_MAX, QUANTITY_STEP).
 UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
 
+# Refused: a change of the item's unit that finds it fixed or free
+# otherwise than its form showed (require_fixed_as_shown), by what fixed or
+# freed it since: the reason it is counted by, and the rule it is refused
+# by, whose words say that cause (Ali, 2026-11-27, inventory-tng-zhnd).
+# Free since: only its labels revoked can free it. Converted by another's
+# save, it is said as any save changed since.
+SINCE_SHOWN: dict[UnitFixed | None, tuple[str, str]] = {
+    "moved": ("moved_since_shown", "item_unit_moved_since_shown"),
+    "labelled": ("labelled_since_shown", "item_unit_labelled_since_shown"),
+    "converted": ("converted_since_shown", "changed_since_shown"),
+    None: ("revoked_since_shown", "item_unit_revoked_since_shown"),
+}
+
 # Refused: a package's amount typed in the unit its form showed, which its
 # item or package has left since (require_unit_shown).
 UNIT_CHANGED = "package_unit_changed"
@@ -207,23 +220,23 @@ def checks_waiting(session: Session, item_id: int) -> bool:
 def require_fixed_as_shown(
     item_id: int, why: UnitFixed | None, shown_free: bool | None
 ) -> None:
-    """RuleBroken ("changed_since_shown") unless a change of the item's
-    unit finds it free (`why` None, unit_fixed) or fixed as its form
-    showed it (`shown_free`). Free, the form says Reorder at is in the
-    unit chosen, and its packages follow; fixed, in the item's own,
+    """RuleBroken, by SINCE_SHOWN's rule for `why`, unless a change of the
+    item's unit finds it free (`why` None, unit_fixed) or fixed as its
+    form showed it (`shown_free`). Free, the form says Reorder at is in
+    the unit chosen, and its packages follow; fixed, in the item's own,
     converted. Stock moved or a label printed or revoked since would read
     the number typed in another unit than the page said, and keep or
     convert what is recorded otherwise (inventory-tng-zhnd). None for no
     form, as a command's."""
     if shown_free is None or shown_free == (why is None):
         return
-    _refused(item_id, "changed_since_shown", "changed_since_shown")
+    _refused(item_id, *SINCE_SHOWN[why])
 
 
 def _refused(item_id: int, reason: str, rule: str) -> None:
     """A change of the item's unit refused by `rule`, logged and counted
     by `reason`, from a fixed list: UnitFixed's, "checks_waiting",
-    "out_of_range" or "changed_since_shown"."""
+    "out_of_range" or SINCE_SHOWN's."""
     log.info("unit change refused", item_id=item_id, reason=reason)
     unit_changes_refused.add(1, {"reason": reason})
     enforce(rule)

@@ -7,7 +7,7 @@ typed, such a box is marked invalid, its problem heard in its label
 (inventory-tng-h3tw's rule; inventory-tng-qyf6). Sent back with its unit
 changed, Reorder at says the unit it is read in (inventory-tng-zhnd), and
 a save that would read it in another, as stock moved or a label was
-printed or revoked since, is refused as changed since."""
+printed or revoked since, is refused, saying which (Ali, 2026-11-27)."""
 
 from decimal import Decimal
 
@@ -60,17 +60,35 @@ def _unit_free(page: Element, item_id: int) -> str:
     return form.one("input", name=UNIT_FREE).attrs["value"]
 
 
-def _refused_as_changed(
-    client: TestClient, session: Session, item: Item, drawn: str, minimum: str
+def _refused_since(
+    client: TestClient,
+    session: Session,
+    item: Item,
+    drawn: str,
+    minimum: str,
+    rule: str,
 ) -> None:
     """A change of `item`'s unit to ft, Reorder at `minimum`, sent from a
-    form `drawn` free or not: refused as changed since, nothing saved."""
+    form `drawn` free or not: refused with `rule`'s words alone, which say
+    what changed since, nothing saved."""
     unit, before = item.unit, item.minimum
     sent = shown_item_form(item, unit="ft", minimum=minimum) | {UNIT_FREE: drawn}
     refused = client.post(f"{ITEMS}/{item.id}", data=sent)
-    assert str(RULES[CHANGED]) in text(refused)
+    said = text(refused)
+    assert str(RULES[rule]) in said
+    for other in SINCE_SHOWN_RULES - {rule}:
+        assert str(RULES[other]) not in said
     session.refresh(item)
     assert (item.unit, item.minimum) == (unit, before)
+
+
+# Each refusal of a unit fixed or freed since its form was shown.
+SINCE_SHOWN_RULES = {
+    CHANGED,
+    "item_unit_moved_since_shown",
+    "item_unit_labelled_since_shown",
+    "item_unit_revoked_since_shown",
+}
 
 
 def test_reorder_at_sent_back_says_the_unit_sent_while_it_can_change(
@@ -131,13 +149,44 @@ def test_reorder_at_typed_while_free_is_refused_once_stock_has_moved(
 ) -> None:
     """Drawn while the cable's unit was free, Reorder at in the unit
     chosen; stock received in m before Save, which would read the 10 in m
-    and convert it: refused as changed since, nothing saved."""
+    and convert it: refused, saying stock moved, nothing saved."""
     place = Place(session)
     cable = place.cable
     drawn = _unit_free(read(admin_client.get(f"{ITEMS}/{cable.id}").text), cable.id)
     assert drawn == "yes"
     received(session, place, [{"item_id": cable.id, "quantity": "305", "unit": "m"}])
-    _refused_as_changed(admin_client, session, cable, drawn, "10")
+    _refused_since(
+        admin_client, session, cable, drawn, "10", "item_unit_moved_since_shown"
+    )
+
+
+def test_reorder_at_typed_while_free_is_refused_once_a_label_is_printed(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Drawn while the cable's unit was free; a label printed before Save,
+    which would read the 10 in m and convert it: refused, saying a label
+    was printed, nothing saved."""
+    cable = new_item(session, radios, "Cat6 cable", unit="m")
+    drawn = _unit_free(read(admin_client.get(f"{ITEMS}/{cable.id}").text), cable.id)
+    assert drawn == "yes"
+    labelled(session, cable, 0)
+    _refused_since(
+        admin_client, session, cable, drawn, "10", "item_unit_labelled_since_shown"
+    )
+
+
+def test_reorder_at_typed_while_free_is_refused_once_converted_by_another(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Drawn while the cable's unit was free; its amounts converted by
+    another's save before Save, which fixes it for good: refused as any
+    save changed since, nothing saved."""
+    cable = new_item(session, radios, "Cat6 cable", unit="m")
+    drawn = _unit_free(read(admin_client.get(f"{ITEMS}/{cable.id}").text), cable.id)
+    assert drawn == "yes"
+    cable.unit_converted = True
+    session.flush()
+    _refused_since(admin_client, session, cable, drawn, "10", CHANGED)
 
 
 def test_reorder_at_typed_while_labelled_is_refused_once_they_are_revoked(
@@ -145,14 +194,16 @@ def test_reorder_at_typed_while_labelled_is_refused_once_they_are_revoked(
 ) -> None:
     """Drawn while a label fixed the cable's unit, Reorder at in m, to be
     converted; the label revoked before Save, which would keep the 100 as
-    ft and its packages' numbers unconverted: refused as changed since,
-    nothing saved."""
+    ft and its packages' numbers unconverted: refused, saying its labels
+    were revoked, nothing saved."""
     cable = new_item(session, radios, "Cat6 cable", unit="m")
     (label,) = labelled(session, cable, 0)
     drawn = _unit_free(read(admin_client.get(f"{ITEMS}/{cable.id}").text), cable.id)
     assert drawn == "no"
     assert labels.revoke(session, label.id, NOW)
-    _refused_as_changed(admin_client, session, cable, drawn, "100")
+    _refused_since(
+        admin_client, session, cable, drawn, "100", "item_unit_revoked_since_shown"
+    )
 
 
 @pytest.mark.parametrize("unit", ["m", "ft", "each"])

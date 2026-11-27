@@ -411,8 +411,9 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
   have moved or converted, and no current label, as above. Reorder at is
   read in the unit chosen while the unit is free, in the item's own once
   fixed, and the form says which: a save that finds the unit otherwise,
-  stock moved or a label printed or revoked since, is refused as changed
-  since (inventory-tng-zhnd).
+  stock moved or a label printed or revoked since, is refused, saying
+  which of those happened, or as changed since if another's save
+  converted it (Ali, 2026-11-27, inventory-tng-zhnd).
 - Yes converts, in one transaction holding the item, its vendor offers
   and its open packages in the ledger's lock order: its stock, its
   Reorder at (as typed in the old unit), what is on order, its vendor
