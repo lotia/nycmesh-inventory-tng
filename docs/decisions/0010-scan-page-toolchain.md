@@ -207,9 +207,9 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   When it takes the last entry away, the list's space stays blank as
   long, so the cart form below does not move up under the finger, and
   focus goes to the Cart heading; a tap in that space puts focus back
-  there (Ali, 2026-11-27, inventory-tng-lm1b). Focus does not scroll the
-  heading into view, as the page moving would put something new under
-  the finger.
+  there (Ali, 2026-11-27, inventory-tng-lm1b). None of these focus
+  moves scrolls the heading into view, as the page moving would put
+  something new under the finger (Ali, 2026-11-27).
   A save keeps its batch key while its lines go, as
   one put back and changed in the cart does: an older tab may have sent
   it as it was, and the key then has the server take it once. We

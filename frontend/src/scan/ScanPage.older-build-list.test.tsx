@@ -828,6 +828,36 @@ describe("what an older build left", () => {
     expect(document.activeElement).toBe(list);
   });
 
+  test("focus moved by the older list's taps never scrolls the page (Ali, 2026-11-27)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    leaveSavesAlike();
+    open();
+    await ready();
+    const list = screen.getByRole("heading", { name: HEADING });
+    // To the list's heading, the entry below gone.
+    fireEvent.click(discardOf(FIVE));
+    await vi.waitFor(() => expect(document.activeElement).toBe(list));
+    // Back there, on an ignored tap.
+    fireEvent.click(discardOf(THREE), { detail: 1 });
+    expect(document.activeElement).toBe(list);
+    // To the Cart heading, the last entry gone.
+    await vi.advanceTimersByTimeAsync(500);
+    fireEvent.click(discardOf(THREE));
+    await vi.waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { name: say(CART) }),
+      ),
+    );
+    // Each heading's focus, the list's twice and the Cart's.
+    const onHeadings = focus.mock.calls.filter(
+      (_, at) => (focus.mock.contexts[at] as HTMLElement).tagName === "H2",
+    );
+    expect(onHeadings).toHaveLength(3);
+    expect(onHeadings).toEqual(onHeadings.map(() => [{ preventScroll: true }]));
+    focus.mockRestore();
+  });
+
   test("the last entry's Discard, confirmed, focuses the list's heading, none being below it (inventory-tng-ensw)", async () => {
     leaveSavesAlike();
     open();

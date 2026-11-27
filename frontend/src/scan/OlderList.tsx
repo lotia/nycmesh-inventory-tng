@@ -99,7 +99,8 @@ export function OlderList({
   catalogue: Catalogue;
   /** Put one back in the cart: why not, if it was not. */
   onPutBack: (each: Older) => NotPut | null;
-  /** Focus what follows the list, once nothing is listed. */
+  /** Focus what follows the list, once nothing is listed, without
+   * scrolling to it. */
   focusAfter: () => void;
 }) {
   // The one whose discarding is being confirmed, and what one tap said.
@@ -152,13 +153,14 @@ export function OlderList({
     shown.findIndex(({ each }) => olderId(each) === on);
   /** Focus the heading of the entry at `at`, or the list's if none is,
    * or, none listed, what follows the list (Ali, 2026-11-27,
-   * inventory-tng-lm1b). */
+   * inventory-tng-lm1b). Never scrolled to: the page moving would put
+   * something new under the finger (Ali, 2026-11-27). */
   const focusPlace = (at: number) => {
     const to = document.getElementById(`older-${at}`) ?? heading.current;
     if (to === null) {
       focusAfter();
     } else {
-      to.focus();
+      to.focus({ preventScroll: true });
     }
   };
   // After a line's Discard, focus goes to its entry's heading, not to the
