@@ -142,6 +142,23 @@ is, read [README.md](README.md).
       once and tell the person.
     - **While `main` is red,** push nothing else. The next batch may go on
       building; its push waits for green.
+16. **A fix to a pattern covers every place the pattern is.** A pattern is
+    anything written the same way in more than one place, such as a box
+    showing its unit after it, a form marking refused boxes invalid, or a
+    script re-checking on Back. A bead that applies a rule or fixes one
+    such place is about the pattern, not the place it was seen
+    (Ali, 2026-11-26).
+    - **Filing or planning:** search the code for every instance and list
+      them all in the bead, with file:line.
+    - **Implementing:** confirm the list is complete before starting, and
+      add any instance it missed.
+    - **Reviewing:** search for instances the diff left out. One it left
+      out is a gap in this change, fixed in the same batch even when the
+      batch's scope is closed, not filed as an older bug for rule 13's
+      next batch.
+    - **Where code can hold the pattern once** (a shared macro or helper),
+      prefer that, with a codebase test that fails on a copy written by
+      hand.
 
 ## More guidance
 
