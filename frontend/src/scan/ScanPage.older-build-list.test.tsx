@@ -527,9 +527,9 @@ describe("what an older build left", () => {
     await ready();
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
     await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
-    // The second tap of a double tap, on what moved up in its place,
-    // focusing it as it lands, as a browser does: ignored, and focus goes
-    // back to the heading, for Enter not to discard it (inventory-tng-bz73).
+    // The second tap of a double tap, on what moved up in its place and
+    // focusing it, as a browser does: ignored, with focus back on the
+    // heading so Enter cannot discard it later (inventory-tng-bz73).
     const movedUp = discardOf("Cat6 cable: 5 m from an open package");
     movedUp.focus();
     fireEvent.click(movedUp, { detail: 1 });

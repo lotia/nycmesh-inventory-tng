@@ -152,10 +152,10 @@ export function OlderList({
   }
   /** A tap on one of `on`'s buttons, ignored just after a line of it was
    * discarded: the second tap of a double tap would land on what moved up
-   * in its place (Ali, inventory-tng-0su). Landing, a pointer's tap
-   * focused that button, for Enter to take later: focus goes back to the
-   * heading (inventory-tng-bz73). A key's (detail 0) leaves focus where
-   * the volunteer moved it. */
+   * in its place (Ali, inventory-tng-0su). A pointer's tap focused that
+   * button as it landed, where Enter would later discard it, so focus goes
+   * back to the heading (inventory-tng-bz73); a key's press (detail 0)
+   * leaves focus where the volunteer moved it. */
   const unlessSettling =
     (on: string, tap: () => void) => (event: MouseEvent) => {
       if (
