@@ -1,23 +1,23 @@
-import { afterEach, expect, test } from "vitest";
+import { beforeEach, expect, test } from "vitest";
 import { follow } from "./follow-fields";
 
-let shows = 0;
-const show = () => {
-  shows += 1;
-};
+let box: HTMLInputElement;
+let list: HTMLSelectElement;
+let shows: number;
 
-afterEach(() => {
-  window.removeEventListener("pageshow", show);
-  shows = 0;
-});
-
-test("shows at once, on a box's input and a list's change, and on pageshow", () => {
+beforeEach(() => {
   document.body.innerHTML = `
     <input name="box">
-    <select name="list"><option>A</option></select>`;
-  const box = document.querySelector("input") as HTMLInputElement;
-  const list = document.querySelector("select") as HTMLSelectElement;
-  follow(document, [box, list], show);
+    <select name="list"><option>A</option><option>B</option></select>`;
+  box = document.querySelector("input") as HTMLInputElement;
+  list = document.querySelector("select") as HTMLSelectElement;
+  shows = 0;
+  follow(document, [box, list], () => {
+    shows += 1;
+  });
+});
+
+test("shows at once, and on a box's input and a list's change", () => {
   expect(shows).toBe(1);
   box.dispatchEvent(new Event("input"));
   list.dispatchEvent(new Event("change"));
@@ -26,7 +26,21 @@ test("shows at once, on a box's input and a list's change, and on pageshow", () 
   list.dispatchEvent(new Event("input"));
   box.dispatchEvent(new Event("change"));
   expect(shows).toBe(3);
-  // As the browser putting values back by itself does: no field's event.
+});
+
+test("shows on pageshow a value put back with no field's event", () => {
+  // As the browser putting values back by itself does.
+  box.value = "40";
+  list.value = "B";
   window.dispatchEvent(new Event("pageshow"));
-  expect(shows).toBe(4);
+  expect(shows).toBe(2);
+});
+
+test("does not show again on pageshow when nothing changed", () => {
+  // As every load ends, so words in a live region are not read out again.
+  window.dispatchEvent(new Event("pageshow"));
+  box.value = "40";
+  box.dispatchEvent(new Event("input"));
+  window.dispatchEvent(new Event("pageshow"));
+  expect(shows).toBe(2);
 });

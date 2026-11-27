@@ -10,21 +10,36 @@ export type Field = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 
 /**
  * Runs `show` now, as any of `fields` is changed (input for a box or a
- * text area, change for a list), and on the window's pageshow. A value the browser puts back
- * by itself, on Back or in a restored tab, fires neither, and Chromium puts
- * it back after the page's script has run (inventory-tng-r86h).
+ * text area, change for a list), and on the window's pageshow if any
+ * holds another value than when it last ran. A value the browser puts
+ * back by itself, on Back or in a restored tab, fires neither input nor
+ * change, and Chromium puts it back after the page's script has run
+ * (inventory-tng-r86h). Pageshow fires on every load too, when nothing
+ * has changed: `show` is not run again then, so words in a live region
+ * are not read out again.
  */
 export function follow(
   document: Document,
   fields: Iterable<Field>,
   show: () => void,
 ): void {
-  for (const field of fields) {
+  const followed = [...fields];
+  const values = () => followed.map((field) => field.value);
+  let shown: string[] = [];
+  const update = () => {
+    shown = values();
+    show();
+  };
+  for (const field of followed) {
     field.addEventListener(
       field instanceof HTMLSelectElement ? "change" : "input",
-      show,
+      update,
     );
   }
-  document.defaultView?.addEventListener("pageshow", show);
-  show();
+  document.defaultView?.addEventListener("pageshow", () => {
+    if (values().some((value, at) => value !== shown[at])) {
+      update();
+    }
+  });
+  update();
 }

@@ -67,10 +67,7 @@ export function followTotals(document: Document): void {
           (amount * sent(box.dataset.per ?? "1")) / THOUSANDTHS_PER_UNIT,
         );
       }
-      // Written only when it differs: follow shows again on pageshow, and
-      // the same words written again may be read out again.
-      const words = boxAmount(total);
-      if (shown.textContent !== words) shown.textContent = words;
+      shown.textContent = boxAmount(total);
       line.hidden = false;
     });
   }

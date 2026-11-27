@@ -47,12 +47,9 @@ test("the Search the web link still follows what is typed after Back", async ({
   );
 });
 
-// The other followers' pages need rows no browser fixture makes (a length
-// check due, a printed length, a retired area emptied while counted, a
-// batch refused as recorded already), so each is added to a page with
-// the fields' names, types and the attributes its follower reads as its
-// template writes them, and the page is sent with it every time, as the
-// browser puts back fields only into the same markup.
+// The other followers' pages need rows no browser fixture makes, so their
+// fields, as their templates write them, are added to a page each time it
+// is sent: the browser puts values back only into the same markup.
 // Exact markup on purpose: the fields a follower reads, as the server sends them.
 const FOLLOWERS = `
   <form>

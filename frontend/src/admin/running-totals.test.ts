@@ -48,7 +48,7 @@ test("it follows what is typed, a blank box as it was sent", () => {
 
 test("the same total is not written again, so it is not read out again", () => {
   const words = line("7-5").querySelector("[data-total-amount]")?.firstChild;
-  // What follow does again on pageshow, every load.
+  // As every load ends, nothing having changed (follow).
   window.dispatchEvent(new Event("pageshow"));
   expect(line("7-5").querySelector("[data-total-amount]")?.firstChild).toBe(
     words,
