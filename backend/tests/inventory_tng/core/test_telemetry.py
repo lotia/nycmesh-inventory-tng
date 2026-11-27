@@ -949,6 +949,41 @@ def test_counts_saves_shown_in_a_unit_or_size_changed_since(
     }
 
 
+def test_counts_a_count_shown_with_a_size_changed_since_once(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A box of radios held nowhere, counted sealed as ten though it holds
+    twelve now, with nothing else wrong: refused at once, logged and
+    counted once, not again by the save (inventory-tng-xse9)."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    place = Place(session)
+    box = add(session, ItemPackage(item_id=place.item.id, name=f"Box {tag()}", size=10))
+    at = count_form_at(client, place.store.id)
+    form = at | {
+        "key": str(uuid.uuid4()),
+        "sizes": f"{at['sizes']} {box.id}:10",
+        f"sealed_{place.item.id}_{box.id}": "3",
+    }
+    box.size = Decimal(12)
+    session.flush()
+    name = "inventory.saves.shown_otherwise"
+    before = counted(reader, name)
+    refused_before = counted(reader, "inventory.counts.refused")
+    with capture_logs() as logs:
+        answer = client.post(f"{COUNTS}/{place.store.id}", data=form)
+    assert answer.status_code == 400
+    assert added(reader, name, before) == {
+        (("changed", "package_size"), ("save", "count")): 1
+    }
+    assert added(reader, "inventory.counts.refused", refused_before) == {
+        (("reason", "shown_otherwise"),): 1
+    }
+    events = [line["event"] for line in logs]
+    assert events.count("save refused: shown otherwise") == 1
+
+
 def test_counts_a_length_reported_in_a_unit_changed_since(
     rolled_back: Recorded, session: Session
 ) -> None:
