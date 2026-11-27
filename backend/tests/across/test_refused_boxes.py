@@ -211,18 +211,12 @@ def _set_up(_: Session, make_client: MakeClient) -> Sent:
     return Sent(client, paths.SETUP, data, ("token",))
 
 
-def _set_up_passwords_differ(_: Session, make_client: MakeClient) -> Sent:
+def _set_up_passwords_differ(session: Session, make_client: MakeClient) -> Sent:
     """Both password boxes marked, by the one problem (Ali, 2026-11-27),
     and the authenticator's code, as none was typed."""
-    data = {
-        "token": TOKEN,
-        "username": "ada",
-        "password": PASSWORD,
-        "password_again": PASSWORD + "!",
-        "authenticator_name": "Phone",
-    }
-    client = make_client(setup_token=TOKEN)
-    return Sent(client, paths.SETUP, data, (*BOTH_PASSWORDS, "code"))
+    sent = _set_up(session, make_client)
+    data = sent.data | {"token": TOKEN, "password_again": PASSWORD + "!"}
+    return sent._replace(data=data, marked=(*BOTH_PASSWORDS, "code"))
 
 
 def _recovered(session: Session, make_client: MakeClient) -> Sent:

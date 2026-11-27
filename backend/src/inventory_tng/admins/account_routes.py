@@ -149,8 +149,7 @@ def change_email(
     if problem := accounts.email_problem(email):
         return _refused(request, session, signed, {"email": problem}, values)
     if not unique(session, lambda: accounts.change_email(session, admin, email, now())):
-        taken = EMAIL_TAKEN
-        return _refused(request, session, signed, {"email": taken}, values)
+        return _refused(request, session, signed, {"email": EMAIL_TAKEN}, values)
     response = _done(signed, session, "email", section="email")
     # Told at the old address, in case it was not them: someone with their
     # session could otherwise take resets over unseen.
@@ -246,8 +245,7 @@ def remove_authenticator(
     if outcome == "missing":
         return not_found()
     if outcome == "last_required":
-        problem = LAST_REQUIRED
-        return _refused(request, session, signed, {"authenticators": problem})
+        return _refused(request, session, signed, {"authenticators": LAST_REQUIRED})
     done = _done(signed, session, outcome, section="authenticators")
     notify.tell(
         signed.admin.email,

@@ -26,7 +26,7 @@ invited from the administrator pages.{% endtrans %}</p>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Password again{% endtrans %}
-    <input name="password_again" type="password" autocomplete="new-password" required{{ described_by("password", sent="password_again" in problems) }}>
+    <input name="password_again" type="password" autocomplete="new-password" required{{ described_by("password_again", said_by="password") }}>
   </label>
   <fieldset>
     <legend>{% if totp_optional %}{% trans %}Authenticator (optional){% endtrans %}{% else %}{% trans %}Authenticator{% endtrans %}{% endif %}</legend>

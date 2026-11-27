@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.items_routes import UNIT_FREE
 from inventory_tng.catalogue.paths import ITEMS
+from inventory_tng.catalogue.unit_changes import SINCE_SHOWN_RULES
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.web.forms import CHANGED, RULES
@@ -80,15 +81,6 @@ def _refused_since(
         assert str(RULES[other]) not in said
     session.refresh(item)
     assert (item.unit, item.minimum) == (unit, before)
-
-
-# Each refusal of a unit fixed or freed since its form was shown.
-SINCE_SHOWN_RULES = {
-    CHANGED,
-    "item_unit_moved_since_shown",
-    "item_unit_labelled_since_shown",
-    "item_unit_revoked_since_shown",
-}
 
 
 def test_reorder_at_sent_back_says_the_unit_sent_while_it_can_change(

@@ -126,7 +126,7 @@ SHOWN_FREE = {"yes": True, "no": False}
 # The refusals of a save of the item that say, as an alert above its page
 # as it is now: ALERTS, and a unit fixed or freed since it was shown, by
 # its cause.
-ITEM_ALERTS = ALERTS | {rule for _, rule in unit_changes.SINCE_SHOWN.values()}
+ITEM_ALERTS = ALERTS | unit_changes.SINCE_SHOWN_RULES
 
 
 class _AskFirst(Exception):

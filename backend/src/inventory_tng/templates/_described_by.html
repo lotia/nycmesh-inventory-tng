@@ -3,13 +3,13 @@ problem (_field_problem.html) first, so a screen reader hears why it was
 refused, and aria-invalid (inventory-tng-h3tw, inventory-tng-l361). A box
 whose problem sits inside its label (`labelled`) hears it in its name
 already, so is only marked invalid (Ali, 2026-11-26). `name` is the
-problem's, which may differ from the box's own name. `sent` says whether
-the box may be refused: false when the page's problems are another form's
-(inventory-tng-gjuq); for a box refused by another box's problem, as
-Password again by Password's when they differ, whether it is. Imported
-with context, for `problems`. -#}
-{% macro described_by(name, described=[], labelled=false, sent=true) -%}
+problem's, which may differ from the box's own name. `said_by`, for a box
+refused under its own name by a problem said beside another box, as
+Password again by Password's when they differ: that box's name. `sent`,
+false when the page's problems are another form's, so the box is never
+refused (inventory-tng-gjuq). Imported with context, for `problems`. -#}
+{% macro described_by(name, described=[], labelled=false, sent=true, said_by=none) -%}
 {%- set refused = problems.get(name) if sent else none -%}
-{%- set ids = ([name ~ "-problem"] if refused and not labelled else []) + described -%}
+{%- set ids = ([(said_by or name) ~ "-problem"] if refused and not labelled else []) + described -%}
 {%- if ids %} aria-describedby="{{ ids | join(' ') }}"{% endif %}{% if refused %} aria-invalid="true"{% endif -%}
 {%- endmacro %}

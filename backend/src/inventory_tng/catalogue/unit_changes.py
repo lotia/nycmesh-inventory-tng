@@ -84,6 +84,7 @@ SINCE_SHOWN: dict[UnitFixed | None, tuple[str, str]] = {
     "converted": ("converted_since_shown", "changed_since_shown"),
     None: ("revoked_since_shown", "item_unit_revoked_since_shown"),
 }
+SINCE_SHOWN_RULES = frozenset(rule for _, rule in SINCE_SHOWN.values())
 
 # Refused: a package's amount typed in the unit its form showed, which its
 # item or package has left since (require_unit_shown).
