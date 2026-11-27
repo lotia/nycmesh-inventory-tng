@@ -180,7 +180,9 @@ def test_reorder_at_typed_while_free_is_refused_once_converted_by_another(
 ) -> None:
     """Drawn while the cable's unit was free; its amounts converted by
     another's save before Save, which fixes it for good: refused as any
-    save changed since, nothing saved."""
+    save changed since, nothing saved. That save changed the item's
+    version, so the stale check refuses it before the unit guard; the
+    guard's own case is in test_telemetry."""
     cable = new_item(session, radios, "Cat6 cable", unit="m")
     drawn = _unit_free(read(admin_client.get(f"{ITEMS}/{cable.id}").text), cable.id)
     assert drawn == "yes"

@@ -76,7 +76,8 @@ UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
 # freed it since: the reason it is counted by, and the rule it is refused
 # by, whose words say that cause (Ali, 2026-11-27, inventory-tng-zhnd).
 # Free since: only its labels revoked can free it. Converted by another's
-# save, it is said as any save changed since.
+# save, it is said as any save changed since; from the item page that save
+# also changed the item's version, so the stale check refuses it first.
 SINCE_SHOWN: dict[UnitFixed | None, tuple[str, str]] = {
     "moved": ("moved_since_shown", "item_unit_moved_since_shown"),
     "labelled": ("labelled_since_shown", "item_unit_labelled_since_shown"),
