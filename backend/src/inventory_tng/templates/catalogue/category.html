@@ -1,14 +1,20 @@
 {% extends "admin_base.html" %}
 {% from "_retired_record.html" import retired_record, retire_section with context %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 {% set retired = category.retired_at is not none %}
 {% if retired %}
 {% call retired_record(category) %}{% trans %}Nobody can pick it for an item.{% endtrans %}{% endcall %}
 {% endif %}
+{#- Its rename sent back (it has a version): only then are the page's
+problems its own, so only then is a refused name marked invalid
+(inventory-tng-gjuq); a refused retire puts its problem on the name with
+nothing sent. #}
+{% set renamed = 'version' in values %}
 <form method="post" action="{{ here }}/name" class="actions">
-  <input type="hidden" name="version" value="{{ category.edit_version }}">
+  <input type="hidden" name="version" value="{{ values.get('version', category.edit_version) }}">
   <label>{% trans %}Name{% endtrans %}
-    <input name="name" inputmode="text" value="{{ category.name }}" maxlength="{{ name_max }}" required {% if retired %}disabled{% endif %}>
+    <input name="name" inputmode="text" value="{{ values.get('name', category.name) }}" maxlength="{{ name_max }}" required {% if retired %}disabled{% endif %}{% if renamed %}{{ described_by("name", labelled=true) }}{% endif %}>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   {% if not retired %}<button class="primary">{% trans %}Rename{% endtrans %}</button>{% endif %}

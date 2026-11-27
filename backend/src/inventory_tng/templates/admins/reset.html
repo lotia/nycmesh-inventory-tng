@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 {% if not link %}
 <p>{% trans link=paths.forgot %}This link doesn't work any more: it has been used, a newer one replaced
@@ -15,7 +16,7 @@ server for a new recovery token.{% endtrans %}</p>
   {% trans %}Set up a new authenticator when you next sign in.{% endtrans %}{% endif %}</p>
   {% endif %}
   <label>{% trans %}New password{% endtrans %} {% include "admins/_password_hint.html" %}
-    <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required autofocus>
+    <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required autofocus{{ described_by("password", labelled=true) }}>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}New password again{% endtrans %}

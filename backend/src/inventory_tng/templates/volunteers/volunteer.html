@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% from "_retired_record.html" import retired_record, retire_section with context %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 {% set retired = volunteer.retired_at is not none %}
 {% with name = "volunteer" %}{% if problems.get(name) %}<p role="alert">{{ problems[name] }}</p>{% endif %}{% endwith %}
@@ -13,11 +14,11 @@ count as theirs.{% endtrans %}{% else %}{% trans %}The scan page doesn't offer t
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
   <input type="hidden" name="version" value="{{ values.get('version', volunteer.edit_version) }}">
   <label>{% trans %}Name{% endtrans %}
-    <input name="name" inputmode="text" value="{{ values.get('name', volunteer.name) }}" maxlength="{{ name_max }}" required>
+    <input name="name" inputmode="text" value="{{ values.get('name', volunteer.name) }}" maxlength="{{ name_max }}" required{{ described_by("name", labelled=true) }}>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional{% endtrans %}</span>
-    <input name="email" type="email" value="{{ values.get('email', volunteer.email or '') }}">
+    <input name="email" type="email" value="{{ values.get('email', volunteer.email or '') }}"{{ described_by("email", labelled=true) }}>
     {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   </fieldset>

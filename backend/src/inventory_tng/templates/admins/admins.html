@@ -1,6 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_listing.html" import sizes, sort_heading, pager %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 <section>
   {{ sizes(view) }}
@@ -29,11 +30,11 @@
   <form method="post" action="{{ here }}">
     {{ single_use_field() }}
     <label>{% trans %}Username{% endtrans %}
-      <input name="username" inputmode="text" value="{{ values.get('username', '') }}" maxlength="{{ limits.username_max }}" required>
+      <input name="username" inputmode="text" value="{{ values.get('username', '') }}" maxlength="{{ limits.username_max }}" required{{ described_by("username", labelled=true) }}>
       {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional: lets them reset their own password{% endtrans %}</span>
-      <input name="email" type="email" value="{{ values.get('email', '') }}">
+      <input name="email" type="email" value="{{ values.get('email', '') }}"{{ described_by("email", labelled=true) }}>
       {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     {% if code_needed %}{% include "admins/_code_field.html" %}{% endif %}

@@ -1,6 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_listing.html" import filter_form, sizes, sort_heading, pager, unfiltered_or %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 <p>{% trans %}A phone or computer must be registered before it can record anything.
 Make a code, then show its QR code in the room, or send its phrase to
@@ -11,19 +12,19 @@ someone remote. Making one asks for a fresh code.{% endtrans %}</p>
   <form method="post" action="{{ codes_path }}">
     {{ single_use_field() }}
     <label>{% trans %}What it's for{% endtrans %} <span class="hint">{% trans %}optional, such as "Hub open day"{% endtrans %}</span>
-      <input name="label" inputmode="text" value="{{ values.get('label', '') }}" maxlength="{{ name_max }}">
+      <input name="label" inputmode="text" value="{{ values.get('label', '') }}" maxlength="{{ name_max }}"{{ described_by("label", labelled=true) }}>
       {% with name = "label" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}Devices it may register{% endtrans %} <span class="hint">{% trans %}keep it small{% endtrans %}</span>
-      <input name="uses" type="number" inputmode="numeric" min="1" max="{{ max_uses }}" value="{{ values.get('uses', '1') }}" required>
+      <input name="uses" type="number" inputmode="numeric" min="1" max="{{ max_uses }}" value="{{ values.get('uses', '1') }}" required{{ described_by("uses", labelled=true) }}>
       {% with name = "uses" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}Days it lasts{% endtrans %}
-      <input name="days" type="number" inputmode="numeric" min="1" max="{{ max_days }}" value="{{ values.get('days', '1') }}" required>
+      <input name="days" type="number" inputmode="numeric" min="1" max="{{ max_days }}" value="{{ values.get('days', '1') }}" required{{ described_by("days", labelled=true) }}>
       {% with name = "days" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}How many codes{% endtrans %} <span class="hint">{% trans most=max_codes %}alike, up to {{ most }}, printed on one sheet{% endtrans %}</span>
-      <input name="count" type="number" inputmode="numeric" min="1" max="{{ max_codes }}" value="{{ values.get('count', '1') }}" required>
+      <input name="count" type="number" inputmode="numeric" min="1" max="{{ max_codes }}" value="{{ values.get('count', '1') }}" required{{ described_by("count", labelled=true) }}>
       {% with name = "count" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <button class="primary">{% trans %}Make a code{% endtrans %}</button>

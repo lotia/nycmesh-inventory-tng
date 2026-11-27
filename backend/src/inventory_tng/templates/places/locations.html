@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_described_by.html" import described_by with context %}
 {% macro branch(places) %}
 <ul>
   {% for place in places %}
@@ -18,17 +19,17 @@
   <h2>{% trans %}Add a location{% endtrans %}</h2>
   <form method="post" action="{{ here }}">
     <label>{% trans %}Name{% endtrans %}
-      <input name="name" inputmode="text" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
+      <input name="name" inputmode="text" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required{{ described_by("name", labelled=true) }}>
       {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}What it is{% endtrans %}
-      <select name="kind" required>
+      <select name="kind" required{{ described_by("kind", labelled=true) }}>
         {% for kind, label in kinds.items() %}<option value="{{ kind }}" {% if values.get('kind') == kind %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
       {% with name = "kind" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}Part of{% endtrans %} <span class="hint">{% trans %}for an area only{% endtrans %}</span>
-      <select name="parent_id">
+      <select name="parent_id"{{ described_by("parent_id", labelled=true) }}>
         <option value="">{% trans %}Nothing{% endtrans %}</option>
         {% for parent in parents %}<option value="{{ parent.id }}" {% if values.get('parent_id') == parent.id | string %}selected{% endif %}>{{ parent.name }}</option>{% endfor %}
       </select>

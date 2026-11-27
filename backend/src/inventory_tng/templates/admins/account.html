@@ -17,7 +17,7 @@
   {% with section_id="email" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ paths.account }}/email">
     <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional: lets you reset your own password{% endtrans %}</span>
-      <input name="email" type="email" value="{{ values.get('email', admin.email or '') }}" autocomplete="email">
+      <input name="email" type="email" value="{{ values.get('email', admin.email or '') }}" autocomplete="email"{{ described_by("email", labelled=true) }}>
       {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <button class="primary">{% trans %}Save email{% endtrans %}</button>
@@ -29,7 +29,7 @@
   {% with section_id="password" %}{% include "_notice.html" %}{% endwith %}
   <form method="post" action="{{ paths.account }}/password">
     <label>{% trans %}New password{% endtrans %} {% include "admins/_password_hint.html" %}
-      <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
+      <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required{{ described_by("password", labelled=true) }}>
       {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}New password again{% endtrans %}

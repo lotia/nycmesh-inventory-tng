@@ -1,21 +1,22 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_listing.html" import filter_form, sizes, sort_heading, pager %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 <p>{% trans %}Every registered phone or computer. After a compromise, list those
 registered while it lasted, then revoke the ones that look wrong.{% endtrans %}</p>
 
 {% call filter_form(view) %}
   <label>{% trans %}Registered from{% endtrans %} <span class="hint">{% trans zone=zone.key %}{{ zone }} time, optional{% endtrans %}</span>
-    <input name="since" type="datetime-local" value="{{ filter.since }}">
+    <input name="since" type="datetime-local" value="{{ filter.since }}"{{ described_by("since", labelled=true) }}>
     {% with name = "since" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}to{% endtrans %} <span class="hint">{% trans %}that minute included, optional{% endtrans %}</span>
-    <input name="until" type="datetime-local" value="{{ filter.until }}">
+    <input name="until" type="datetime-local" value="{{ filter.until }}"{{ described_by("until", labelled=true) }}>
     {% with name = "until" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}With code{% endtrans %} <span class="hint">{% trans %}its number, optional{% endtrans %}</span>
-    <input name="code" inputmode="numeric" value="{{ filter.code }}">
+    <input name="code" inputmode="numeric" value="{{ filter.code }}"{{ described_by("code", labelled=true) }}>
     {% with name = "code" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Showing{% endtrans %}

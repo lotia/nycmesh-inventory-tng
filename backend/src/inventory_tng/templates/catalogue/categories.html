@@ -1,10 +1,11 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_listing.html" import sizes, sort_heading, pager %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 <form method="post" action="{{ here }}" class="actions">
   <label>{% trans %}New category{% endtrans %}
-    <input name="name" inputmode="text" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required>
+    <input name="name" inputmode="text" value="{{ values.get('name', '') }}" maxlength="{{ name_max }}" required{{ described_by("name", labelled=true) }}>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <button class="primary">{% trans %}Add{% endtrans %}</button>

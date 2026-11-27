@@ -46,8 +46,11 @@ from helpers.stock import URL, Place, Spools, cut, raise_check, write
 
 
 def described(page: str, check: OverRecorded) -> list[Element]:
-    """What `check`'s reason's problem describes: each reason, and the words."""
-    return read(page).all("*", aria_describedby=f"reason-{check.id}-problem")
+    """What `check`'s reason's problem describes, each marked invalid
+    (inventory-tng-gjuq): each reason, and the words."""
+    return read(page).all(
+        "*", aria_describedby=f"reason-{check.id}-problem", aria_invalid="true"
+    )
 
 
 def test_needs_your_action_lists_it(

@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 {% if off %}
 <p>{% trans %}Setup is off. Whoever runs the server turns it on by setting
@@ -9,19 +10,19 @@ token.{% endtrans %}</p>
 invited from the administrator pages.{% endtrans %}</p>
 <form method="post" action="{{ paths.setup }}">
   <label>{% trans %}Setup token{% endtrans %} <span class="hint">{% trans %}from whoever runs the server{% endtrans %}</span>
-    <input name="token" inputmode="text" value="{{ values.get('token', '') }}" autocomplete="off" required>
+    <input name="token" inputmode="text" value="{{ values.get('token', '') }}" autocomplete="off" required{{ described_by("token", labelled=true) }}>
     {% with name = "token" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Username{% endtrans %}
-    <input name="username" inputmode="text" value="{{ values.get('username', '') }}" autocomplete="username" maxlength="{{ limits.username_max }}" required>
+    <input name="username" inputmode="text" value="{{ values.get('username', '') }}" autocomplete="username" maxlength="{{ limits.username_max }}" required{{ described_by("username", labelled=true) }}>
     {% with name = "username" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Email{% endtrans %} <span class="hint">{% trans %}optional: lets you reset your own password{% endtrans %}</span>
-    <input name="email" type="email" value="{{ values.get('email', '') }}" autocomplete="email">
+    <input name="email" type="email" value="{{ values.get('email', '') }}" autocomplete="email"{{ described_by("email", labelled=true) }}>
     {% with name = "email" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Password{% endtrans %} {% include "admins/_password_hint.html" %}
-    <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required>
+    <input name="password" type="password" autocomplete="new-password" minlength="{{ limits.password_min }}" required{{ described_by("password", labelled=true) }}>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}Password again{% endtrans %}

@@ -20,7 +20,7 @@
     </fieldset>
     {% for n in numbers %}
     <label>{{ n.label }} <span class="hint">{{ n.hint }}</span>
-      <input name="{{ n.field }}" type="number" inputmode="numeric" min="{{ n.low }}" max="{{ n.high }}" value="{{ values[n.field] }}" required>
+      <input name="{{ n.field }}" type="number" inputmode="numeric" min="{{ n.low }}" max="{{ n.high }}" value="{{ values[n.field] }}" required{{ described_by(n.field, labelled=true) }}>
       {% with name = n.field %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     {% endfor %}
@@ -34,7 +34,7 @@
   <form method="post" action="{{ here }}/site" class="actions">
     <input type="hidden" name="site_version" value="{{ values.site_version }}">
     <label>{% trans %}Times are shown in{% endtrans %}
-      <select name="time_zone" required>
+      <select name="time_zone" required{{ described_by("time_zone", labelled=true) }}>
         {% for zone in zones %}<option {% if values.time_zone == zone %}selected{% endif %}>{{ zone }}</option>{% endfor %}
       </select>
       {% with name = "time_zone" %}{% include "_field_problem.html" %}{% endwith %}
@@ -50,7 +50,7 @@
   <form method="post" action="{{ here }}/scan">
     <input type="hidden" name="scan_version" value="{{ values.scan_version }}">
     <label>{% trans %}Ask whose name it is after{% endtrans %} <span class="hint">{% trans %}minutes a phone sits unused; 0 never asks{% endtrans %}</span>
-      <input name="name_check_minutes" type="number" inputmode="numeric" min="{{ name_check_min }}" max="{{ name_check_max }}" value="{{ values.name_check_minutes }}" required>
+      <input name="name_check_minutes" type="number" inputmode="numeric" min="{{ name_check_min }}" max="{{ name_check_max }}" value="{{ values.name_check_minutes }}" required{{ described_by("name_check_minutes", labelled=true) }}>
       {% with name = "name_check_minutes" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <button class="primary">{% trans %}Save{% endtrans %}</button>
@@ -86,7 +86,7 @@
     {% endfor %}
   {% endcall %}
   <form method="post" action="{{ here }}/reasons" class="actions">
-    <label>{% trans %}New reason{% endtrans %} <input name="name" inputmode="text" value="{{ values.get('reason', '') }}" maxlength="{{ name_max }}" required>
+    <label>{% trans %}New reason{% endtrans %} <input name="name" inputmode="text" value="{{ values.get('reason', '') }}" maxlength="{{ name_max }}" required{{ described_by("reason", labelled=true) }}>
       {% with name = "reason" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <button class="primary">{% trans %}Add{% endtrans %}</button>

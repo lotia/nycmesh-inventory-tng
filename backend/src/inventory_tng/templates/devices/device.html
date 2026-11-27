@@ -1,4 +1,5 @@
 {% extends "admin_base.html" %}
+{% from "_described_by.html" import described_by with context %}
 {% block main %}
 {% set revoked = device.revoked_at is not none %}
 {% if revoked %}
@@ -19,7 +20,7 @@ with a new code.{% endtrans %}</p>
 <form method="post" action="{{ here }}">
   <input type="hidden" name="version" value="{{ values.get('version', device.edit_version) }}">
   <label>{% trans %}Name{% endtrans %} <span class="hint">{% trans name=device.number_name %}optional, such as "Store tablet"; without one, it is {{ name }}{% endtrans %}</span>
-    <input name="label" inputmode="text" value="{{ values.get('label', device.label or '') }}" maxlength="{{ name_max }}" {% if revoked %}disabled{% endif %}>
+    <input name="label" inputmode="text" value="{{ values.get('label', device.label or '') }}" maxlength="{{ name_max }}" {% if revoked %}disabled{% endif %}{{ described_by("label", labelled=true) }}>
     {% with name = "label" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   {% if not revoked %}<button class="primary">{% trans %}Save{% endtrans %}</button>{% endif %}

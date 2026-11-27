@@ -1,6 +1,7 @@
 {# A new authenticator: the QR code, the same key to type, its name and a
    code from it. `key` goes back in a hidden field, so a mistake elsewhere
    on the form does not mean scanning again. #}
+{% from "_described_by.html" import described_by with context %}
 <p>{% trans %}Scan this with an authenticator app, such as Aegis, 2FAS, Google
 Authenticator or a password manager:{% endtrans %}</p>
 <div class="qr">{{ qr }}</div>
@@ -9,10 +10,10 @@ Authenticator or a password manager:{% endtrans %}</p>
 It isn't shown again once saved.{% endtrans %}</p>
 <input type="hidden" name="key" value="{{ key }}">
 <label>{% trans %}Name for it{% endtrans %} <span class="hint">{% trans %}such as the phone or app{% endtrans %}</span>
-  <input name="authenticator_name" inputmode="text" value="{{ values.get('authenticator_name', _('Phone')) }}" maxlength="{{ limits.authenticator_name_max }}" required>
+  <input name="authenticator_name" inputmode="text" value="{{ values.get('authenticator_name', _('Phone')) }}" maxlength="{{ limits.authenticator_name_max }}" required{{ described_by("authenticator_name", labelled=true) }}>
   {% with name = "authenticator_name" %}{% include "_field_problem.html" %}{% endwith %}
 </label>
 <label>{% trans %}The 6-digit code it shows{% endtrans %}{% if totp_optional %} <span class="hint">{% trans %}leave blank to sign in with your password alone{% endtrans %}</span>{% endif %}
-  <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="{{ limits.totp_code_max }}" {% if not totp_optional %}required{% endif %}>
+  <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="{{ limits.totp_code_max }}" {% if not totp_optional %}required{% endif %}{{ described_by("code", labelled=true) }}>
   {% with name = "code" %}{% include "_field_problem.html" %}{% endwith %}
 </label>

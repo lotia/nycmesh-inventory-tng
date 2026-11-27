@@ -2,6 +2,7 @@
 follow. A category with current items cannot be retired: they would be
 left in a category nobody can pick."""
 
+from collections.abc import Mapping
 from typing import Annotated
 
 import structlog
@@ -82,7 +83,9 @@ def _category_page(
     category: Category,
     problem: Words | None = None,
     alert: Words | None = None,
+    values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
+    """The category's page; `values`, its rename as sent back refused."""
     items = queries.current_items_of(session, category.id)
     return admin_page(
         request,
@@ -96,6 +99,7 @@ def _category_page(
             **retirement(session, category),
             "items": items,
             "problems": {"name": problem} if problem else None,
+            "values": values,
             "alert": alert,
         },
     )
@@ -173,7 +177,10 @@ def rename_category(
             return _category_page(request, session, signed, found, alert=RULES[broken])
         problem = broken and CATEGORY_TAKEN
     if problem is not None:
-        return _category_page(request, session, signed, found, problem)
+        # Refused, its box holds what was typed, marked invalid
+        # (inventory-tng-gjuq).
+        values = {"name": name, "version": version}
+        return _category_page(request, session, signed, found, problem, values=values)
     session.commit()
     return redirect(f"{CATEGORIES}/{category_id}", notice="saved")
 
