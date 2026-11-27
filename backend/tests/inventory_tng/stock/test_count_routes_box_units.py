@@ -117,7 +117,6 @@ def test_how_much_and_left_on_it_are_described_by_the_unit_picked(
     described by how to read a printed length."""
     spools = Spools(session)
     spools.opened()
-    Place(session, cable_unit="ft")
     page = page_at(admin_client, spools.store.id)
     for box, picker, described in [
         ("extra_quantity", "extra_item_id", ["unit-extra_quantity"]),
