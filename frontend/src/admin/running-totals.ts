@@ -5,6 +5,7 @@ import {
   sent,
   THOUSANDTHS_PER_UNIT,
 } from "../shared/quantity";
+import { follow } from "./follow-fields";
 
 /**
  * What a place on the count form holds once saved, under "Moved to" it:
@@ -47,7 +48,10 @@ export function followTotals(document: Document): void {
     if (shown === null || boxes.length === 0) {
       continue;
     }
-    const add = () => {
+    const fields = boxes.flatMap(({ box, state }) =>
+      state === null ? [box] : [box, state],
+    );
+    follow(document, fields, () => {
       let total = 0;
       for (const { box, state } of boxes) {
         if ((state?.value ?? "here") !== "here") {
@@ -65,12 +69,7 @@ export function followTotals(document: Document): void {
       }
       shown.textContent = boxAmount(total);
       line.hidden = false;
-    };
-    for (const { box, state } of boxes) {
-      box.addEventListener("input", add);
-      state?.addEventListener("change", add);
-    }
-    add();
+    });
   }
 }
 

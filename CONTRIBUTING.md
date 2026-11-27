@@ -873,7 +873,11 @@ utilities. When you style a page:
   an inline script, a `<style>` or a `style` attribute: the
   Content-Security-Policy refuses them (docs/decisions/0010,
   `web/security_headers.py`). Give an element a class, or a `data-` attribute
-  that `admin.ts` acts on, as the Print button's `data-print`.
+  that `admin.ts` acts on, as the Print button's `data-print`. A script
+  that shows something from a field's value follows the field with
+  `follow` (`frontend/src/admin/follow-fields.ts`), which checks it again
+  when the browser puts a value back on Back; a codebase test refuses
+  another input or change listener.
 - A page that prints a QR code puts a `.printable` in its `main`: the
   `print_controls` macro (`_print_controls.html`: the paper and a Print
   button), then a `.print-sheet` for each page, what prints

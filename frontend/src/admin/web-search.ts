@@ -1,3 +1,5 @@
+import { follow } from "./follow-fields";
+
 /**
  * The Search the web link beside an item's manufacturer and part number
  * (catalogue/_web_search.html), kept current as they are typed in: its
@@ -16,7 +18,7 @@ export function followWebSearch(document: Document): void {
     const fields = ["manufacturer", "part_number"]
       .map((name) => form.elements.namedItem(name))
       .filter((field) => field instanceof HTMLInputElement);
-    const search = () => {
+    follow(document, fields, () => {
       const query = fields
         .map((field) => field.value.trim())
         .filter((value) => value !== "")
@@ -25,10 +27,6 @@ export function followWebSearch(document: Document): void {
       address.searchParams.set("q", query);
       link.href = address.href;
       shown.hidden = query === "";
-    };
-    for (const field of fields) {
-      field.addEventListener("input", search);
-    }
-    search();
+    });
   }
 }

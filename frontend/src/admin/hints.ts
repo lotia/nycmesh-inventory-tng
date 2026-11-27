@@ -1,8 +1,9 @@
 import { boxAmount, readBox } from "../shared/quantity";
+import { follow } from "./follow-fields";
 
 /**
  * Words that follow a field as it is filled in, each still right without
- * the browser's help.
+ * the browser's help, and after it puts a value back by itself (follow).
  *
  * A hint about the package a select picks, shown only while it is one it
  * fits: the printed-length hint under an open package nobody recorded, on
@@ -26,12 +27,10 @@ export function followPicks(document: Document): void {
     if (select === null || field === null) {
       continue;
     }
-    const show = () => {
+    follow(document, [select], () => {
       const picked = select.options[select.selectedIndex];
       showDescribing(field, hint, picked?.hasAttribute("data-hinted") ?? false);
-    };
-    select.addEventListener("change", show);
-    show();
+    });
   }
 }
 
@@ -71,12 +70,10 @@ export function followUnits(document: Document): void {
     if (select === null) {
       continue;
     }
-    const show = () => {
+    follow(document, [select], () => {
       words.textContent =
         select.options[select.selectedIndex]?.dataset.unit ?? "";
-    };
-    select.addEventListener("change", show);
-    show();
+    });
   }
 }
 
@@ -98,7 +95,7 @@ export function followTyped(document: Document): void {
     }
     const unit = words.dataset.unit ? ` ${words.dataset.unit}` : "";
     const sent = words.textContent;
-    const say = () => {
+    follow(document, [field], () => {
       // A number, as the page takes one, written back as its boxes are
       // (boxAmount), in its decimal separator; else what is typed is no
       // length.
@@ -106,9 +103,7 @@ export function followTyped(document: Document): void {
       const length = typed === "" ? null : readBox(typed);
       words.textContent =
         length === null ? sent : `${boxAmount(length)}${unit}`;
-    };
-    field.addEventListener("input", say);
-    say();
+    });
   }
 }
 
@@ -119,13 +114,8 @@ export function followTyped(document: Document): void {
  * words are the element with its id and `-was`, named in its
  * aria-describedby only while shown (inventory-tng-suqp). Without this,
  * they show only on a page sent back with another count.
- *
- * Checked at once and on pageshow too, not only as it is typed in: a
- * count the browser puts back by itself, on Back or in a restored tab,
- * fires no input (inventory-tng-2t5h).
  */
 export function followWas(document: Document): void {
-  const shows: (() => void)[] = [];
   for (const field of document.querySelectorAll<HTMLInputElement>(
     "input[data-was]",
   )) {
@@ -133,16 +123,8 @@ export function followWas(document: Document): void {
     if (was === null) {
       continue;
     }
-    const show = () => {
+    follow(document, [field], () => {
       showDescribing(field, was, field.value !== field.dataset.was);
-    };
-    field.addEventListener("input", show);
-    shows.push(show);
-    show();
+    });
   }
-  document.defaultView?.addEventListener("pageshow", () => {
-    for (const show of shows) {
-      show();
-    }
-  });
 }
