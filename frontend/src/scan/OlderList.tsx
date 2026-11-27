@@ -133,28 +133,36 @@ export function OlderList({
       };
     });
   }, [listed, catalogue]);
+  /** Focus `on`'s heading, while it is listed. */
+  const focusHeading = (on: string | null) => {
+    const n = shown.findIndex(({ each }) => olderId(each) === on);
+    if (n >= 0) {
+      document.getElementById(`older-${n}`)?.focus();
+    }
+  };
   // After a line's Discard, focus goes to its entry's heading, not to the
   // page; if the entry went with it, where it goes after an entry's Discard.
   useEffect(() => {
     const on = refocus.current;
     refocus.current = null;
-    const n = shown.findIndex(({ each }) => olderId(each) === on);
-    if (n >= 0) {
-      document.getElementById(`older-${n}`)?.focus();
-    }
+    focusHeading(on);
   }, [shown]);
   if (shown.length === 0) {
     return null;
   }
   /** A tap on one of `on`'s buttons, ignored just after a line of it was
    * discarded: the second tap of a double tap would land on what moved up
-   * in its place (Ali, inventory-tng-0su). */
+   * in its place (Ali, inventory-tng-0su). Landing, the tap focused that
+   * button, for Enter to take later: focus goes back to the heading
+   * (inventory-tng-bz73). */
   const unlessSettling = (on: string, tap: () => void) => () => {
     if (
       performance.now() - (lineGoneAt.current.get(on) ?? -Infinity) >=
       SETTLE_MS
     ) {
       tap();
+    } else {
+      focusHeading(on);
     }
   };
   /** What to tell the volunteer, under `on`, of its Discard, or a line's,

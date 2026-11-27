@@ -526,9 +526,15 @@ describe("what an older build left", () => {
     open();
     await ready();
     fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
-    // The second tap of a double tap, on what moved up in its place.
-    fireEvent.click(discardOf("Cat6 cable: 5 m from an open package"));
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
+    // The second tap of a double tap, on what moved up in its place,
+    // focusing it as it lands, as a browser does: ignored, and focus goes
+    // back to the heading, for Enter not to discard it (inventory-tng-bz73).
+    const movedUp = discardOf("Cat6 cable: 5 m from an open package");
+    movedUp.focus();
+    fireEvent.click(movedUp);
     within(listing()).getByText("Cat6 cable: 5 m from an open package");
+    expect(document.activeElement?.id).toBe("older-0");
     fireEvent.click(lastDiscard());
     fireEvent.click(
       within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),

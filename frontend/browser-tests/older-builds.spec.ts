@@ -438,10 +438,11 @@ test("a cart this build filled, which its tab recorded as a newer build took it 
   expect(await response.json()).toEqual({ transaction_id: saved });
 });
 
-// What only a real browser shows: a real double click, both its clicks
-// landing before the page settles, and the ignored taps taken again on a
-// real clock. The rest of how a line's Discard behaves is in
-// ScanPage.older-build-list.test.tsx (inventory-tng-vtda.1).
+// What only a real browser shows: a double tap as a finger makes it, its
+// second tap landing on what moved up after the first and focusing it as
+// it lands, and the ignored taps taken again on a real clock. The rest of
+// how a line's Discard behaves is in ScanPage.older-build-list.test.tsx
+// (inventory-tng-vtda.1, inventory-tng-bz73).
 test("a double tap on a line's Discard discards that line only, and focuses the entry; once settled, a tap is taken again", async ({
   page,
 }) => {
@@ -457,7 +458,19 @@ test("a double tap on a line's Discard discards that line only, and focuses the 
   await page.reload();
 
   const listing = listingOf(page);
-  await lineDiscard(listing, `${cable}: 3 m from an open package`).dblclick();
+  const box = await lineDiscard(
+    listing,
+    `${cable}: 3 m from an open package`,
+  ).boundingBox();
+  if (box === null) {
+    throw new Error("the line's Discard is not shown");
+  }
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.touchscreen.tap(x, y);
+  // A finger's gap between the taps, the list redrawn after the first.
+  await page.waitForTimeout(150);
+  await page.touchscreen.tap(x, y);
   await expect(
     listing.getByText(`${cable}: 3 m from an open package`),
   ).toHaveCount(0);
