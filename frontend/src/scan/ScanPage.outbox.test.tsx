@@ -2,6 +2,7 @@ import { act, fireEvent, screen, within } from "@testing-library/preact";
 import { describe, expect, type MockInstance, test, vi } from "vitest";
 import { messages as pseudo } from "../locales/pseudo.po";
 import { say, speak } from "../shared/i18n";
+import { STORAGE_KEY } from "../shared/outbox";
 import {
   NO_ANSWER,
   NOT_RECORDED,
@@ -269,19 +270,18 @@ describe("the batches listed in the outbox", () => {
 });
 
 describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => {
+  /** A save refused for its key, `at`, to `to`. */
+  const refused = (to: string, at: number) =>
+    outboxEntry({
+      body: moveBody({ key: `00000000-0000-4000-8000-00000000000${at}` }),
+      summary: { from: "Hub", to },
+      queuedAt: at,
+      state: "refused",
+      reason: { code: "key_reused" },
+    });
   /** Saves refused for their key, each to `to`, listed newest first. */
   function refusedTo(...places: string[]) {
-    storeOutbox(
-      places.map((to, at) =>
-        outboxEntry({
-          body: moveBody({ key: `00000000-0000-4000-8000-00000000000${at}` }),
-          summary: { from: "Hub", to },
-          queuedAt: at,
-          state: "refused",
-          reason: { code: "key_reused" },
-        }),
-      ),
-    );
+    storeOutbox(places.map(refused));
   }
   const words = (to: string) => `Move: 1 item from Hub to ${to}`;
   const dismissOf = (to: string) =>
@@ -315,6 +315,40 @@ describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => 
     await vi.advanceTimersByTimeAsync(500);
     fireEvent.click(dismissOf("Van"), { detail: 1 });
     expect(screen.queryByText(words("Van"))).toBeNull();
+  });
+
+  test("one saved in another tab as one is dismissed moves focus with the entry that moved up, not its place", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    refusedTo("Van", "Shelf", "Desk");
+    open();
+    await ready();
+    // Listed Desk, Shelf, Van: Shelf goes, and before the list is drawn
+    // again another tab saves one more, listed first.
+    act(() => {
+      fireEvent.click(dismissOf("Shelf"), { detail: 1 });
+      storeOutbox([refused("Van", 0), refused("Desk", 2), refused("Roof", 3)]);
+      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    });
+    screen.getByText(words("Roof"));
+    await vi.waitFor(() =>
+      expect(document.activeElement?.textContent).toBe(words("Van")),
+    );
+    // An ignored tap, once yet another is saved elsewhere, goes back to
+    // Van's heading too.
+    act(() => {
+      storeOutbox([
+        refused("Van", 0),
+        refused("Desk", 2),
+        refused("Roof", 3),
+        refused("Yard", 4),
+      ]);
+      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+    });
+    const tapped = dismissOf("Desk");
+    tapped.focus();
+    fireEvent.click(tapped, { detail: 1 });
+    screen.getByText(words("Desk"));
+    expect(document.activeElement?.textContent).toBe(words("Van"));
   });
 
   test("the last listed dismissed focuses the list's heading, and an ignored tap puts it back there", async () => {

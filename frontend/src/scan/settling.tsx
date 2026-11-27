@@ -52,12 +52,13 @@ export function useKeptSpace() {
  * its place; or once a tap changed `on` but left it listed (`stayed`), on
  * `on`'s taps alone (Ali, inventory-tng-0su, inventory-tng-ensw,
  * inventory-tng-34ns). Focus then goes, without scrolling, to the heading
- * of the entry that moved up (`placeId`), or of the list (`heading`), or,
- * none listed, to `after`, and the list's space stays blank a moment
- * (useKeptSpace, `space`); after `stayed`, to `on`'s. A pointer's ignored
- * tap focused the button as it landed, where Enter would later tap it, so
- * focus goes back there (inventory-tng-bz73); a key's press (detail 0)
- * leaves focus where the volunteer moved it.
+ * of the entry that moved up (`placeId`), found by its id, so one listed
+ * or gone meanwhile in another tab does not send focus to another; or of
+ * the list (`heading`); or, none listed, to `after`, and the list's
+ * space stays blank a moment (useKeptSpace, `space`); after `stayed`, to
+ * `on`'s. A pointer's ignored tap focused the button as it landed, where
+ * Enter would later tap it, so focus goes back there (inventory-tng-bz73);
+ * a key's press (detail 0) leaves focus where the volunteer moved it.
  *
  * `drawn` is the entries' ids as drawn, in order, and `listed` gives them
  * as they are kept once a tap has run.
@@ -73,34 +74,48 @@ export function useSettledList({
   placeId: (at: number) => string;
   after: RefObject<HTMLElement | null>;
 }) {
-  // When an entry last went by a tap, and the place it went from.
-  const entryGone = useRef({ when: -Infinity, at: 0 });
+  // When an entry last went by a tap, and the one that moved up in its
+  // place, if any: by id, not place, as one saved or dismissed meanwhile
+  // in another tab moves the places.
+  const entryGone = useRef<{ when: number; next: string | null }>({
+    when: -Infinity,
+    next: null,
+  });
   // When a tap last changed each but left it listed.
   const stayedAt = useRef(new Map<string, number>());
   // The heading to focus once the list is drawn again: `on`'s, or, `on`
-  // gone from place `at`, the one at that place once `on` is not listed.
-  const refocus = useRef<{ on: string; at: number | null } | null>(null);
+  // gone, `next`'s once `on` is not listed.
+  const refocus = useRef<{
+    on: string;
+    gone: boolean;
+    next: string | null;
+  } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const list = useRef<HTMLElement>(null);
   const kept = useKeptSpace();
-  const placeOf = (on: string) => drawn.indexOf(on);
-  const focusPlace = (at: number) =>
+  /** Focus the heading of `on`, as drawn, or the list's if it is not
+   * listed, or, none listed, what follows the list (Ali, 2026-11-27,
+   * inventory-tng-lm1b). */
+  const focusOn = (on: string | null) => {
+    const at = on === null ? -1 : drawn.indexOf(on);
     focusInPlace(
-      document.getElementById(placeId(at)) ?? heading.current ?? after.current,
+      (at < 0 ? null : document.getElementById(placeId(at))) ??
+        heading.current ??
+        after.current,
     );
+  };
   // After every render: the one after a tap draws what it changed.
   useEffect(() => {
     const want = refocus.current;
     if (want === null) {
       return;
     }
-    const n = placeOf(want.on);
-    if (want.at !== null && n >= 0) {
+    if (want.gone && drawn.includes(want.on)) {
       // A render from before it went.
       return;
     }
     refocus.current = null;
-    focusPlace(want.at ?? n);
+    focusOn(want.gone ? want.next : want.on);
   });
   return {
     /** For the list's section, measured as a tap lands. */
@@ -112,7 +127,7 @@ export function useSettledList({
     /** A tap changed `on` but left it listed. */
     stayed: (on: string) => {
       stayedAt.current.set(on, performance.now());
-      refocus.current = { on, at: null };
+      refocus.current = { on, gone: false, next: null };
     },
     /** `tap`, on one of `on`'s buttons, unless taps are waiting. */
     unlessSettling:
@@ -125,7 +140,7 @@ export function useSettledList({
           now - (stayedAt.current.get(on) ?? -Infinity) < SETTLE_MS
         ) {
           if (event.detail > 0) {
-            focusPlace(entryWaits ? entryGone.current.at : placeOf(on));
+            focusOn(entryWaits ? entryGone.current.next : on);
           }
           return;
         }
@@ -135,9 +150,13 @@ export function useSettledList({
         tap();
         const left = listed();
         if (!left.includes(on)) {
-          const at = placeOf(on);
-          entryGone.current = { when: performance.now(), at };
-          refocus.current = { on, at };
+          // The first below it still listed, which moved up in its place.
+          const next =
+            drawn
+              .slice(drawn.indexOf(on) + 1)
+              .find((id) => left.includes(id)) ?? null;
+          entryGone.current = { when: performance.now(), next };
+          refocus.current = { on, gone: true, next };
           if (left.length === 0) {
             kept.keep(tall);
           }
