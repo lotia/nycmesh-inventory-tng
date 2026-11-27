@@ -52,28 +52,29 @@ export function useKeptSpace() {
  * its place; or once a tap changed `on` but left it listed (`stayed`), on
  * `on`'s taps alone (Ali, inventory-tng-0su, inventory-tng-ensw,
  * inventory-tng-34ns). Focus then goes, without scrolling, to the heading
- * of the entry that moved up (`placeId`), found by its id, so one listed
- * or gone meanwhile in another tab does not send focus to another; or of
+ * of the entry that moved up, found by its id, so one listed or gone
+ * meanwhile in another tab does not send focus to another; or of
  * the list (`heading`); or, none listed, to `after`, and the list's
  * space stays blank a moment (useKeptSpace, `space`); after `stayed`, to
  * `on`'s. A pointer's ignored tap focused the button as it landed, where
  * Enter would later tap it, so focus goes back there (inventory-tng-bz73);
  * a key's press (detail 0) leaves focus where the volunteer moved it.
  *
- * `drawn` is the entries' ids as drawn, in order, and `listed` gives them
- * as they are kept once a tap has run.
+ * `listed` gives the entries' ids in the order they are drawn, as they
+ * are kept: called as the list is drawn, and again once a tap has run.
+ * The heading of the entry drawn at place `at` has the id
+ * `${headingIds}-${at}`.
  */
 export function useSettledList({
-  drawn,
   listed,
-  placeId,
+  headingIds,
   after,
 }: {
-  drawn: string[];
   listed: () => string[];
-  placeId: (at: number) => string;
+  headingIds: string;
   after: RefObject<HTMLElement | null>;
 }) {
+  const drawn = listed();
   // When an entry last went by a tap, and the one that moved up in its
   // place, if any: by id, not place, as one saved or dismissed meanwhile
   // in another tab moves the places.
@@ -83,13 +84,12 @@ export function useSettledList({
   });
   // When a tap last changed each but left it listed.
   const stayedAt = useRef(new Map<string, number>());
-  // The heading to focus once the list is drawn again: `on`'s, or, `on`
-  // gone, `next`'s once `on` is not listed.
-  const refocus = useRef<{
-    on: string;
-    gone: boolean;
-    next: string | null;
-  } | null>(null);
+  // The entry whose heading to focus once the list is drawn again, and
+  // the one gone by the tap, which a render from before it went still
+  // draws.
+  const refocus = useRef<{ to: string | null; gone: string | null } | null>(
+    null,
+  );
   const heading = useRef<HTMLHeadingElement>(null);
   const list = useRef<HTMLElement>(null);
   const kept = useKeptSpace();
@@ -99,7 +99,7 @@ export function useSettledList({
   const focusOn = (on: string | null) => {
     const at = on === null ? -1 : drawn.indexOf(on);
     focusInPlace(
-      (at < 0 ? null : document.getElementById(placeId(at))) ??
+      (at < 0 ? null : document.getElementById(`${headingIds}-${at}`)) ??
         heading.current ??
         after.current,
     );
@@ -110,12 +110,11 @@ export function useSettledList({
     if (want === null) {
       return;
     }
-    if (want.gone && drawn.includes(want.on)) {
-      // A render from before it went.
+    if (want.gone !== null && drawn.includes(want.gone)) {
       return;
     }
     refocus.current = null;
-    focusOn(want.gone ? want.next : want.on);
+    focusOn(want.to);
   });
   return {
     /** For the list's section, measured as a tap lands. */
@@ -127,7 +126,7 @@ export function useSettledList({
     /** A tap changed `on` but left it listed. */
     stayed: (on: string) => {
       stayedAt.current.set(on, performance.now());
-      refocus.current = { on, gone: false, next: null };
+      refocus.current = { to: on, gone: null };
     },
     /** `tap`, on one of `on`'s buttons, unless taps are waiting. */
     unlessSettling:
@@ -156,7 +155,7 @@ export function useSettledList({
               .slice(drawn.indexOf(on) + 1)
               .find((id) => left.includes(id)) ?? null;
           entryGone.current = { when: performance.now(), next };
-          refocus.current = { on, gone: true, next };
+          refocus.current = { to: next, gone: on };
           if (left.length === 0) {
             kept.keep(tall);
           }

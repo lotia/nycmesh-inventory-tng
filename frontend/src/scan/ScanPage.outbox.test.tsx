@@ -283,6 +283,11 @@ describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => 
   function refusedTo(...places: string[]) {
     storeOutbox(places.map(refused));
   }
+  /** The outbox as another tab leaves it: `saves`, told to this one. */
+  const savedElsewhere = (...saves: ReturnType<typeof refused>[]) => {
+    storeOutbox(saves);
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+  };
   const words = (to: string) => `Move: 1 item from Hub to ${to}`;
   const dismissOf = (to: string) =>
     screen.getByRole("button", { name: say(DISMISS), description: words(to) });
@@ -326,8 +331,7 @@ describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => 
     // again another tab saves one more, listed first.
     act(() => {
       fireEvent.click(dismissOf("Shelf"), { detail: 1 });
-      storeOutbox([refused("Van", 0), refused("Desk", 2), refused("Roof", 3)]);
-      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+      savedElsewhere(refused("Van", 0), refused("Desk", 2), refused("Roof", 3));
     });
     screen.getByText(words("Roof"));
     await vi.waitFor(() =>
@@ -336,13 +340,12 @@ describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => 
     // An ignored tap, once yet another is saved elsewhere, goes back to
     // Van's heading too.
     act(() => {
-      storeOutbox([
+      savedElsewhere(
         refused("Van", 0),
         refused("Desk", 2),
         refused("Roof", 3),
         refused("Yard", 4),
-      ]);
-      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+      );
     });
     const tapped = dismissOf("Desk");
     tapped.focus();

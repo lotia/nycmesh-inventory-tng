@@ -142,9 +142,8 @@ export function OlderList({
   // page; if a tap took the entry away, to the heading of the one that
   // moved up in its place (Ali, 2026-11-27, inventory-tng-ensw).
   const settled = useSettledList({
-    drawn: shown.map(({ each }) => olderId(each)),
     listed: () => older.listed.value.map(olderId),
-    placeId: (at) => `older-${at}`,
+    headingIds: "older",
     after,
   });
   if (shown.length === 0) {

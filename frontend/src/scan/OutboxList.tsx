@@ -152,9 +152,12 @@ export function OutboxList({
   );
   const entries = outbox.shown().reverse();
   const settled = useSettledList({
-    drawn: entries.map((entry) => batchId(entry.body)),
-    listed: () => outbox.shown().map((entry) => batchId(entry.body)),
-    placeId: (at) => `outbox-${at}`,
+    listed: () =>
+      outbox
+        .shown()
+        .reverse()
+        .map((entry) => batchId(entry.body)),
+    headingIds: "outbox",
     after,
   });
   if (entries.length === 0) {
