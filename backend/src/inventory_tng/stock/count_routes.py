@@ -225,8 +225,9 @@ moves_fixed = meter.create_counter(
 # named twice, something else here listed elsewhere, a package it counts
 # closed meanwhile, a box's own problem (such as no number), a unit or
 # package size shown otherwise, or nothing typed; or, as it was saved, the
-# rules of RULE_REFUSALS. A form that is not as the page sends it is not
-# found, and not counted.
+# rules of RULE_REFUSALS, a place retired since included, though answered
+# as not found. A form that is not as the page sends it is not found, and
+# not counted.
 CountRefusal = Literal[
     "named_twice",
     "listed_elsewhere",
@@ -836,9 +837,11 @@ def count(
         others=sent.problems,
     )
     problems |= words
-    # Measured once a refusal is certain, each reason once.
+    # Measured once a refusal is certain, each reason once. Shown otherwise
+    # by `said`, as a sealed row of a package held nowhere has no box for
+    # words beside.
     reasons: list[CountRefusal] = ["named_twice"] if sent.twice else []
-    if words:
+    if said:
         reasons.append("shown_otherwise")
     # Every alert is said above the form, each in its own words: why it was
     # refused (named twice, then closed meanwhile), then a unit or size
