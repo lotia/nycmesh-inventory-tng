@@ -877,7 +877,8 @@ utilities. When you style a page:
   that shows something from a field's value follows the field with
   `follow` (`frontend/src/admin/follow-fields.ts`), which checks it again
   when the browser puts a value back on Back; a codebase test refuses
-  another input or change listener.
+  another input or change listener, but for the search box's suggestions
+  (`combobox.ts`), which follow only what is typed.
 - A page that prints a QR code puts a `.printable` in its `main`: the
   `print_controls` macro (`_print_controls.html`: the paper and a Print
   button), then a `.print-sheet` for each page, what prints

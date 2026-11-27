@@ -46,6 +46,15 @@ test("it follows what is typed, a blank box as it was sent", () => {
   expect(total("7-5")).toBe("6");
 });
 
+test("the same total is not written again, so it is not read out again", () => {
+  const words = line("7-5").querySelector("[data-total-amount]")?.firstChild;
+  // What follow does again on pageshow, every load.
+  window.dispatchEvent(new Event("pageshow"));
+  expect(line("7-5").querySelector("[data-total-amount]")?.firstChild).toBe(
+    words,
+  );
+});
+
 test("an open package closed counts as none", () => {
   const state = document.querySelector("select") as HTMLSelectElement;
   state.value = "used_up";

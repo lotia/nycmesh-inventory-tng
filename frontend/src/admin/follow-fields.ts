@@ -6,11 +6,11 @@
  */
 
 /** A field whose value something on the page shows. */
-export type Field = HTMLInputElement | HTMLSelectElement;
+export type Field = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 
 /**
- * Runs `show` now, as any of `fields` is changed (input for a box, change
- * for a list), and on the window's pageshow. A value the browser puts back
+ * Runs `show` now, as any of `fields` is changed (input for a box or a
+ * text area, change for a list), and on the window's pageshow. A value the browser puts back
  * by itself, on Back or in a restored tab, fires neither, and Chromium puts
  * it back after the page's script has run (inventory-tng-r86h).
  */

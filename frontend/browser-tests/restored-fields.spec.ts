@@ -49,23 +49,24 @@ test("the Search the web link still follows what is typed after Back", async ({
 
 // The other followers' pages need rows no browser fixture makes (a length
 // check due, a printed length, a retired area emptied while counted, a
-// batch refused as recorded already), so each is added to a page as its
-// template writes it, and the page is sent with it every time, as the
+// batch refused as recorded already), so each is added to a page with
+// the fields' names, types and the attributes its follower reads as its
+// template writes them, and the page is sent with it every time, as the
 // browser puts back fields only into the same markup.
 // Exact markup on purpose: the fields a follower reads, as the server sends them.
 const FOLLOWERS = `
   <form>
-    <input id="left-1" aria-label="Left" value="3">
+    <input name="left" id="left-1" aria-label="Left" value="3">
     <button type="button">Set to <span data-follows="left-1" data-unit="m">it</span></button>
     <select name="found_package_id" aria-label="Package">
       <option value="">None</option><option value="1" data-hinted>Spool</option>
     </select>
     <input name="found_left" aria-label="Found" aria-describedby="hint-found_left">
     <span id="hint-found_left" data-hint-for="found_package_id">Read the length</span>
-    <input id="count-1" aria-label="Count" value="305" data-was="305">
+    <input id="count-1" name="count" aria-label="Count" value="305" data-was="305">
     <p id="count-1-was" hidden>Was 305 m</p>
     <input name="moved" aria-label="Moved" value="1" data-adds-to="k" data-unset="1">
-    <p data-total="k" hidden>After saving: <span data-total-amount>1</span> m</p>
+    <p data-total="k" hidden><span role="status" aria-atomic="true">After saving: <span data-total-amount>1</span> m</span></p>
   </form>`;
 
 test("each other follower still shows what is in its field after Back", async ({

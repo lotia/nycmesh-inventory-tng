@@ -2,7 +2,8 @@
 the field through `follow` (frontend/src/admin/follow-fields.ts), which
 checks it again on pageshow: a value the browser puts back by itself, on
 Back, fires no input or change event (inventory-tng-r86h). So no other
-module listens for input or change itself."""
+module listens for input or change itself, but for the search box's
+suggestions, left out below."""
 
 import re
 
@@ -17,7 +18,11 @@ HELPER = SOURCE / "admin/follow-fields.ts"
 # The search box's suggestions follow what is typed, not what is put back:
 # a value restored on Back must not open the list.
 LEFT_OUT = {SOURCE / "admin/combobox.ts"}
-LISTENS = re.compile(r"""addEventListener\(\s*["'`](?:input|change)["'`]""")
+# A listener added, or set as the field's oninput or onchange.
+LISTENS = re.compile(
+    r"""addEventListener\(\s*["'`](?:input|change)["'`]"""
+    r"""|\.on(?:input|change)\s*=(?!=)"""
+)
 
 
 def test_only_follow_listens_for_input_or_change() -> None:
