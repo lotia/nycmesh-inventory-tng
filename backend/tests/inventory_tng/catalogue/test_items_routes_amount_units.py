@@ -17,14 +17,13 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.items_routes import UNIT_FREE
 from inventory_tng.catalogue.paths import ITEMS
-from inventory_tng.catalogue.unit_changes import SINCE_SHOWN_RULES
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.web.forms import CHANGED, RULES
 
 from helpers.items import NOW, new_item, shown_item_form
 from helpers.labels import labelled
-from helpers.markup import Element, marked, problem, read, text, unit_beside
+from helpers.markup import Element, alerts_on, marked, problem, read, unit_beside
 from helpers.rows import add, shown
 from helpers.stock import Place, received
 
@@ -75,10 +74,7 @@ def _refused_since(
     unit, before = item.unit, item.minimum
     sent = shown_item_form(item, unit="ft", minimum=minimum) | {UNIT_FREE: drawn}
     refused = client.post(f"{ITEMS}/{item.id}", data=sent)
-    said = text(refused)
-    assert str(RULES[rule]) in said
-    for other in SINCE_SHOWN_RULES - {rule}:
-        assert str(RULES[other]) not in said
+    assert alerts_on(refused.text) == [str(RULES[rule])]
     session.refresh(item)
     assert (item.unit, item.minimum) == (unit, before)
 
@@ -212,7 +208,7 @@ def test_a_unit_fixed_since_keeps_what_was_typed_beside_its_alert(
     sent = shown_item_form(cable, unit="ft", minimum="10", part_number="C6-OUT")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=sent | {UNIT_FREE: "yes"})
     assert refused.status_code == 409
-    assert str(RULES["item_unit_labelled_since_shown"]) in text(refused)
+    assert alerts_on(refused.text) == [str(RULES["item_unit_labelled_since_shown"])]
     page = read(refused.text)
     form = page.one("form", action=f"{ITEMS}/{cable.id}")
     assert form.one("input", name="part_number").attrs["value"] == "C6-OUT"
@@ -235,13 +231,13 @@ def test_a_unit_fixed_since_is_said_when_sent_back_for_another_box(
     sent = shown_item_form(cable, unit="ft", minimum="10", name="")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=sent | {UNIT_FREE: "yes"})
     assert refused.status_code == 409
-    assert str(RULES["item_unit_moved_since_shown"]) in text(refused)
+    assert alerts_on(refused.text) == [str(RULES["item_unit_moved_since_shown"])]
     page = read(refused.text)
     assert marked({"name": page.one("input", name="name")})[1] == ["name"]
     assert _reorder_at(page, cable.id) == ("m", "decimal", None)
     unchanged = shown_item_form(cable, unit="ft", minimum="10", name="")
     again = admin_client.post(f"{ITEMS}/{cable.id}", data=unchanged | {UNIT_FREE: "no"})
-    assert str(RULES["item_unit_moved_since_shown"]) not in text(again)
+    assert str(RULES["item_unit_moved_since_shown"]) not in alerts_on(again.text)
 
 
 @pytest.mark.parametrize("unit", ["m", "ft", "each"])

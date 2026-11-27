@@ -54,7 +54,7 @@ from helpers.devices import new_device
 from helpers.mail import SentMail
 from helpers.pools import checked_out
 from helpers.rows import add, rolled_back
-from helpers.sign_in import TOTP_KEY, new_admin, sign_in_with
+from helpers.sign_in import TOTP_KEY, signed_in_admin
 from helpers.stock import Place, Spools
 
 # structlog's lines go through the standard library, where caplog sees them.
@@ -612,10 +612,7 @@ def admin_client(
 ) -> TestClient:
     """A client signed in as an administrator, Ada, with the confirmation
     window open."""
-    client = make_client()
-    _, key = new_admin(session)
-    assert sign_in_with(client, key=key).status_code == 303
-    return client
+    return signed_in_admin(session, make_client())
 
 
 @pytest.fixture

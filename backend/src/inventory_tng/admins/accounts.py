@@ -194,16 +194,11 @@ def _length_problem(password: str) -> Words | None:
     return None
 
 
-def password_problem(password: str, again: str) -> Words | None:
-    if problem := _length_problem(password):
-        return problem
-    return PASSWORDS_DIFFER if password != again else None
-
-
 def password_problems(password: str, again: str) -> dict[str, Words]:
-    """password_problem by the box it refuses: Password alone for its
-    length, or both when they differ, by the one problem, said beside
-    Password, neither singled out (Ali, 2026-11-27, inventory-tng-gjuq)."""
+    """What is wrong with a new password, by the box it refuses: Password
+    alone for its length, or both when they differ, by the one problem,
+    said beside Password, neither singled out (Ali, 2026-11-27,
+    inventory-tng-gjuq)."""
     if problem := _length_problem(password):
         return {"password": problem}
     if password != again:
@@ -771,8 +766,8 @@ def set_password(
     keep: int | None = None,
 ) -> None:
     """A new password: their sessions end, all but `keep`, and any unused
-    reset link. The caller has checked it (password_problems, or
-    password_problem for a command's) and commits."""
+    reset link. The caller has checked it (password_problems) and
+    commits."""
     _set_password(session, admin_id, password, now)
     ended = end_sessions(session, admin_id, now, keep=keep)
     void_reset_links(session, admin_id, now)

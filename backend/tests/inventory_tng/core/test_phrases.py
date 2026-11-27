@@ -162,8 +162,8 @@ def named_phrases() -> list[LazyProxy]:
 SAID_WITH_VALUES: list[Callable[[], Words]] = [
     lambda: accounts.username_problem("!") or "",
     lambda: name_up_to(9),
-    lambda: accounts.password_problem("", "") or "",
-    lambda: accounts.password_problem("." * 1000, "") or "",
+    lambda: accounts.password_problems("", "")["password"],
+    lambda: accounts.password_problems("." * 1000, "")["password"],
     lambda: up_to(9),
     lambda: at_most_places(3),
     lambda: revoke_title(NOT_ENGLISH),

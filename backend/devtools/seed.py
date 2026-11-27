@@ -61,7 +61,7 @@ STOCK = {
 def run(session: Session, args: argparse.Namespace) -> int:
     set_actor(session, CLI_ACTOR)
     given = args.password
-    if given and (problem := accounts.password_problem(given, given)):
+    if given and (problem := accounts.password_problems(given, given).get("password")):
         print(problem, file=sys.stderr)
         return 1
     admin = session.scalar(select(Admin).where(Admin.username == USERNAME))

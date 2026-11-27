@@ -42,7 +42,7 @@ from helpers.sign_in import (
     PASSWORD,
     new_admin,
     reset_link,
-    sign_in_with,
+    signed_in_admin,
     with_code,
 )
 
@@ -66,48 +66,48 @@ class Sent(NamedTuple):
     method: str = "post"
 
 
-def _ada(session: Session, make_client: MakeClient) -> TestClient:
-    """A client signed in as Ada, with the confirmation window open."""
-    client = make_client()
-    _, key = new_admin(session)
-    assert sign_in_with(client, key=key).status_code == 303
-    return client
-
-
 def _volunteer_added(session: Session, make_client: MakeClient) -> Sent:
     data = {"name": "", "email": "not an address"}
-    return Sent(_ada(session, make_client), VOLUNTEERS, data, ("name", "email"))
+    return Sent(
+        signed_in_admin(session, make_client()), VOLUNTEERS, data, ("name", "email")
+    )
 
 
 def _volunteer_saved(session: Session, make_client: MakeClient) -> Sent:
     ada = add(session, Volunteer(name="Ada"))
     data = {"name": "", "email": "", "version": shown(ada)}
     path = f"{VOLUNTEERS}/{ada.id}"
-    return Sent(_ada(session, make_client), path, data, ("name",))
+    return Sent(signed_in_admin(session, make_client()), path, data, ("name",))
 
 
 def _location_added(session: Session, make_client: MakeClient) -> Sent:
     data = {"name": "", "kind": "nothing", "parent_id": ""}
-    return Sent(_ada(session, make_client), LOCATIONS, data, ("name", "kind"))
+    return Sent(
+        signed_in_admin(session, make_client()), LOCATIONS, data, ("name", "kind")
+    )
 
 
 def _area_added(session: Session, make_client: MakeClient) -> Sent:
     data = {"name": "Shelf", "kind": "area", "parent_id": ""}
-    return Sent(_ada(session, make_client), LOCATIONS, data, ("parent_id",))
+    return Sent(
+        signed_in_admin(session, make_client()), LOCATIONS, data, ("parent_id",)
+    )
 
 
 def _area_added_under_a_van(session: Session, make_client: MakeClient) -> Sent:
     """Refused by the database's rule for a parent, said by Part of."""
     van = add(session, Location(name="Van", kind="vehicle"))
     data = {"name": "Glovebox", "kind": "area", "parent_id": str(van.id)}
-    return Sent(_ada(session, make_client), LOCATIONS, data, ("parent_id",))
+    return Sent(
+        signed_in_admin(session, make_client()), LOCATIONS, data, ("parent_id",)
+    )
 
 
 def _location_saved(session: Session, make_client: MakeClient) -> Sent:
     hub = add(session, Location(name="Hub", kind="store"))
     data = {"name": "", "time_zone": "", "version": shown(hub)}
     path = f"{LOCATIONS}/{hub.id}"
-    return Sent(_ada(session, make_client), path, data, ("name",))
+    return Sent(signed_in_admin(session, make_client()), path, data, ("name",))
 
 
 def _area_moved_into_itself(session: Session, make_client: MakeClient) -> Sent:
@@ -118,7 +118,7 @@ def _area_moved_into_itself(session: Session, make_client: MakeClient) -> Sent:
     bin_ = add(session, Location(name="Bin", kind="area", parent_id=shelf.id))
     data = {"name": "Shelf", "parent_id": str(bin_.id), "version": shown(shelf)}
     path = f"{LOCATIONS}/{shelf.id}"
-    return Sent(_ada(session, make_client), path, data, ("parent_id",))
+    return Sent(signed_in_admin(session, make_client()), path, data, ("parent_id",))
 
 
 def _location_retired(session: Session, make_client: MakeClient) -> Sent:
@@ -126,23 +126,25 @@ def _location_retired(session: Session, make_client: MakeClient) -> Sent:
     hub = add(session, Location(name="Hub", kind="store"))
     add(session, Location(name="Shelf", kind="area", parent_id=hub.id))
     path = f"{LOCATIONS}/{hub.id}/retire"
-    return Sent(_ada(session, make_client), path, {}, ())
+    return Sent(signed_in_admin(session, make_client()), path, {}, ())
 
 
 def _codes_made(session: Session, make_client: MakeClient) -> Sent:
     data = {"label": TOO_LONG, "uses": "0", "days": "0", "count": "0"}
     marked = ("label", "uses", "days", "count")
-    return Sent(_ada(session, make_client), CODES, data, marked)
+    return Sent(signed_in_admin(session, make_client()), CODES, data, marked)
 
 
 def _devices_listed(session: Session, make_client: MakeClient) -> Sent:
     data = {"since": "soon", "until": "later", "code": "first"}
     marked = ("since", "until", "code")
-    return Sent(_ada(session, make_client), DEVICE_LIST, data, marked, "get")
+    return Sent(
+        signed_in_admin(session, make_client()), DEVICE_LIST, data, marked, "get"
+    )
 
 
 def _device_saved(session: Session, make_client: MakeClient) -> Sent:
-    client = _ada(session, make_client)
+    client = signed_in_admin(session, make_client())
     device, _ = new_device(session)
     data = {"label": TOO_LONG, "version": shown(device)}
     return Sent(client, f"{DEVICES}/{device.id}", data, ("label",))
@@ -150,7 +152,9 @@ def _device_saved(session: Session, make_client: MakeClient) -> Sent:
 
 def _item_added(session: Session, make_client: MakeClient) -> Sent:
     data = {"name": "", "category_id": "", "unit": "each"}
-    return Sent(_ada(session, make_client), ITEMS, data, ("name", "category_id"))
+    return Sent(
+        signed_in_admin(session, make_client()), ITEMS, data, ("name", "category_id")
+    )
 
 
 def _item(session: Session) -> Item:
@@ -163,13 +167,20 @@ def _item(session: Session) -> Item:
 def _item_saved(session: Session, make_client: MakeClient) -> Sent:
     item = _item(session)
     data = shown_item_form(item, name="")
-    return Sent(_ada(session, make_client), f"{ITEMS}/{item.id}", data, ("name",))
+    return Sent(
+        signed_in_admin(session, make_client()), f"{ITEMS}/{item.id}", data, ("name",)
+    )
 
 
 def _alias_added(session: Session, make_client: MakeClient) -> Sent:
     item = _item(session)
     path = f"{ITEMS}/{item.id}/aliases"
-    return Sent(_ada(session, make_client), path, {"alias_name": ""}, ("alias_name",))
+    return Sent(
+        signed_in_admin(session, make_client()),
+        path,
+        {"alias_name": ""},
+        ("alias_name",),
+    )
 
 
 def _package_added(session: Session, make_client: MakeClient) -> Sent:
@@ -178,7 +189,7 @@ def _package_added(session: Session, make_client: MakeClient) -> Sent:
     path = f"{ITEMS}/{item.id}/packages"
     data = {"package_name": "", "size": ""}
     marked = ("package_name", "size")
-    return Sent(_ada(session, make_client), path, data, marked)
+    return Sent(signed_in_admin(session, make_client()), path, data, marked)
 
 
 def _box(session: Session) -> ItemPackage:
@@ -192,32 +203,36 @@ def _package_saved(session: Session, make_client: MakeClient) -> Sent:
     box = _box(session)
     path = f"{ITEMS}/{box.item_id}/packages/{box.id}"
     data = {"package_version": shown(box), "package_name": "", "size": "1"}
-    return Sent(_ada(session, make_client), path, data, ("package_name",))
+    return Sent(signed_in_admin(session, make_client()), path, data, ("package_name",))
 
 
 def _package_settings(session: Session, make_client: MakeClient) -> Sent:
     box = _box(session)
     path = f"{ITEMS}/{box.item_id}/packages/{box.id}/settings"
     data = {"minimum_sealed": "x"}
-    return Sent(_ada(session, make_client), path, data, ("minimum_sealed",))
+    return Sent(
+        signed_in_admin(session, make_client()), path, data, ("minimum_sealed",)
+    )
 
 
 def _category_added(session: Session, make_client: MakeClient) -> Sent:
-    return Sent(_ada(session, make_client), CATEGORIES, {"name": ""}, ("name",))
+    return Sent(
+        signed_in_admin(session, make_client()), CATEGORIES, {"name": ""}, ("name",)
+    )
 
 
 def _category_renamed(session: Session, make_client: MakeClient) -> Sent:
     radios = add(session, Category(name="Radios"))
     path = f"{CATEGORIES}/{radios.id}/name"
     data = {"name": "", "version": shown(radios)}
-    return Sent(_ada(session, make_client), path, data, ("name",))
+    return Sent(signed_in_admin(session, make_client()), path, data, ("name",))
 
 
 def _category_retired(session: Session, make_client: MakeClient) -> Sent:
     """Refused for its item, said beside its name."""
     item = _item(session)
     path = f"{CATEGORIES}/{item.category_id}/retire"
-    return Sent(_ada(session, make_client), path, {}, ())
+    return Sent(signed_in_admin(session, make_client()), path, {}, ())
 
 
 def _set_up(_: Session, make_client: MakeClient) -> Sent:
@@ -262,7 +277,7 @@ def _reset_passwords_differ(session: Session, make_client: MakeClient) -> Sent:
 
 
 def _invited(session: Session, make_client: MakeClient) -> Sent:
-    client = _ada(session, make_client)
+    client = signed_in_admin(session, make_client())
     data = with_code(session, username="", email="not an address")
     return Sent(client, paths.ADMINS, data, ("username", "email"))
 
@@ -270,28 +285,32 @@ def _invited(session: Session, make_client: MakeClient) -> Sent:
 def _authenticator_added(session: Session, make_client: MakeClient) -> Sent:
     data = {"authenticator_name": "", "code": "000000"}
     marked = ("authenticator_name", "code")
-    return Sent(_ada(session, make_client), paths.NEW_AUTHENTICATOR, data, marked)
+    return Sent(
+        signed_in_admin(session, make_client()), paths.NEW_AUTHENTICATOR, data, marked
+    )
 
 
 def _email_changed(session: Session, make_client: MakeClient) -> Sent:
     path = f"{paths.ACCOUNT}/email"
-    return Sent(_ada(session, make_client), path, {"email": "nope"}, ("email",))
+    return Sent(
+        signed_in_admin(session, make_client()), path, {"email": "nope"}, ("email",)
+    )
 
 
 def _password_changed(session: Session, make_client: MakeClient) -> Sent:
     path = f"{paths.ACCOUNT}/password"
     data = {"password": "short", "password_again": "short"}
-    return Sent(_ada(session, make_client), path, data, ("password",))
+    return Sent(signed_in_admin(session, make_client()), path, data, ("password",))
 
 
 def _password_changed_differ(session: Session, make_client: MakeClient) -> Sent:
     path = f"{paths.ACCOUNT}/password"
     data = {"password": PASSWORD, "password_again": PASSWORD + "!"}
-    return Sent(_ada(session, make_client), path, data, BOTH_PASSWORDS)
+    return Sent(signed_in_admin(session, make_client()), path, data, BOTH_PASSWORDS)
 
 
 def _authenticator_renamed(session: Session, make_client: MakeClient) -> Sent:
-    client = _ada(session, make_client)
+    client = signed_in_admin(session, make_client())
     (authenticator,) = session.scalars(select(Authenticator)).all()
     path = f"{paths.ACCOUNT}/authenticators/{authenticator.id}/name"
     data = {"authenticator_name": ""}
@@ -302,7 +321,9 @@ def _scan_settings(session: Session, make_client: MakeClient) -> Sent:
     row = session.get_one(ScanSettings, 1)
     data = {"name_check_minutes": "-1", "scan_version": shown(row)}
     path = f"{SETTINGS}/scan"
-    return Sent(_ada(session, make_client), path, data, ("name_check_minutes",))
+    return Sent(
+        signed_in_admin(session, make_client()), path, data, ("name_check_minutes",)
+    )
 
 
 def _sign_in_settings(session: Session, make_client: MakeClient) -> Sent:
@@ -316,14 +337,14 @@ def _sign_in_settings(session: Session, make_client: MakeClient) -> Sent:
         "sign_in_version": shown(row),
     }
     path = f"{SETTINGS}/sign-in"
-    return Sent(_ada(session, make_client), path, data, ("session_days",))
+    return Sent(signed_in_admin(session, make_client()), path, data, ("session_days",))
 
 
 def _reason_added(session: Session, make_client: MakeClient) -> Sent:
     """Its box marked, not the box of the reason beside it."""
     add(session, AdjustmentReason(name="Dropped"))
     path = f"{SETTINGS}/reasons"
-    return Sent(_ada(session, make_client), path, {"name": ""}, ("name",))
+    return Sent(signed_in_admin(session, make_client()), path, {"name": ""}, ("name",))
 
 
 def _reason_renamed(session: Session, make_client: MakeClient) -> Sent:
@@ -331,7 +352,7 @@ def _reason_renamed(session: Session, make_client: MakeClient) -> Sent:
     reason = add(session, AdjustmentReason(name="Dropped"))
     path = f"{SETTINGS}/reasons/{reason.id}"
     data = {"name": TOO_LONG, "action": "rename", "version": shown(reason)}
-    return Sent(_ada(session, make_client), path, data, ("name",))
+    return Sent(signed_in_admin(session, make_client()), path, data, ("name",))
 
 
 REFUSALS: dict[str, Callable[[Session, MakeClient], Sent]] = {

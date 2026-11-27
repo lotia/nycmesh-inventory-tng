@@ -66,7 +66,7 @@ address, to come back to. #}
   <p>{% trans link=categories_path %}Add a <a href="{{ link }}">category</a> first: every item has one.{% endtrans %}</p>
   {% endif %}
   <form method="post" action="{{ here }}">
-    {% with default = "", again = _("A different item? Add it again."), sent_back = true %}{% include "catalogue/_item_name.html" %}{% endwith %}
+    {% with default = "", again = _("A different item? Add it again.") %}{% include "catalogue/_item_name.html" %}{% endwith %}
     <label>{% trans %}Category{% endtrans %}
       <select name="category_id" required{{ described_by("category_id", labelled=true) }}>
         <option value="">{% trans %}Pick one{% endtrans %}</option>

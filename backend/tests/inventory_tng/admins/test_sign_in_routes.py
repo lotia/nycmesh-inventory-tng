@@ -28,7 +28,7 @@ from inventory_tng.admins import (
 from inventory_tng.admins.accounts import (
     NOT_AN_EMAIL,
     PASSWORDS_DIFFER,
-    password_problem,
+    password_problems,
     username_problem,
 )
 from inventory_tng.admins.forms import NOT_THE_TOKEN, code_mismatch
@@ -143,7 +143,7 @@ def test_setup_refuses_a_wrong_token_then_too_many(client: TestClient) -> None:
         ({"username": "ada lovelace"}, username_problem("ada lovelace")),
         (
             {"password": "short", "password_again": "short"},
-            password_problem("short", "short"),
+            password_problems("short", "short")["password"],
         ),
         ({"password_again": PASSWORD + "!"}, PASSWORDS_DIFFER),
         ({"email": "not an address"}, NOT_AN_EMAIL),

@@ -796,18 +796,21 @@ def item(
     )
 
 
-def _unit_since(session: Session, item: Item, form: Mapping[str, str]) -> Words | None:
+def _unit_since(
+    session: Session, item: Item, form: Mapping[str, str], shown_free: bool | None
+) -> Words | None:
     """The words of SINCE_SHOWN's rule when the item form, sent back for
     what was typed before its save could check (items.save), changes the
-    unit fixed or freed since it was shown: the page sent back says
-    Reorder at's unit as it is now, so a number typed for the other is
-    not saved in it unnoticed (inventory-tng-zhnd)."""
+    unit fixed or freed since it was shown (`shown_free`): the page sent
+    back says Reorder at's unit as it is now, so a number typed for the
+    other is not saved in it unnoticed (inventory-tng-zhnd)."""
     if form.get("unit", item.unit) == item.unit:
         return None
     why = unit_changes.unit_fixed(session, item)
-    if not unit_changes.fixed_otherwise(why, SHOWN_FREE.get(form.get(UNIT_FREE, ""))):
+    since = unit_changes.since_shown(why, shown_free)
+    if since is None:
         return None
-    reason, rule = unit_changes.SINCE_SHOWN[why]
+    reason, rule = since
     log.info("unit fixed otherwise than shown", item_id=item.id, reason=reason)
     return RULES[rule]
 
@@ -857,6 +860,7 @@ def save_item(
     fields, problems, typed = forms.item_fields(
         session, form, found, separator=decimal_separator(request)
     )
+    shown_free = SHOWN_FREE.get(form.get(UNIT_FREE, ""))
     if answer == "no":
         if fields is not None:
             return _unit_declined(request, session, signed, found, form, fields.unit)
@@ -864,7 +868,6 @@ def save_item(
             return _item_page(request, session, signed, found, alert=RULES[CHANGED])
     if fields is not None:
         recorded_in = form.get(RECORDED_IN) if answer == "yes" else None
-        shown_free = SHOWN_FREE.get(form.get(UNIT_FREE, ""))
         same = forms.same_name(session, found, form, fields, typed)
         asked = None if same else []
         loose = 0
@@ -941,7 +944,7 @@ def save_item(
             problems=problems,
             values=form,
             form_sent_back=ItemForm.ITEM,
-            alert=_unit_since(session, found, form),
+            alert=_unit_since(session, found, form, shown_free),
         )
     _decided(session, typed, item_id=item_id)
     session.commit()

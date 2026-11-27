@@ -164,8 +164,7 @@ def test_a_short_password_is_refused(
     form = {"password": "short", "password_again": "short"}
     refused = client.post(f"{ACCOUNT}/password", data=form)
     assert refused.status_code == 400
-    problem = accounts.password_problem("short", "short")
-    assert problem
+    problem = accounts.password_problems("short", "short")["password"]
     assert str(problem) in text(refused)
 
 

@@ -104,6 +104,14 @@ def new_admin(
     return admin, key
 
 
+def signed_in_admin(session: Session, client: TestClient) -> TestClient:
+    """`client` signed in as a new administrator, Ada, with the
+    confirmation window open."""
+    _, key = new_admin(session)
+    assert sign_in_with(client, key=key).status_code == 303
+    return client
+
+
 def new_admin_id(session: Session) -> int:
     """A new administrator's id; stock.ada_id is admin_client's."""
     admin, _ = new_admin(session, f"ada-{tag()}", totp=False)
