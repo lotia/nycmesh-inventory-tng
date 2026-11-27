@@ -75,7 +75,7 @@ import uuid
 from collections.abc import Callable, Collection, Mapping, Sequence
 from decimal import Decimal
 from functools import cache, partial
-from typing import Annotated, NamedTuple
+from typing import Annotated, Literal, NamedTuple
 from urllib.parse import urlencode
 
 import structlog
@@ -206,6 +206,23 @@ areas_brought_back = meter.create_counter(
     unit="{area}",
     description="Retired areas emptied while they were counted, brought back "
     "from the count form",
+)
+# Why Bring it back refused an area, nothing changed, by the rule that
+# refused it (places/locations.restore); one no rule there names, other.
+BringBackRefusal = Literal[
+    "parent_kind", "parent_retired", "custodian_retired", "other"
+]
+BRING_BACK_REFUSALS: dict[str, BringBackRefusal] = {
+    "location_area_parent": "parent_kind",
+    "location_parent_current": "parent_retired",
+    "location_custody_volunteer": "custodian_retired",
+}
+# Refused, so measured at once (inventory-tng-wmh2).
+bring_backs_refused = meter.create_counter(
+    "inventory.count.bring_backs_refused",
+    unit="{area}",
+    description="Retired areas the count form's Bring it back refused, by "
+    "reason, nothing changed",
 )
 
 # A move from an area gone from a count form fixed on it: more or less
@@ -1191,6 +1208,7 @@ def bring_back(
 
     brought, broken = attempt(session, restore)
     if broken is not None:
+        bring_backs_refused.add(1, {"reason": BRING_BACK_REFUSALS.get(broken, "other")})
         log.info(
             "count area not brought back",
             location_id=place.id,

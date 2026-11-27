@@ -567,6 +567,51 @@ def test_counts_the_areas_brought_back_from_a_count_form(
     assert counted(reader, name)[()] == before + 1
 
 
+def test_counts_the_areas_bring_it_back_refused_by_reason(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Counted at once, as a refusal changes nothing: a bin in a retired
+    shelf, emptied while its store was counted, refused while its shelf is
+    retired (inventory-tng-wmh2), and not counted as brought back."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    place = stocked(session)
+    shelf = add(
+        session, Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id)
+    )
+    bin_ = add(session, Location(name=f"Bin {tag()}", kind="area", parent_id=shelf.id))
+    retire(session, shelf, bin_)
+    radio = [{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}]
+    write(
+        session,
+        place,
+        from_location_id=place.store.id,
+        to_location_id=bin_.id,
+        lines=radio,
+    )
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form_at(client, place.store.id)
+    write(
+        session,
+        place,
+        from_location_id=bin_.id,
+        to_location_id=place.van.id,
+        lines=radio,
+    )
+    refused = client.post(path, data=form)
+    assert refused.status_code == 409
+    name = "inventory.count.bring_backs_refused"
+    before = counted(reader, name)
+    brought_before = counted(reader, "inventory.count.areas_brought_back")
+    back = client.post(
+        f"{path}/bring-back", data=count_form(refused) | {"area_id": str(bin_.id)}
+    )
+    assert back.status_code == 409
+    assert added(reader, name, before) == {(("reason", "parent_retired"),): 1}
+    assert counted(reader, "inventory.count.areas_brought_back") == brought_before
+
+
 def test_counts_the_moves_fixed_on_a_count_form(
     rolled_back: Recorded, session: Session
 ) -> None:
