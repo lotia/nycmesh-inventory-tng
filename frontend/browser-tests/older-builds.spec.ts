@@ -219,9 +219,14 @@ test("saves of an item retired since go by their line's Discard, or by their own
   await lineDiscard(listing, `${cable}: 2 m`).click();
   await expect(listing.getByText(`${cable}: 2 m`)).toHaveCount(0);
   await expect(listing.getByText(`${cable}: 3 m`)).toBeVisible();
-  // The save's own asks first.
-  await listing.getByRole("button", { name: "Discard" }).last().click();
-  await expect(listing.getByText("Confirm discard")).toBeVisible();
+  // The save's own asks first, once taps are taken again: the save that
+  // went makes every entry wait (inventory-tng-ensw).
+  await expect(async () => {
+    await listing.getByRole("button", { name: "Discard" }).last().click();
+    await expect(listing.getByText("Confirm discard")).toBeVisible({
+      timeout: 1000,
+    });
+  }).toPass();
   await listing.getByRole("button", { name: "Discard" }).last().click();
   await expect(listing).toHaveCount(0);
   expect(
@@ -489,4 +494,41 @@ test("a double tap on a line's Discard discards that line only, and focuses the 
   await expect(
     listing.getByText(`${cable}: 7 m from an open package`),
   ).toBeVisible();
+});
+
+test("a double tap on a Discard that takes its entry away leaves the next entry, moved up, as it was, and focuses it (inventory-tng-ensw)", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  const itemId = itemIdOf(page);
+  await page.goto("/scan");
+  // Two entries alike, so the second's line comes up under the finger.
+  await leave(
+    page,
+    [{ item_id: itemId, quantity: "3", open_package_key: crypto.randomUUID() }],
+    [{ item_id: itemId, quantity: "5", open_package_key: crypto.randomUUID() }],
+  );
+  await page.reload();
+
+  const listing = listingOf(page);
+  const box = await lineDiscard(
+    listing,
+    `${cable}: 3 m from an open package`,
+  ).boundingBox();
+  if (box === null) {
+    throw new Error("the line's Discard is not shown");
+  }
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.touchscreen.tap(x, y);
+  await page.waitForTimeout(150);
+  await page.touchscreen.tap(x, y);
+  await expect(
+    listing.getByText(`${cable}: 3 m from an open package`),
+  ).toHaveCount(0);
+  await expect(
+    listing.getByText(`${cable}: 5 m from an open package`),
+  ).toBeVisible();
+  // Focus on the heading of the entry that moved up.
+  await expect(listing.locator("#older-0")).toBeFocused();
 });

@@ -21,6 +21,7 @@ import {
   KEY,
   keep,
   keepOlderCart,
+  moveBody,
   olderSave,
   outboxEntry,
   storeOutbox,
@@ -694,6 +695,118 @@ describe("what an older build left", () => {
       "STRONG",
     );
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
+  });
+
+  /** Two saves alike, each of one line from an open package: 3 m, then
+   * 5 m, so the second comes up under the first's buttons. */
+  function leaveTwoSaves() {
+    const ofCable = (key: string, quantity: string, queuedAt: number) =>
+      olderSave(
+        moveBody({
+          key,
+          lines: [{ item_id: 101, quantity, unit: "m", open_package_key: key }],
+        }),
+        { queuedAt },
+      );
+    keep("inventory.outbox.v3", [
+      ofCable(KEY, "3", AT),
+      ofCable("5d1e7f00-2b8c-4c3a-9e4f-6a7b8c9d0e1f", "5", AT + 1),
+    ]);
+  }
+  const THREE = "Cat6 cable: 3 m from an open package";
+  const FIVE = "Cat6 cable: 5 m from an open package";
+  /** The listed entry whose line says `words`. */
+  const entryOf = (words: string) =>
+    within(listing())
+      .getByText(words)
+      .closest("ul")
+      ?.closest("li") as HTMLElement;
+
+  test("a line's Discard that takes its entry away makes every entry's taps wait, and focuses the entry that moved up (inventory-tng-ensw)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    leaveTwoSaves();
+    open();
+    await ready();
+    fireEvent.click(discardOf(THREE));
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
+    expect(within(listing()).queryByText(THREE)).toBeNull();
+    // The second tap, on the next entry's line, moved up: ignored, focus
+    // back on that entry's heading.
+    const movedUp = discardOf(FIVE);
+    movedUp.focus();
+    fireEvent.click(movedUp, { detail: 1 });
+    within(listing()).getByText(FIVE);
+    expect(document.activeElement?.id).toBe("older-0");
+    // Pressed by key: ignored, focus left where the volunteer put it.
+    movedUp.focus();
+    fireEvent.click(movedUp, { detail: 0 });
+    within(listing()).getByText(FIVE);
+    expect(document.activeElement).toBe(movedUp);
+    fireEvent.click(lastDiscard());
+    expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
+    await vi.advanceTimersByTimeAsync(500);
+    fireEvent.click(movedUp, { detail: 1 });
+    expect(screen.queryByText(HEADING)).toBeNull();
+  });
+
+  test("an entry's Discard, confirmed, makes every entry's taps wait, and focuses the next entry's heading (inventory-tng-ensw)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    leaveTwoSaves();
+    open();
+    await ready();
+    fireEvent.click(lastDiscard(entryOf(THREE)));
+    fireEvent.click(lastDiscard(entryOf(THREE)));
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
+    expect(within(listing()).queryByText(THREE)).toBeNull();
+    // The next entry's Discard, moved up: ignored.
+    fireEvent.click(lastDiscard(), { detail: 1 });
+    expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
+    expect(document.activeElement?.id).toBe("older-0");
+    await vi.advanceTimersByTimeAsync(500);
+    fireEvent.click(lastDiscard());
+    within(listing()).getByText(say(CONFIRM_DISCARD));
+  });
+
+  test("Add to cart, taking its entry away, makes every entry's taps wait, and focuses the next entry's heading (inventory-tng-ensw)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    leaveTwoSaves();
+    // The first fills a cart too, with radios beside its line.
+    const [first, second] = JSON.parse(
+      localStorage.getItem("inventory.outbox.v3") ?? "[]",
+    );
+    first.body.lines.unshift({
+      item_id: 100,
+      quantity: "8",
+      unit: "each",
+      package_id: 1000,
+    });
+    keep("inventory.outbox.v3", [first, second]);
+    open();
+    await ready();
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
+    );
+    await screen.findByText(ADDED_BACK);
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
+    expect(within(listing()).queryByText(THREE)).toBeNull();
+    fireEvent.click(discardOf(FIVE), { detail: 1 });
+    within(listing()).getByText(FIVE);
+    expect(document.activeElement?.id).toBe("older-0");
+  });
+
+  test("the last entry's Discard, confirmed, focuses the list's heading, none being below it (inventory-tng-ensw)", async () => {
+    leaveTwoSaves();
+    open();
+    await ready();
+    fireEvent.click(lastDiscard(entryOf(FIVE)));
+    fireEvent.click(lastDiscard(entryOf(FIVE)));
+    await vi.waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { name: HEADING }),
+      ),
+    );
+    expect(within(listing()).queryByText(FIVE)).toBeNull();
+    within(listing()).getByText(THREE);
   });
 
   test("discarding asks first, on the page; kept, nothing goes", async () => {

@@ -80,7 +80,9 @@ export const KEPT_ON_NOT_SENT = msg`Kept on this device {when}, not sent.`;
  * (older-builds.ts). Discarding asks first, here on the page. A line that
  * cannot go back says why under it, and can be discarded on its own,
  * without asking: focus then goes to its entry's heading, and taps on the
- * entry's buttons wait a moment (SETTLE_MS). One holding an item retired
+ * entry's buttons wait a moment (SETTLE_MS). A tap that takes its entry
+ * away makes every entry's buttons wait, and focus goes to the heading of
+ * the entry that moved up, or of the list. One holding an item retired
  * since, and out of the catalogue, names it from the catalogue's retired
  * items, and goes in the cart only once that line is discarded.
  */
@@ -97,10 +99,13 @@ export function OlderList({
   // The one whose discarding is being confirmed, and what one tap said.
   const discarding = useSignal<string | null>(null);
   const said = useSignal<{ on: string; why: OlderWhy } | null>(null);
-  // When a line of each was last discarded, and the one whose heading is
-  // to take focus once it is listed again.
+  // When a line of each was last discarded, and an entry last went by a
+  // tap; whose heading is to take focus once it is listed again, or, gone
+  // (`at` its place), the heading at its place once it is no longer listed.
   const lineGoneAt = useRef(new Map<string, number>());
-  const refocus = useRef<string | null>(null);
+  const entryGoneAt = useRef(-Infinity);
+  const refocus = useRef<{ on: string; at: number | null } | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const listed = older.listed.value;
   // Each in words once, not on every change to the cart beside it.
   const shown = useMemo(() => {
@@ -134,37 +139,60 @@ export function OlderList({
     });
   }, [listed, catalogue]);
   /** Focus `on`'s heading, while it is listed. */
-  const focusHeading = (on: string | null) => {
+  const focusHeading = (on: string) => {
     const n = shown.findIndex(({ each }) => olderId(each) === on);
     if (n >= 0) {
       document.getElementById(`older-${n}`)?.focus();
     }
   };
   // After a line's Discard, focus goes to its entry's heading, not to the
-  // page; if the entry went with it, where it goes after an entry's Discard.
+  // page; if a tap took the entry away, to the heading of the one that
+  // moved up in its place, or of the list if none did (Ali, 2026-11-27,
+  // inventory-tng-ensw).
   useEffect(() => {
-    const on = refocus.current;
+    const want = refocus.current;
+    if (want === null) {
+      return;
+    }
+    const n = shown.findIndex(({ each }) => olderId(each) === want.on);
+    if (want.at !== null && n >= 0) {
+      // A render from before it went.
+      return;
+    }
     refocus.current = null;
-    focusHeading(on);
+    (
+      document.getElementById(`older-${want.at ?? n}`) ?? heading.current
+    )?.focus();
   }, [shown]);
   if (shown.length === 0) {
     return null;
   }
   /** A tap on one of `on`'s buttons, ignored just after a line of it was
-   * discarded: the second tap of a double tap would land on what moved up
-   * in its place (Ali, inventory-tng-0su). A pointer's tap focused that
+   * discarded, or just after a tap took any entry away: the second tap of
+   * a double tap would land on what moved up in its place (Ali,
+   * inventory-tng-0su, inventory-tng-ensw). A pointer's tap focused that
    * button as it landed, where Enter would later discard it, so focus goes
    * back to the heading (inventory-tng-bz73); a key's press (detail 0)
    * leaves focus where the volunteer moved it. */
   const unlessSettling =
     (on: string, tap: () => void) => (event: MouseEvent) => {
-      if (
-        performance.now() - (lineGoneAt.current.get(on) ?? -Infinity) >=
-        SETTLE_MS
-      ) {
-        tap();
-      } else if (event.detail > 0) {
-        focusHeading(on);
+      const since = Math.max(
+        lineGoneAt.current.get(on) ?? -Infinity,
+        entryGoneAt.current,
+      );
+      if (performance.now() - since < SETTLE_MS) {
+        if (event.detail > 0) {
+          focusHeading(on);
+        }
+        return;
+      }
+      tap();
+      if (!older.listed.value.some((each) => olderId(each) === on)) {
+        entryGoneAt.current = performance.now();
+        refocus.current = {
+          on,
+          at: shown.findIndex(({ each }) => olderId(each) === on),
+        };
       }
     };
   /** What to tell the volunteer, under `on`, of its Discard, or a line's,
@@ -182,7 +210,9 @@ export function OlderList({
         };
   return (
     <section>
-      <h2>{say(CHECKED_OUT)}</h2>
+      <h2 ref={heading} tabIndex={-1}>
+        {say(CHECKED_OUT)}
+      </h2>
       <ul class={RULED_LIST}>
         {shown.map(({ each, lost, lines, fills, retired }, n) => {
           const on = olderId(each);
@@ -241,7 +271,7 @@ export function OlderList({
                               );
                               if (done === "done") {
                                 lineGoneAt.current.set(on, performance.now());
-                                refocus.current = on;
+                                refocus.current = { on, at: null };
                                 recordOlder(each, "line_discarded");
                               } else {
                                 said.value = discardSaid(on, done);
@@ -324,7 +354,8 @@ export const NOT_KEPT = msg`This browser can't keep the cart. Clear local data, 
 export const NOT_DISCARDED = msg`Unable to discard. Clear your site data to remove.`;
 
 /** How long after a line's Discard taps on its entry's buttons are
- * ignored, in milliseconds. */
+ * ignored, and after a tap took an entry away taps on every entry's, in
+ * milliseconds. */
 const SETTLE_MS = 500;
 
 /** Add to cart, tapped on one changed in another tab since it was listed
