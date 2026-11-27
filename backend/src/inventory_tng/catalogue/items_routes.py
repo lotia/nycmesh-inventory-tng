@@ -400,6 +400,21 @@ OPEN_SORTING = Sorting(
 )
 
 
+# Which of the item page's forms was sent back (`sent_form`): only its
+# boxes show what was typed and are marked refused, as several share box
+# names, package_name and size in every package's form and in Add a
+# package (inventory-tng-1rmm). Compared by item.html.
+ITEM_FORM = "item"
+ALIAS_FORM = "alias"
+NEW_PACKAGE_FORM = "new_package"
+
+
+def _package_form(package_id: int) -> str:
+    """A package's own forms, its name and size and its settings, which
+    share no box name, as `sent_form` names them."""
+    return f"package-{package_id}"
+
+
 def _short_fraction(
     session: Session,
     item: Item,
@@ -424,7 +439,7 @@ def _short_shown(
     packages: Sequence[ItemPackage],
     short_fraction: int | None,
     problems: Mapping[str, Words] | None,
-    values: Mapping[str, str] | None,
+    sent_form: str | None,
 ) -> set[int]:
     """The packages whose Too short to use box the item page shows: those
     whose opened ones are followed, as it only says when an open package is
@@ -433,16 +448,14 @@ def _short_shown(
     a resize was refused for, at or below its length, so it can be
     changed first. The value of one hidden is kept."""
     each = counted_whole(item.unit)
-    resized = None
-    if (problems or {}).get("size") is RULES[SHORT_UNDER_SIZE]:
-        resized = (values or {}).get("package_id")
+    resized = (problems or {}).get("size") is RULES[SHORT_UNDER_SIZE]
     return {
         package.id
         for package in packages
         if tracks_opened(item.track_opened, package.track_opened)
         or package.id == short_fraction
         or (each and forms.short_has_fraction(package))
-        or str(package.id) == resized
+        or (resized and sent_form == _package_form(package.id))
     }
 
 
@@ -501,6 +514,7 @@ def _item_page(
     *,
     problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
+    sent_form: str | None = None,
     alert: Words | None = None,
     similar: Sequence[items.Close] = (),
     undo: str | None = None,
@@ -515,6 +529,8 @@ def _item_page(
     status_code: int | None = None,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
+    `values` and `problems`, those of the form `sent_form` names, sent
+    back refused or asking more (ITEM_FORM and the rest).
     `asking_unit`, the form sent back asks whether what was recorded was
     in its unit, Yes and No in place of Save (unit_changes.UNIT_UNCONFIRMED).
     With `held_back`, a retired package not brought back for its size's
@@ -588,13 +604,14 @@ def _item_page(
             "zone": site_zone(session),
             "problems": problems,
             "values": values,
+            "sent_form": sent_form,
             "short_fraction": short_fraction,
             "alert": alert,
             "held_back": held_back,
             "short_to_set": short_to_set,
             "set_whole": short_to_set and forms.short_to_set(short_to_set),
             "short_shown": _short_shown(
-                item, packages, short_fraction, problems, values
+                item, packages, short_fraction, problems, sent_form
             ),
             "followed_now": _followed_now(item, packages, opened),
             **_name_field(session, similar),
@@ -855,18 +872,36 @@ def save_item(
         )
         if broken == CLOSE:
             return _item_page(
-                request, session, signed, found, values=form, similar=asked or ()
+                request,
+                session,
+                signed,
+                found,
+                values=form,
+                sent_form=ITEM_FORM,
+                similar=asked or (),
             )
         if broken in ITEM_ALERTS:
             alert = RULES[broken]
             return _item_page(request, session, signed, found, alert=alert)
         if broken == unit_changes.UNIT_UNCONFIRMED and not problems:
             return _item_page(
-                request, session, signed, found, values=form, asking_unit=True
+                request,
+                session,
+                signed,
+                found,
+                values=form,
+                sent_form=ITEM_FORM,
+                asking_unit=True,
             )
     if problems:
         return _item_page(
-            request, session, signed, found, problems=problems, values=form
+            request,
+            session,
+            signed,
+            found,
+            problems=problems,
+            values=form,
+            sent_form=ITEM_FORM,
         )
     _decided(session, typed, item_id=item_id)
     session.commit()
@@ -898,7 +933,13 @@ def _unit_declined(
         # revoked since, or about a change that is not between lengths:
         # ask afresh.
         return _item_page(
-            request, session, signed, item, values=form, fixed_by=fixed_by
+            request,
+            session,
+            signed,
+            item,
+            values=form,
+            sent_form=ITEM_FORM,
+            fixed_by=fixed_by,
         )
     log.info("unit change declined", item_id=item.id, reason=why)
     values = {**form, "unit": item.unit}
@@ -916,6 +957,7 @@ def _unit_declined(
         item,
         problems=problems,
         values=values,
+        sent_form=ITEM_FORM,
         unit_declined=None if retired else why,
         unit_declined_to=unit,
         unit_example=example,
@@ -1054,9 +1096,17 @@ def add_package(
         required=forms.SIZE_REQUIRED,
         separator=separator,
     )
-    # With the units chosen, if any: not a package's own form's (package_id).
+    # With the units chosen, if any.
     values = {**form, "package_name": name, "size": size}
-    return _item_page(request, session, signed, found, problems=problems, values=values)
+    return _item_page(
+        request,
+        session,
+        signed,
+        found,
+        problems=problems,
+        values=values,
+        sent_form=NEW_PACKAGE_FORM,
+    )
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}")
@@ -1094,7 +1144,6 @@ def save_package(
     # chosen, if any.
     values = {
         **form,
-        "package_id": str(package_id),
         "package_name": name,
         "size": size,
         "package_version": package_version,
@@ -1134,6 +1183,7 @@ def save_package(
             found,
             problems=problems,
             values=values | {"package_version": str(package.edit_version)},
+            sent_form=_package_form(package_id),
             status_code=409,
         )
     parsed, problems = read()
@@ -1169,7 +1219,15 @@ def save_package(
             problems["package_name"] = forms.read_alike(session, typed)
         else:  # SHORT_UNDER_SIZE, or PACKAGE_WHOLE: its item made each.
             problems["size"] = RULES[broken]
-    return _item_page(request, session, signed, found, problems=problems, values=values)
+    return _item_page(
+        request,
+        session,
+        signed,
+        found,
+        problems=problems,
+        values=values,
+        sent_form=_package_form(package_id),
+    )
 
 
 @router.post(f"{ITEMS}/{{item_id}}/packages/{{package_id}}/restore")
@@ -1288,11 +1346,7 @@ def package_settings(
     short, minimum, problems = forms.package_settings_fields(
         package, found.unit, short_below, minimum_sealed, separator=separator
     )
-    # Beside the fields of the package it was sent for.
-    values = {
-        "package_id": str(package_id),
-        "minimum_sealed": minimum_sealed,
-    }
+    values = {"minimum_sealed": minimum_sealed}
     if short_below is not None:
         values["short_below"] = short_below
     if not problems:
@@ -1328,7 +1382,15 @@ def package_settings(
         _asked_in_unit_now(
             problems, form, "short_below", package.unit, separator=separator
         )
-    return _item_page(request, session, signed, found, problems=problems, values=values)
+    return _item_page(
+        request,
+        session,
+        signed,
+        found,
+        problems=problems,
+        values=values,
+        sent_form=_package_form(package_id),
+    )
 
 
 @router.post(f"{ITEMS}/{{item_id}}/aliases")
@@ -1373,7 +1435,15 @@ def add_alias(
         )
     values = {**form, "alias_name": name}
     problems = {"alias_name": problem}
-    return _item_page(request, session, signed, found, problems=problems, values=values)
+    return _item_page(
+        request,
+        session,
+        signed,
+        found,
+        problems=problems,
+        values=values,
+        sent_form=ALIAS_FORM,
+    )
 
 
 @router.post(f"{ITEMS}/{{item_id}}/aliases/{{alias_id}}/remove")

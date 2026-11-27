@@ -85,7 +85,9 @@ def _category_page(
     alert: Words | None = None,
     values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
-    """The category's page; `values`, its rename as sent back refused."""
+    """The category's page; `values`, its rename as sent back refused:
+    only then is the name refused (`sent_back`); a refused retire says its
+    problem beside the name, marking nothing (inventory-tng-1rmm)."""
     items = queries.current_items_of(session, category.id)
     return admin_page(
         request,
@@ -100,6 +102,7 @@ def _category_page(
             "items": items,
             "problems": {"name": problem} if problem else None,
             "values": values,
+            "sent_back": values is not None,
             "alert": alert,
         },
     )

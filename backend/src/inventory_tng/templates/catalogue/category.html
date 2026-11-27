@@ -6,12 +6,13 @@
 {% if retired %}
 {% call retired_record(category) %}{% trans %}Nobody can pick it for an item.{% endtrans %}{% endcall %}
 {% endif %}
-{#- Only a rename sent back (with its version) marks the name refused; a
-refused retire puts its problem there with nothing sent (inventory-tng-gjuq). #}
+{#- Only a rename sent back, as the route says (`sent_back`), marks the
+name refused; a refused retire puts its problem there with nothing sent
+(inventory-tng-gjuq). #}
 <form method="post" action="{{ here }}/name" class="actions">
   <input type="hidden" name="version" value="{{ values.get('version', category.edit_version) }}">
   <label>{% trans %}Name{% endtrans %}
-    <input name="name" inputmode="text" value="{{ values.get('name', category.name) }}" maxlength="{{ name_max }}" required {% if retired %}disabled{% endif %}{{ described_by("name", labelled=true, sent='version' in values) }}>
+    <input name="name" inputmode="text" value="{{ values.get('name', category.name) }}" maxlength="{{ name_max }}" required {% if retired %}disabled{% endif %}{{ described_by("name", labelled=true, sent=sent_back) }}>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   {% if not retired %}<button class="primary">{% trans %}Rename{% endtrans %}</button>{% endif %}

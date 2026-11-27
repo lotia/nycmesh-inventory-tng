@@ -114,6 +114,10 @@ def _location_page(
     values: Mapping[str, str] | None = None,
     alert: Words | None = None,
 ) -> HTMLResponse:
+    """The location's page. `values`, its form sent back refused: only
+    then are the page's problems its boxes' (`sent_back`); a refused retire or
+    bring-back says its problem beside the name, marking nothing
+    (inventory-tng-1rmm)."""
     areas = queries.current_areas_of(session, location.id)
     return admin_page(
         request,
@@ -134,6 +138,7 @@ def _location_page(
             "inherited": zone_at(session, location.parent_id),
             "problems": problems,
             "values": values,
+            "sent_back": values is not None,
             "alert": alert,
         },
     )

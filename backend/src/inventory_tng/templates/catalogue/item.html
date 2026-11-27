@@ -15,11 +15,12 @@ has no box to change: added again instead (Ali, 2026-11-23). #}
 take the {{ left }} {{ unit }} left, until it runs out.{% endtrans %}{% else %}{% trans %}It can't be received.
 None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
 {% endif %}
-{#- The item's form sent back (it has a version): only then are the
-page's problems its own, so only then is a refused box marked invalid
-(inventory-tng-qwjj); a refused bring-back puts its problem on the name
-with nothing sent. #}
-{% set item_sent = 'version' in values %}
+{#- Which of the page's forms was sent back, as the route says
+(`sent_form`, catalogue/items_routes.py): only that form's boxes show
+what was typed and are marked refused, as several share box names
+(inventory-tng-1rmm). A refused bring-back puts its problem on the name
+with no form sent, so it marks nothing (inventory-tng-qwjj). #}
+{% set item_sent = sent_form == "item" %}
 <form method="post" action="{{ here }}">
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
   <input type="hidden" name="version" value="{{ values.get('version', item.edit_version) }}">
@@ -131,9 +132,9 @@ with nothing sent. #}
   {% with manufacturer = values.get('manufacturer', item.manufacturer or ''), part_number = values.get('part_number', item.part_number or '') %}{% include "catalogue/_web_search.html" %}{% endwith %}
   {% endif %}
   {% endfor %}
-  {#- The item's form sent back (it has a version): the box as sent; any
-  other form's page, such as a package refused, shows the item's own. #}
-  {% set tracking = values.get('track_opened') == 'on' if 'version' in values else item.track_opened %}
+  {#- The item's form sent back: the box as sent; any other form's page,
+  such as a package refused, shows the item's own. #}
+  {% set tracking = values.get('track_opened') == 'on' if item_sent else item.track_opened %}
   <label class="flex items-center gap-2 font-normal">
     <input type="checkbox" name="track_opened" {% if tracking %}checked{% endif %}
       {%- if followed_now.item and not retired %} aria-describedby="followed-now"{% endif %}>
@@ -178,11 +179,12 @@ with nothing sent. #}
     {% endfor %}
   {% endcall %}
   {% if not retired %}
-  {% set sent = values if 'alias_name' in values else {} %}
+  {% set alias_sent = sent_form == "alias" %}
+  {% set sent = values if alias_sent else {} %}
   <form method="post" action="{{ here }}/aliases" class="actions">
     <label>{% trans %}Alias{% endtrans %} <input name="alias_name" inputmode="text" value="{{ sent.get('alias_name', '') }}" maxlength="{{ name_max }}" required
-      {{- described_by("alias_name", labelled=true, sent=sent) }}>
-      {% if sent %}{% with name = "alias_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+      {{- described_by("alias_name", labelled=true, sent=alias_sent) }}>
+      {% if alias_sent %}{% with name = "alias_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = sent.get('alias_name', '') %}{% include "catalogue/_units_read.html" %}{% endwith %}
     <button class="primary">{% trans %}Add alias{% endtrans %}</button>
@@ -199,7 +201,8 @@ with nothing sent. #}
     {% set own = package.track_opened is not none %}
     {% set followed = package.track_opened if own else item.track_opened %}
     {#- What was sent, and its problems, beside the package it was for. #}
-    {% set sent = values if values.get('package_id') == package.id | string else {} %}
+    {% set package_sent = sent_form == "package-" ~ package.id %}
+    {% set sent = values if package_sent else {} %}
     {% set short = package.short_below | box_amount(decimal) if package.short_below is not none else '' %}
     {% set keep = package.minimum_sealed if package.minimum_sealed is not none else '' %}
     <tr>
@@ -208,8 +211,8 @@ with nothing sent. #}
           <input type="hidden" name="package_version" value="{{ sent.get('package_version', package.edit_version) }}">
           <label>{% trans %}Name{% endtrans %}
             <input name="package_name" inputmode="text" value="{{ sent.get('package_name', package.name) }}" required
-              {{- described_by("package_name", labelled=true, sent=sent) }}>
-            {% if sent %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+              {{- described_by("package_name", labelled=true, sent=package_sent) }}>
+            {% if package_sent %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% with typed = sent.get('package_name', package.name) %}{% include "catalogue/_units_read.html" %}{% endwith %}
           {% if package.id not in sizes_fixed %}
@@ -219,9 +222,9 @@ with nothing sent. #}
           inventory-tng-0mor). #}
           <label>{{ holds }} <span class="hint">{% trans %}fixed once some has moved or been opened, or while it is labelled{% endtrans %}</span>
             <span class="with-unit"><input name="size" inputmode="{{ package.unit | keyboard }}" value="{{ sent.get('size', package.size | box_amount(decimal)) }}" required
-              {{- described_by("size", ["unit-size-" ~ package.id], labelled=true, sent=sent) }}>
+              {{- described_by("size", ["unit-size-" ~ package.id], labelled=true, sent=package_sent) }}>
               <span id="unit-size-{{ package.id }}" aria-hidden="true">{{ package.unit }}</span></span>
-            {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+            {% if package_sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% elif sizes_fixed[package.id] == "labelled" %}
           {% set printed = package_labels_printed[package.id] %}
@@ -265,16 +268,16 @@ with nothing sent. #}
             <span class="with-unit"><input name="short_below" inputmode="{{ package.unit | keyboard }}" value="{{ sent.get('short_below', short) }}"
               {%- if package.id == short_fraction %} aria-invalid="true" aria-describedby="unit-problem {{ unit_id }}"
               {%- elif to_set %} aria-invalid="true" aria-describedby="short-to-set {{ unit_id }}" autofocus
-              {%- else %}{{ described_by("short_below", [unit_id], labelled=true, sent=sent) }}{% endif %}>
+              {%- else %}{{ described_by("short_below", [unit_id], labelled=true, sent=package_sent) }}{% endif %}>
               <span id="{{ unit_id }}" aria-hidden="true">{{ package.unit }}</span></span>
             {% if to_set %}<span class="problem" id="short-to-set">{{ set_whole }}</span>{% endif %}
-            {% if sent %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+            {% if package_sent %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% endif %}
           <label>{% trans %}Keep sealed{% endtrans %} <span class="hint">{% trans %}in the stores; blank: no minimum{% endtrans %}</span>
             <input name="minimum_sealed" inputmode="numeric" value="{{ sent.get('minimum_sealed', keep) }}"
-              {{- described_by("minimum_sealed", labelled=true, sent=sent) }}>
-            {% if sent %}{% with name = "minimum_sealed" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
+              {{- described_by("minimum_sealed", labelled=true, sent=package_sent) }}>
+            {% if package_sent %}{% with name = "minimum_sealed" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <button>{% trans %}Save{% endtrans %}<span class="sr-only"> {{ package.name_shown }}</span></button>
         </form>
@@ -290,8 +293,7 @@ with nothing sent. #}
     {% endfor %}
   {% endcall %}
   {% if not retired %}
-  {#- A package's own form sent back names it: its problems are beside it. #}
-  {% set adding = 'package_id' not in values %}
+  {% set adding = sent_form == "new_package" %}
   {% set new = values if adding else {} %}
   <form method="post" action="{{ here }}/packages" class="actions" id="add-package">
     <input type="hidden" name="unit_shown" value="{{ item.unit }}">
