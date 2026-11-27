@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { guardRetire, unsaved } from "./retire";
 
 guardRetire(document);
@@ -88,6 +88,27 @@ describe("retiring", () => {
     expect(sent).toHaveLength(1);
     expect(document.querySelector("dialog")).toBeNull();
     expect(field("name").value).toBe("Cable, grey");
+  });
+
+  it("closed, ignores taps a moment, and puts focus back on Retire, without scrolling (Ali, 2026-11-27, inventory-tng-r3jx)", () => {
+    field("name").value = "Cable, grey";
+    const retire = form("retire").querySelector("button") as HTMLElement;
+    form("retire").requestSubmit(retire);
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    document.querySelector("dialog")?.close("back");
+    expect(document.activeElement).toBe(retire);
+    expect(focus.mock.calls).toEqual([[{ preventScroll: true }]]);
+    focus.mockRestore();
+    // The second tap of a double tap, on Save, under where Go back was.
+    const save = form("save").querySelector("button") as HTMLElement;
+    save.focus();
+    expect(
+      save.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }),
+      ),
+    ).toBe(false);
+    expect(sent).toHaveLength(1);
+    expect(document.activeElement).toBe(retire);
   });
 
   it("retires anyway when told", () => {

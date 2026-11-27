@@ -43,6 +43,24 @@ test("registering says so, links to the scan page and drops the phrase", async (
   expect(window.location.search).toBe("?from=qr");
 });
 
+test("registered, taps wait a moment, and what it says has focus, without scrolling (Ali, 2026-11-27, inventory-tng-r3jx)", async () => {
+  const { api } = answering(registered);
+  openAt("/register?code=a-b-c-d-e");
+  render(<RegisterPage api={api} />);
+  const focus = vi.spyOn(HTMLElement.prototype, "focus");
+  fireEvent.submit(button());
+  const said = await screen.findByRole("status");
+  await vi.waitFor(() => expect(document.activeElement).toBe(said));
+  expect(focus.mock.calls).toEqual([[{ preventScroll: true }]]);
+  focus.mockRestore();
+  // The second tap of a double tap, on the link come under the finger:
+  // ignored (its click cancelled), focus back on what registering did.
+  const link = screen.getByRole("link");
+  link.focus();
+  expect(fireEvent.click(link, { detail: 1 })).toBe(false);
+  expect(document.activeElement).toBe(said);
+});
+
 test("a typed phrase is sent without the spaces around it", async () => {
   const { api, sent } = answering(registered);
   openAt("/register");

@@ -5,6 +5,7 @@
  */
 import { msg } from "@lingui/core/macro";
 import { say } from "../shared/i18n";
+import { focusInPlace, ignoreTaps } from "../shared/settling";
 
 export const UNSAVED_CHANGES = msg`This page has changes you haven't saved. Retiring now loses them.`;
 export const GO_BACK = msg`Go back`;
@@ -86,9 +87,15 @@ export function guardRetire(document: Document): void {
     const others = [...document.forms].filter((other) => other !== form);
     if (!others.some(unsaved)) return;
     event.preventDefault();
+    const retire = () => form.querySelector("button");
     const dialog = question(document);
     dialog.addEventListener("close", () => {
       dialog.remove();
+      // The page under the question comes under the finger: taps wait a
+      // moment, and focus goes back to Retire, without scrolling (Ali,
+      // 2026-11-27, inventory-tng-r3jx).
+      focusInPlace(retire());
+      ignoreTaps(document, retire);
       if (dialog.returnValue === "retire") {
         form.dataset.sure = "yes";
         form.requestSubmit();

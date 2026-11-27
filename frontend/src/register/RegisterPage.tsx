@@ -2,12 +2,13 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren, TargetedSubmitEvent } from "preact";
-import { useId } from "preact/hooks";
+import { useEffect, useId, useRef } from "preact/hooks";
 import { type Api, makeApi } from "../api/client";
 import { Field } from "../shared/Field";
 import { say } from "../shared/i18n";
 import { type Outbox, sharedOutbox } from "../shared/outbox";
 import { type Outcome, REFUSALS, register } from "../shared/registration";
+import { focusInPlace, ignoreTaps } from "../shared/settling";
 
 const CODE = "code";
 
@@ -67,6 +68,18 @@ export function RegisterPage({
   // Batches saved here before registering, sent now (decision 0009).
   const waiting = useSignal(0);
   const problemId = useId();
+  const registered = useRef<HTMLParagraphElement>(null);
+  const done = outcome.value?.kind === "registered";
+  // The form gives way to what registering did, and Go to the scan page
+  // may come under the finger: taps wait a moment, and focus goes to the
+  // words saying so, without scrolling (Ali, 2026-11-27,
+  // inventory-tng-r3jx).
+  useEffect(() => {
+    if (done) {
+      focusInPlace(registered.current);
+      ignoreTaps(document, () => registered.current);
+    }
+  }, [done]);
 
   async function submit(event: TargetedSubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -92,10 +105,12 @@ export function RegisterPage({
     }
   }
 
-  if (outcome.value?.kind === "registered") {
+  if (done) {
     return (
       <Page>
-        <p role="status">{say(REGISTERED)}</p>
+        <p role="status" ref={registered} tabIndex={-1}>
+          {say(REGISTERED)}
+        </p>
         {waiting.value > 0 && (
           <p>{say(BATCHES_WAITING, { count: waiting.value })}</p>
         )}
