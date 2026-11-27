@@ -49,6 +49,7 @@ from helpers.markup import (
     addresses,
     button,
     hidden_fields,
+    keypads_offered,
     links,
     options,
     read,
@@ -128,12 +129,17 @@ def test_how_much_is_followed_by_the_unit_of_the_item_picked(
     """Each item offered carries its unit, which the browser shows right
     after How much once it is picked, inside its label, so a screen reader
     says it too (frontend/src/admin/hints.ts, followUnits;
-    inventory-tng-mdvz)."""
+    inventory-tng-mdvz), and its keypad, which the box takes."""
     place = Place(session, cable_unit=unit)
     page = read(admin_client.get(COUNTS).text)
     units = units_offered(page, "item_id")
     assert units[str(place.cable.id)] == unit
     assert units[str(place.item.id)] == "each"
+    keypads = keypads_offered(page, "item_id")
+    assert (keypads[str(place.cable.id)], keypads[str(place.item.id)]) == (
+        "decimal",
+        "numeric",
+    )
     after = page.one("input", name="amount").parent
     assert isinstance(after, Element)
     assert "with-unit" in after.classes

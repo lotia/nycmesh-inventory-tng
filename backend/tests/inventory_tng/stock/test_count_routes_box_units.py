@@ -16,6 +16,7 @@ from inventory_tng.web.forms import type_a_number
 from helpers.markup import (
     Element,
     described_and_invalid,
+    keypads_offered,
     read,
     said_beside,
     units_offered,
@@ -99,14 +100,19 @@ def test_a_box_says_the_unit_its_item_is_counted_in_now(
 def test_something_else_here_says_the_unit_of_each_item_offered(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Shown, in the browser, beside How much once one is picked
-    (frontend/src/admin/hints.ts, followUnits)."""
+    """Shown, in the browser, beside How much once one is picked, its
+    keypad taken by the box (frontend/src/admin/hints.ts, followUnits)."""
     place = loose_cable_and_radios(session, "m")
     other = Place(session, cable_unit="ft")
     page = page_at(admin_client, place.store.id)
     units = units_offered(page, "extra_item_id")
     assert units[str(other.cable.id)] == "ft"
     assert units[str(other.item.id)] == "each"
+    keypads = keypads_offered(page, "extra_item_id")
+    assert (keypads[str(other.cable.id)], keypads[str(other.item.id)]) == (
+        "decimal",
+        "numeric",
+    )
     after = page.one("input", name="extra_quantity").parent
     assert isinstance(after, Element)
     assert after.one("span", data_unit_of="extra_item_id").text == ""
@@ -135,6 +141,11 @@ def test_how_much_and_left_on_it_are_described_by_the_unit_picked(
         )
         field = page.one("input", name=box)
         assert field.attrs["aria-describedby"].split() == described
+    # Spools, in m: Left on it takes the decimal keypad once one is picked.
+    assert set(keypads_offered(page, "found_package_id").values()) == {
+        None,
+        "decimal",
+    }
 
 
 def test_a_refused_box_is_described_by_its_problem_then_its_unit(

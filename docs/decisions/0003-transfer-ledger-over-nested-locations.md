@@ -408,7 +408,11 @@ recorded. Rejected: keeping the unit fixed once stock has moved.
 - The item form offers only the other length, and asks "Were the
   recorded amounts really in m?", naming the unit it is in, with Yes and
   No. A change between each and a length still needs the item never to
-  have moved or converted, and no current label, as above.
+  have moved or converted, and no current label, as above. Reorder at is
+  read in the unit chosen while the unit is free, in the item's own once
+  fixed, and the form says which: a save that finds the unit otherwise,
+  stock moved or a label printed or revoked since, is refused as changed
+  since (inventory-tng-zhnd).
 - Yes converts, in one transaction holding the item, its vendor offers
   and its open packages in the ledger's lock order: its stock, its
   Reorder at (as typed in the old unit), what is on order, its vendor

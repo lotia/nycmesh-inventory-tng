@@ -57,10 +57,11 @@ function showDescribing(field: Element, words: HTMLElement, shown: boolean) {
  * typed in: "m" beside How much on the adjustment form, once a cable in m
  * is picked (inventory-tng-mdvz), and in the box's description, which
  * names the words (inventory-tng-4mcj). The words carry `data-unit-of`,
- * the select's name; each option, `data-unit`, and, where its keypad
- * differs by unit, `data-inputmode`, which the box they describe takes:
- * Reorder at on the item page, read in the unit chosen while it can
- * change (inventory-tng-zhnd). Without this, the unit shows only in the
+ * the select's name; each option, `data-unit`, and `data-inputmode`, the
+ * keypad for its unit, which the box they describe takes, keeping its own
+ * for an option with none, as "Pick one": Reorder at on the item page, read
+ * in the unit chosen while it can change (inventory-tng-zhnd), and How
+ * much for the item picked. Without this, the unit shows only in the
  * option's words, as "Cable (m)".
  */
 export function followUnits(document: Document): void {
@@ -73,18 +74,18 @@ export function followUnits(document: Document): void {
     if (select === null) {
       continue;
     }
-    // The box the words describe, whose keypad follows the unit too
-    // where the options give one (data-inputmode).
+    // The box the words describe, whose keypad follows the unit too.
     const box = words.id
       ? document.querySelector<HTMLInputElement>(
           `input[aria-describedby~="${words.id}"]`,
         )
       : null;
+    const own = box?.inputMode ?? "";
     follow(document, [select], () => {
       const picked = select.options[select.selectedIndex];
       words.textContent = picked?.dataset.unit ?? "";
-      if (box !== null && picked?.dataset.inputmode) {
-        box.inputMode = picked.dataset.inputmode;
+      if (box !== null) {
+        box.inputMode = picked?.dataset.inputmode || own;
       }
     });
   }

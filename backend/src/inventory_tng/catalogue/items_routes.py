@@ -117,6 +117,11 @@ REFUSED_FIELDS = {
 # about, so an answer about another is asked again.
 RECORDED = "unit_recorded"
 RECORDED_IN = "unit_asked"
+# Whether the item form showed its unit free, Reorder at read in the unit
+# chosen, or fixed, read in the item's own: "yes" or "no", the save
+# refused as changed since if it is no longer so
+# (unit_changes.require_fixed_as_shown).
+UNIT_FREE = "unit_free"
 
 
 class _AskFirst(Exception):
@@ -560,6 +565,7 @@ def _item_page(
             "unit_declined": unit_declined,
             "recorded": RECORDED,
             "recorded_in": RECORDED_IN,
+            "unit_free": UNIT_FREE,
             "its_labels": item_labels(item.id),
             "recount_to": unit_declined_to,
             "recount_in": unit_declined_to and unit_recount(item.id, unit_declined_to),
@@ -807,6 +813,7 @@ def save_item(
             return _item_page(request, session, signed, found, alert=RULES[CHANGED])
     if fields is not None:
         recorded_in = form.get(RECORDED_IN) if answer == "yes" else None
+        shown_free = {"yes": True, "no": False}.get(form.get(UNIT_FREE, ""))
         same = forms.same_name(session, found, form, fields, typed)
         asked = None if same else []
         loose = 0
@@ -825,7 +832,12 @@ def save_item(
                     typed,
                     signed,
                     lambda: items.save(
-                        session, found, fields, seen=seen, recorded_in=recorded_in
+                        session,
+                        found,
+                        fields,
+                        seen=seen,
+                        recorded_in=recorded_in,
+                        shown_free=shown_free,
                     ),
                 ),
                 item_ids=() if fields.track_opened else [item_id],

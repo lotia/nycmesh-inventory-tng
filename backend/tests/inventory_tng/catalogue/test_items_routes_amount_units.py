@@ -5,7 +5,9 @@ package's Holds and Too short to use, and the Add package form's Holds
 (inventory-tng-0mor). Refused for what was
 typed, such a box is marked invalid, its problem heard in its label
 (inventory-tng-h3tw's rule; inventory-tng-qyf6). Sent back with its unit
-changed, Reorder at says the unit it is read in (inventory-tng-zhnd)."""
+changed, Reorder at says the unit it is read in (inventory-tng-zhnd), and
+a save that would read it in another, as stock moved or a label was
+printed or revoked since, is refused as changed since."""
 
 from decimal import Decimal
 
@@ -13,11 +15,15 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from inventory_tng.catalogue.items_routes import UNIT_FREE
 from inventory_tng.catalogue.paths import ITEMS
+from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Category, ItemPackage
+from inventory_tng.web.forms import CHANGED, RULES
 
-from helpers.items import new_item, shown_item_form
-from helpers.markup import Element, marked, problem, read, unit_beside
+from helpers.items import NOW, new_item, shown_item_form
+from helpers.labels import labelled
+from helpers.markup import Element, marked, problem, read, text, unit_beside
 from helpers.rows import add, shown
 from helpers.stock import Place, received
 
@@ -48,6 +54,12 @@ def _reorder_at(page: Element, item_id: int) -> tuple[str, str, str | None]:
     return unit, box.attrs["inputmode"], follows
 
 
+def _unit_free(page: Element, item_id: int) -> dict[str, str]:
+    """Whether the item form says its unit is free, as it sends it."""
+    form = page.one("form", action=f"{ITEMS}/{item_id}")
+    return {UNIT_FREE: form.one("input", name=UNIT_FREE).attrs["value"]}
+
+
 def test_reorder_at_sent_back_says_the_unit_sent_while_it_can_change(
     admin_client: TestClient, session: Session, radios: Category
 ) -> None:
@@ -73,7 +85,11 @@ def test_reorder_at_sent_back_says_the_unit_sent_while_it_can_change(
         "each": "numeric",
     }
     assert all(each.attrs["data-unit"] == each.text for each in options)
-    assert admin_client.post(f"{ITEMS}/{item.id}", data=sent).status_code == 303
+    assert _unit_free(page, item.id) == {UNIT_FREE: "yes"}
+    saved = admin_client.post(
+        f"{ITEMS}/{item.id}", data=sent | _unit_free(page, item.id)
+    )
+    assert saved.status_code == 303
     session.refresh(item)
     assert (item.unit, item.minimum) == ("each", Decimal(2))
 
@@ -93,10 +109,53 @@ def test_reorder_at_sent_back_says_the_item_unit_while_it_is_fixed(
     sent = shown_item_form(cable, unit="ft", minimum="10")
     refused = admin_client.post(f"{ITEMS}/{cable.id}", data=sent | {"name": ""})
     assert refused.status_code == 400
-    assert _reorder_at(read(refused.text), cable.id) == ("m", "decimal", None)
-    asked = admin_client.post(f"{ITEMS}/{cable.id}", data=sent)
+    page = read(refused.text)
+    assert _reorder_at(page, cable.id) == ("m", "decimal", None)
+    asked = admin_client.post(
+        f"{ITEMS}/{cable.id}", data=sent | _unit_free(page, cable.id)
+    )
     assert asked.status_code == 200
-    assert _reorder_at(read(asked.text), cable.id) == ("m", "decimal", None)
+    page = read(asked.text)
+    assert _reorder_at(page, cable.id) == ("m", "decimal", None)
+    assert _unit_free(page, cable.id) == {UNIT_FREE: "no"}
+
+
+def test_reorder_at_typed_while_free_is_refused_once_stock_has_moved(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Drawn while the cable's unit was free, Reorder at in the unit
+    chosen; stock received in m before Save, which would read the 10 in m
+    and convert it: refused as changed since, nothing saved."""
+    place = Place(session)
+    cable = place.cable
+    before = cable.minimum
+    drawn = _unit_free(read(admin_client.get(f"{ITEMS}/{cable.id}").text), cable.id)
+    assert drawn == {UNIT_FREE: "yes"}
+    received(session, place, [{"item_id": cable.id, "quantity": "305", "unit": "m"}])
+    sent = shown_item_form(cable, unit="ft", minimum="10") | drawn
+    refused = admin_client.post(f"{ITEMS}/{cable.id}", data=sent)
+    assert str(RULES[CHANGED]) in text(refused)
+    session.refresh(cable)
+    assert (cable.unit, cable.minimum) == ("m", before)
+
+
+def test_reorder_at_typed_while_labelled_is_refused_once_they_are_revoked(
+    admin_client: TestClient, session: Session, radios: Category
+) -> None:
+    """Drawn while a label fixed the cable's unit, Reorder at in m, to be
+    converted; the label revoked before Save, which would keep the 100 as
+    ft and its packages' numbers unconverted: refused as changed since,
+    nothing saved."""
+    cable = new_item(session, radios, "Cat6 cable", unit="m")
+    (label,) = labelled(session, cable, 0)
+    drawn = _unit_free(read(admin_client.get(f"{ITEMS}/{cable.id}").text), cable.id)
+    assert drawn == {UNIT_FREE: "no"}
+    assert labels.revoke(session, label.id, NOW)
+    sent = shown_item_form(cable, unit="ft", minimum="100") | drawn
+    refused = admin_client.post(f"{ITEMS}/{cable.id}", data=sent)
+    assert str(RULES[CHANGED]) in text(refused)
+    session.refresh(cable)
+    assert (cable.unit, cable.minimum) == ("m", None)
 
 
 @pytest.mark.parametrize("unit", ["m", "ft", "each"])

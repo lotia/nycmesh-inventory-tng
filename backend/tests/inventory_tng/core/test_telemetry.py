@@ -1332,7 +1332,8 @@ def test_counts_unit_changes_refused_by_why(
 ) -> None:
     """Counted and logged at once, as a refusal writes nothing to commit:
     by what fixes the unit, or, between lengths, a check waiting or an
-    amount too large in the new unit."""
+    amount too large in the new unit; or as fixed or free otherwise than
+    its form showed."""
     _, _, reader, _ = rolled_back
     name = "inventory.unit_changes.refused"
     before = counted(reader, name)
@@ -1347,6 +1348,7 @@ def test_counts_unit_changes_refused_by_why(
         moved_at = write(session, each, lines=[line])
     raise_check(session, moved_at)
     waiting, huge = other.cable, place.cable
+    free = Place(session).cable
     refusals = (
         (moved, "m", "item_unit_fixed", {}),
         (labelled, "each", "item_unit_labelled", {}),
@@ -1359,12 +1361,18 @@ def test_counts_unit_changes_refused_by_why(
             fields = item_fields(item, unit=unit, **more)
             with breaks(session, rule):
                 items.save(session, item, fields, seen=None, recorded_in=item.unit)
+        # Its form drawn while its unit was fixed; free now.
+        with breaks(session, "changed_since_shown"):
+            items.save(
+                session, free, item_fields(free, unit="ft"), seen=None, shown_free=False
+            )
     assert added(reader, name, before) == {
         (("reason", "moved"),): 1,
         (("reason", "labelled"),): 1,
         (("reason", "converted"),): 1,
         (("reason", "checks_waiting"),): 1,
         (("reason", "out_of_range"),): 1,
+        (("reason", "changed_since_shown"),): 1,
     }
     assert [
         (line["item_id"], line["reason"], line["log_level"])
@@ -1376,6 +1384,7 @@ def test_counts_unit_changes_refused_by_why(
         (converted.id, "converted", "info"),
         (waiting.id, "checks_waiting", "info"),
         (huge.id, "out_of_range", "info"),
+        (free.id, "changed_since_shown", "info"),
     ]
 
 

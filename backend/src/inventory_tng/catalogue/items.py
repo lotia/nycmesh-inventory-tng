@@ -421,6 +421,7 @@ def save(
     *,
     seen: Seen,
     recorded_in: str | None = None,
+    shown_free: bool | None = None,
 ) -> Renamed | None:
     """Every one of `fields` set; and, if its name's key changes, its old
     name kept as an alias, in place of the alias it is renamed to if it is
@@ -430,17 +431,24 @@ def save(
     lengths converts what is recorded, `fields`' Reorder at too, as typed
     in its unit, once `recorded_in`, the administrator's answer, says what
     was recorded was in its unit as it is held; else
-    unit_changes.UNIT_UNCONFIRMED, to ask (unit_changes.convert)."""
+    unit_changes.UNIT_UNCONFIRMED, to ask (unit_changes.convert). A
+    change is refused as changed since shown unless its form, if any,
+    showed the unit free or fixed as it is (`shown_free`;
+    unit_changes.require_fixed_as_shown)."""
     # FOR UPDATE waits for any movement of it being written, and for any
     # label of it being made, which locks the item too (labels.make_for_item).
     relock(session, item, seen=seen)
     enforce("retired_read_only", when=item.retired_at is not None)
-    if fields.unit != item.unit and (why := unit_changes.unit_fixed(session, item)):
+    changing = fields.unit != item.unit
+    why = unit_changes.unit_fixed(session, item) if changing else None
+    if changing:
+        unit_changes.require_fixed_as_shown(item.id, why, shown_free)
+    if why:
         minimum = unit_changes.convert(
             session, item, fields.unit, fields.minimum, why=why, recorded_in=recorded_in
         )
         fields = replace(fields, minimum=minimum)
-    elif fields.unit != item.unit:
+    elif changing:
         if counted_whole(fields.unit):
             # Under the catalogue lock, which every package write takes.
             fraction = fractional_package(session, item.id) is not None

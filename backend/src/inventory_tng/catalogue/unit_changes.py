@@ -204,10 +204,26 @@ def checks_waiting(session: Session, item_id: int) -> bool:
     )
 
 
+def require_fixed_as_shown(
+    item_id: int, why: UnitFixed | None, shown_free: bool | None
+) -> None:
+    """RuleBroken ("changed_since_shown") unless a change of the item's
+    unit finds it free (`why` None, unit_fixed) or fixed as its form
+    showed it (`shown_free`). Free, the form says Reorder at is in the
+    unit chosen, and its packages follow; fixed, in the item's own,
+    converted. Stock moved or a label printed or revoked since would read
+    the number typed in another unit than the page said, and keep or
+    convert what is recorded otherwise (inventory-tng-zhnd). None for no
+    form, as a command's."""
+    if shown_free is None or shown_free == (why is None):
+        return
+    _refused(item_id, "changed_since_shown", "changed_since_shown")
+
+
 def _refused(item_id: int, reason: str, rule: str) -> None:
     """A change of the item's unit refused by `rule`, logged and counted
-    by `reason`, from a fixed list: UnitFixed's, "checks_waiting" or
-    "out_of_range"."""
+    by `reason`, from a fixed list: UnitFixed's, "checks_waiting",
+    "out_of_range" or "changed_since_shown"."""
     log.info("unit change refused", item_id=item_id, reason=reason)
     unit_changes_refused.add(1, {"reason": reason})
     enforce(rule)

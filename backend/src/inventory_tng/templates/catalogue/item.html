@@ -104,6 +104,8 @@ with nothing sent. #}
   followed as another is chosen; fixed, the item's own, converted from
   (inventory-tng-zhnd). #}
   {% set read_in = values.get('unit') if not unit_fixed and values.get('unit') in units else item.unit %}
+  {#- Which of the two it said, the save refused if no longer so. #}
+  <input type="hidden" name="{{ unit_free }}" value="{{ 'no' if unit_fixed else 'yes' }}">
   {% for name, label, hint in [
     ("manufacturer", _("Manufacturer"), ""),
     ("part_number", _("Part number"), ""),

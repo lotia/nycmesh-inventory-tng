@@ -241,17 +241,19 @@ test("Reorder at's unit and keypad follow the item's unit chosen", () => {
   expect(box.inputMode).toBe("decimal");
 });
 
-test("a box whose item's options give no keypad keeps its own", () => {
+test("How much takes the keypad of the item picked, its own for none", () => {
   document.body.innerHTML = `
     <select name="item_id">
-      <option value="1" data-unit="each">Radio (each)</option>
+      <option value="">Pick one</option>
+      <option value="1" data-unit="each" data-inputmode="numeric">Radio (each)</option>
     </select>
     <input name="amount" inputmode="decimal" aria-describedby="unit-amount"><span id="unit-amount" data-unit-of="item_id"></span>`;
   followUnits(document);
+  const box = document.querySelector("input") as HTMLInputElement;
   pick("1");
-  expect((document.querySelector("input") as HTMLInputElement).inputMode).toBe(
-    "decimal",
-  );
+  expect(box.inputMode).toBe("numeric");
+  pick("");
+  expect(box.inputMode).toBe("decimal");
 });
 
 test("the unit of an item picked when the page is shown is there at once", () => {

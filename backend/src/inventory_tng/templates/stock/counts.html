@@ -39,7 +39,7 @@
     <label>{% trans %}Item{% endtrans %}
       <select name="item_id" required{{ described_by("item_id", labelled=true) }}>
         <option value="">{% trans %}Pick one{% endtrans %}</option>
-        {% for item in items %}<option value="{{ item.id }}" data-unit="{{ item.unit }}" {% if values.get('item_id') == item.id | string %}selected{% endif %}>{{ item.name_shown }} ({{ item.unit }})</option>{% endfor %}
+        {% for item in items %}<option value="{{ item.id }}" data-unit="{{ item.unit }}" data-inputmode="{{ item.unit | keyboard }}" {% if values.get('item_id') == item.id | string %}selected{% endif %}>{{ item.name_shown }} ({{ item.unit }})</option>{% endfor %}
       </select>
       {% with name = "item_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
