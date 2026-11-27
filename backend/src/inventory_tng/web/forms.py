@@ -64,15 +64,14 @@ RULES = {
     # drawn, which fixes its unit. "Reorder at" is the box's label.
     "item_unit_moved_since_shown": lazy_gettext(
         "Not saved: stock of this item moved after you opened this page, so "
-        "changing its unit now asks how to convert what is recorded. Check the "
-        "unit and Reorder at, then save again."
+        "its unit is now fixed. Check the unit and Reorder at, then save again."
     ),
     # Translators: refused as a label of the item was printed after its page
     # was drawn, which fixes its unit. "Reorder at" is the box's label.
     "item_unit_labelled_since_shown": lazy_gettext(
         "Not saved: a label of this item was printed after you opened this "
-        "page, so changing its unit now asks how to convert what is recorded. "
-        "Check the unit and Reorder at, then save again."
+        "page, so its unit is now fixed. Check the unit and Reorder at, then "
+        "save again."
     ),
     # Translators: refused as the item's labels were revoked after its page
     # was drawn, which frees its unit. "Reorder at" is the box's label.

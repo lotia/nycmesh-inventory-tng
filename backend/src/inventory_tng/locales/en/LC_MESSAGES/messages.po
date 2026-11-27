@@ -2640,8 +2640,7 @@ msgstr[1] ""
 #: src/inventory_tng/web/forms.py
 msgid ""
 "Not saved: a label of this item was printed after you opened this page, "
-"so changing its unit now asks how to convert what is recorded. Check the "
-"unit and Reorder at, then save again."
+"so its unit is now fixed. Check the unit and Reorder at, then save again."
 msgstr ""
 
 #: src/inventory_tng/web/forms.py
@@ -2671,9 +2670,8 @@ msgstr ""
 #. drawn, which fixes its unit. "Reorder at" is the box's label.
 #: src/inventory_tng/web/forms.py
 msgid ""
-"Not saved: stock of this item moved after you opened this page, so "
-"changing its unit now asks how to convert what is recorded. Check the "
-"unit and Reorder at, then save again."
+"Not saved: stock of this item moved after you opened this page, so its "
+"unit is now fixed. Check the unit and Reorder at, then save again."
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/reading_rule.html
