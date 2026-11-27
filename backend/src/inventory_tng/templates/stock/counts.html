@@ -44,8 +44,8 @@
       {% with name = "item_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}How much{% endtrans %}
-      <span class="with-unit"><input name="amount" inputmode="decimal" value="{{ values.get('amount', '') }}" required{{ described_by("amount", labelled=true) }}>
-        <span data-unit-of="item_id"></span></span>
+      <span class="with-unit"><input name="amount" inputmode="decimal" value="{{ values.get('amount', '') }}" required{{ described_by("amount", ["unit-amount"], labelled=true) }}>
+        <span id="unit-amount" aria-hidden="true" data-unit-of="item_id"></span></span>
       {% with name = "amount" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <fieldset>

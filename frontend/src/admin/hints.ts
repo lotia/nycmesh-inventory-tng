@@ -56,9 +56,10 @@ function showDescribing(field: Element, words: HTMLElement, shown: boolean) {
 /**
  * The unit of the item a select picks, right after the box its amount is
  * typed in: "m" beside How much on the adjustment form, once a cable in m
- * is picked (inventory-tng-mdvz). The words carry `data-unit-of`, the
- * select's name; each option, `data-unit`. Without this, the unit shows
- * only in the option's words, as "Cable (m)".
+ * is picked (inventory-tng-mdvz), and in the box's description, which
+ * names the words (inventory-tng-4mcj). The words carry `data-unit-of`,
+ * the select's name; each option, `data-unit`. Without this, the unit
+ * shows only in the option's words, as "Cable (m)".
  */
 export function followUnits(document: Document): void {
   for (const words of document.querySelectorAll<HTMLElement>(

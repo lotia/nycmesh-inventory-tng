@@ -2,10 +2,9 @@
  * An amount's box says what it is counted in, right after it and to a
  * screen reader (inventory-tng-mdvz): on the adjustment form, the unit of
  * the item picked, which follows the pick (admin/hints.ts, followUnits);
- * on the count form, the item's unit. The item page's package boxes, which
- * their label wraps, say it in their description, not their name
- * (inventory-tng-0mor); the adjustment form's How much, in its name
- * (inventory-tng-4mcj).
+ * on the count form, the item's unit. Each says it in its description,
+ * not its name, its label wrapping it or not (decision 0019, Amounts;
+ * inventory-tng-0mor, inventory-tng-4mcj).
  * What each box says for each unit, and for sealed packages, the backend
  * tests check (test_count_routes_box_units.py,
  * test_items_routes_amount_units.py).
@@ -24,9 +23,12 @@ test("the adjustment and count forms say the unit beside the box", async ({
   const adjust = page.locator("#adjust");
   const howMuch = adjust.getByRole("textbox", { name: /^How much/ });
   await expect(howMuch).toHaveAccessibleName("How much");
+  await expect(howMuch).toHaveAccessibleDescription("");
   await adjust.getByLabel(/^Place/).selectOption({ label: store });
   await adjust.getByLabel(/^Item/).selectOption({ label: `${cable} (m)` });
-  await expect(howMuch).toHaveAccessibleName("How much m");
+  await expect(howMuch).toHaveAccessibleName("How much");
+  await expect(howMuch).toHaveAccessibleDescription("m");
+  await expect(howMuch.locator("xpath=..")).toHaveText("m");
   await howMuch.fill("20");
   await adjust.getByLabel("found there").check();
   await adjust.getByLabel(/^Why/).selectOption({ index: 1 });

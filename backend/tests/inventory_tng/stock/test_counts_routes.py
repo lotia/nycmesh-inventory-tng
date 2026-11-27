@@ -184,7 +184,8 @@ def test_an_adjustment_s_refused_box_is_tied_to_its_problem(
 ) -> None:
     """Only the refused box is marked invalid (inventory-tng-h3tw). A box's
     problem inside its label is in its name; the radios' is outside
-    theirs, so describes each."""
+    theirs, so describes each. How much is described by its unit alone
+    (decision 0019, Amounts; inventory-tng-4mcj)."""
     place = stocked(session)
     form = adjustment_form(session, place.store, place.item) | change
     page = read(admin_client.post(ADJUSTMENTS, data=form).text)
@@ -196,6 +197,8 @@ def test_an_adjustment_s_refused_box_is_tied_to_its_problem(
             described = each.attrs.get("aria-describedby")
             if box == name == "direction":
                 assert described == "direction-problem"
+            elif box == "amount":
+                assert described == "unit-amount"
             else:
                 assert described is None
     if name != "direction":

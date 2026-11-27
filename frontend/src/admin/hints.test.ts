@@ -209,7 +209,7 @@ test("the unit of the item picked follows its box", () => {
       <option value="1" data-unit="m">Cable (m)</option>
       <option value="2" data-unit="each">Radio (each)</option>
     </select>
-    <label>How much <input name="amount"><span data-unit-of="item_id"></span></label>
+    <label>How much <input name="amount" aria-describedby="unit-amount"><span id="unit-amount" aria-hidden="true" data-unit-of="item_id"></span></label>
     <span id="lonely" data-unit-of="nothing">kept</span>`;
   followUnits(document);
   const label = document.querySelector("label") as HTMLLabelElement;

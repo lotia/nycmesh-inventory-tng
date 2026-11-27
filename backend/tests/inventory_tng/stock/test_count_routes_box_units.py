@@ -1,7 +1,8 @@
 """What each box of a count form is counted in, right after it and to a
-screen reader (templates/stock/count.html; inventory-tng-mdvz): the
-item's unit, or "sealed" for a box counting sealed packages. Refused, a
-box's problem comes first (inventory-tng-h3tw)."""
+screen reader in its description (templates/stock/count.html;
+inventory-tng-mdvz, inventory-tng-4mcj): the item's unit, or "sealed"
+for a box counting sealed packages. Refused, a box's problem comes first
+(inventory-tng-h3tw)."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -105,6 +106,32 @@ def test_something_else_here_says_the_unit_of_each_item_offered(
     assert after.one("span", data_unit_of="extra_item_id").text == ""
 
 
+def test_how_much_and_left_on_it_are_described_by_the_unit_picked(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Something else here's How much and an open package nobody
+    recorded's Left on it: the unit of what is picked follows, in the
+    browser, right after the box (frontend/src/admin/hints.ts,
+    followUnits), hidden from its name and describing it (decision 0019,
+    Amounts; Ali, 2026-11-26, inventory-tng-4mcj). Left on it is then
+    described by how to read a printed length."""
+    spools = Spools(session)
+    spools.opened()
+    Place(session, cable_unit="ft")
+    page = page_at(admin_client, spools.store.id)
+    for box, picker, described in [
+        ("extra_quantity", "extra_item_id", ["unit-extra_quantity"]),
+        ("found_left", "found_package_id", ["unit-found_left", "hint-found_left"]),
+    ]:
+        unit = page.one("span", data_unit_of=picker)
+        assert (unit.attrs["id"], unit.attrs.get("aria-hidden")) == (
+            described[0],
+            "true",
+        )
+        field = page.one("input", name=box)
+        assert field.attrs["aria-describedby"].split() == described
+
+
 def test_a_refused_box_is_described_by_its_problem_then_its_unit(
     admin_client: TestClient, session: Session
 ) -> None:
@@ -143,7 +170,7 @@ def test_a_refused_box_whose_problem_is_in_its_label_is_marked_invalid(
     admin_client: TestClient, session: Session
 ) -> None:
     """How much's problem is inside its label, so in its name already: it
-    is not described by it again, only marked invalid."""
+    is not described by it again, only by its unit, and marked invalid."""
     place = loose_cable_and_radios(session, "m")
     typed = {"extra_item_id": str(place.cable.id), "extra_quantity": "lots"}
     page = refused(admin_client, place.store.id, typed)
@@ -151,5 +178,5 @@ def test_a_refused_box_whose_problem_is_in_its_label_is_marked_invalid(
     label = box.find_parent("label")
     assert isinstance(label, Element)
     assert type_a_number() in label.spoken
-    assert "aria-describedby" not in box.attrs
+    assert box.attrs["aria-describedby"] == "unit-extra_quantity"
     assert invalid(page, "extra_quantity")

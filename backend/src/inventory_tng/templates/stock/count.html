@@ -38,9 +38,10 @@ if you didn't count it. Anything else here, add below.{% endtrans %}</p>
 {% set filtered = shown.only or shown.search %}
 {% set columns = 4 if recount else 3 %}
 {#- What follows a box: the item's unit, or, for sealed packages, that it
-counts them (inventory-tng-mdvz). A sealed box's label already says
-"sealed", so where it is used a screen reader isn't told it again: a
-row's box leaves it out of aria-describedby, an arrival's label hides it. #}
+counts them (inventory-tng-mdvz). A unit is in the box's description, not
+its name (decision 0019, Amounts; inventory-tng-4mcj). A sealed box's
+label already says "sealed", so a screen reader isn't told it again: the
+box leaves it out of aria-describedby, and a label around it hides it. #}
 {% macro counted_in(item, row) -%}
 {%- if row.sealed %}{#- Translators: follows the box where the number of an item's sealed packages is typed, as in "2 sealed". #}{% trans %}sealed{% endtrans %}{% else %}{{ item.unit }}{% endif -%}
 {%- endmacro %}
@@ -153,8 +154,8 @@ one by its size, an open package closed as none
         {% for row in each.rows %}
         {% set name = each.prefix ~ row.field %}
         <label>{% if each.worded %}{{ row.words }}{% else %}{% trans %}How many arrived?{% endtrans %}{{ said }}{% endif %}
-          <span class="with-unit"><input name="{{ name }}" inputmode="{{ each.item.unit | keyboard(row.sealed) }}" value="{{ values.get(name, row.amount | box_amount(decimal)) }}" data-adds-to="{{ moved.adds_to(section.place.id, each.item.id) }}" data-unset="{{ row.amount | plain_amount }}"{% if row.sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}{{ described_by(name) }}>
-          <span{% if row.sealed %} aria-hidden="true"{% endif %}>{{ counted_in(each.item, row) }}</span></span>
+          <span class="with-unit"><input name="{{ name }}" inputmode="{{ each.item.unit | keyboard(row.sealed) }}" value="{{ values.get(name, row.amount | box_amount(decimal)) }}" data-adds-to="{{ moved.adds_to(section.place.id, each.item.id) }}" data-unset="{{ row.amount | plain_amount }}"{% if row.sealed %} data-per="{{ row.per | plain_amount }}"{% endif %}{{ described_by(name, [] if row.sealed else ["unit-" ~ name]) }}>
+          <span id="unit-{{ name }}" aria-hidden="true">{{ counted_in(each.item, row) }}</span></span>
         </label>
         {% include "_field_problem.html" %}
         {% endfor %}
@@ -214,8 +215,8 @@ one by its size, an open package closed as none
       {% with name = "extra_item_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}How much{% endtrans %}
-      <span class="with-unit"><input name="extra_quantity" inputmode="decimal" value="{{ values.get('extra_quantity', '') }}"{{ described_by("extra_quantity", labelled=true) }}>
-        <span data-unit-of="extra_item_id"></span></span>
+      <span class="with-unit"><input name="extra_quantity" inputmode="decimal" value="{{ values.get('extra_quantity', '') }}"{{ described_by("extra_quantity", ["unit-extra_quantity"], labelled=true) }}>
+        <span id="unit-extra_quantity" aria-hidden="true" data-unit-of="extra_item_id"></span></span>
       {% with name = "extra_quantity" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
   </fieldset>
@@ -235,8 +236,8 @@ one by its size, an open package closed as none
       {% with name = "found_package_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
     <label>{% trans %}Left on it{% endtrans %}
-      <span class="with-unit"><input name="found_left" inputmode="decimal" value="{{ values.get('found_left', '') }}"{{ described_by("found_left", ["hint-found_left"] if found_hint else [], labelled=true) }}>
-        <span data-unit-of="found_package_id"></span></span>
+      <span class="with-unit"><input name="found_left" inputmode="decimal" value="{{ values.get('found_left', '') }}"{{ described_by("found_left", ["unit-found_left"] + (["hint-found_left"] if found_hint else []), labelled=true) }}>
+        <span id="unit-found_left" aria-hidden="true" data-unit-of="found_package_id"></span></span>
       {% with name = "found_left" %}{% include "_field_problem.html" %}{% endwith %}
       {#- Any offered of an item in a length: shown, and, in the browser,
       only while one is picked (frontend/src/admin/hints.ts). #}
