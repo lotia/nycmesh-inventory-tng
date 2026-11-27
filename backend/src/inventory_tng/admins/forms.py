@@ -38,16 +38,16 @@ def setup_problems(
     username: str, email: str, password: str, password_again: str
 ) -> dict[str, Words]:
     """What is wrong with the first administrator's username, email and
-    password, as typed twice."""
-    return {
+    password, as typed twice (accounts.password_problems)."""
+    problems = {
         field: problem
         for field, problem in (
             ("username", accounts.username_problem(username)),
             ("email", accounts.email_problem(email)),
-            ("password", accounts.password_problem(password, password_again)),
         )
         if problem
     }
+    return problems | accounts.password_problems(password, password_again)
 
 
 def authenticator_problems(name: str, step: int | None) -> dict[str, Words]:

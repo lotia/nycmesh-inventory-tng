@@ -108,17 +108,17 @@ def _refused(
     request: Request,
     session: Session,
     signed: SignedIn,
-    field: str,
-    problem: Words,
+    problems: Mapping[str, Words],
     values: Mapping[str, str] | None = None,
 ) -> HTMLResponse:
-    """The page again, with what was wrong, and nothing of the change kept."""
+    """The page again, with what was wrong, by box, and nothing of the
+    change kept."""
     session.rollback()
     return _account_page(
         request,
         session,
         signed,
-        problems={field: problem},
+        problems=problems,
         values=values,
         status_code=400,
     )
@@ -147,10 +147,10 @@ def change_email(
     admin, old = signed.admin, signed.admin.email
     values = {"email": email}
     if problem := accounts.email_problem(email):
-        return _refused(request, session, signed, "email", problem, values)
+        return _refused(request, session, signed, {"email": problem}, values)
     if not unique(session, lambda: accounts.change_email(session, admin, email, now())):
         taken = EMAIL_TAKEN
-        return _refused(request, session, signed, "email", taken, values)
+        return _refused(request, session, signed, {"email": taken}, values)
     response = _done(signed, session, "email", section="email")
     # Told at the old address, in case it was not them: someone with their
     # session could otherwise take resets over unseen.
@@ -168,8 +168,8 @@ def change_password(
     password: Annotated[str, Form()] = "",
     password_again: Annotated[str, Form()] = "",
 ) -> Response:
-    if problem := accounts.password_problem(password, password_again):
-        return _refused(request, session, signed, "password", problem)
+    if problems := accounts.password_problems(password, password_again):
+        return _refused(request, session, signed, problems)
     accounts.change_password(session, signed.row, password, now())
     response = _done(signed, session, "password", section="password")
     notify.tell(signed.admin.email, signed.admin.id, mail_messages.password_changed)
@@ -189,7 +189,7 @@ def rename_authenticator(
     # Refused, its box shows what was typed, beside its problem.
     values = {field: name}
     if problem := accounts.authenticator_name_problem(name):
-        return _refused(request, session, signed, field, problem, values)
+        return _refused(request, session, signed, {field: problem}, values)
     found: list[bool] = []
     admin_id = signed.admin.id
 
@@ -199,7 +199,7 @@ def rename_authenticator(
         )
 
     if not unique(session, rename):
-        return _refused(request, session, signed, field, NAME_TAKEN, values)
+        return _refused(request, session, signed, {field: NAME_TAKEN}, values)
     if not found[0]:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
     return _done(signed, session, "renamed", section="authenticators")
@@ -216,7 +216,7 @@ def confirm_remove_authenticator(
     if found is None:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
     if outcome == "last_required":
-        return _refused(request, session, signed, "authenticators", LAST_REQUIRED)
+        return _refused(request, session, signed, {"authenticators": LAST_REQUIRED})
     return admin_page(
         request,
         signed,
@@ -247,7 +247,7 @@ def remove_authenticator(
         return not_found()
     if outcome == "last_required":
         problem = LAST_REQUIRED
-        return _refused(request, session, signed, "authenticators", problem)
+        return _refused(request, session, signed, {"authenticators": problem})
     done = _done(signed, session, outcome, section="authenticators")
     notify.tell(
         signed.admin.email,
@@ -271,7 +271,7 @@ def new_recovery_codes(
         # Sent from a page shown before the last authenticator went, which
         # took the recovery codes section with it: said by the authenticators.
         problem = CODES_NEED_TOTP
-        return _refused(request, session, signed, "authenticators", problem)
+        return _refused(request, session, signed, {"authenticators": problem})
     if again := sent_before(
         request, session, signed, single_use, "recovery_codes", ACCOUNT
     ):

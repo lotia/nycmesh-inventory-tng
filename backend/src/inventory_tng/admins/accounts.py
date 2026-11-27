@@ -196,6 +196,20 @@ def password_problem(password: str, again: str) -> Words | None:
     return None
 
 
+def password_problems(password: str, again: str) -> dict[str, Words]:
+    """What is wrong with a new password, as typed in Password and again,
+    by the box it refuses: Password alone, or both when they differ, by
+    the one problem, said beside Password, neither singled out (Ali,
+    2026-11-27, inventory-tng-gjuq)."""
+    problem = password_problem(password, again)
+    if problem is None:
+        return {}
+    boxes = ["password"]
+    if problem is PASSWORDS_DIFFER:
+        boxes.append("password_again")
+    return dict.fromkeys(boxes, problem)
+
+
 def _current(admin_id: int) -> tuple[ColumnElement[bool], ...]:
     return (Authenticator.admin_id == admin_id, CURRENT_TOTP)
 

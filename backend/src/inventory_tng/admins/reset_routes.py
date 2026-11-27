@@ -163,8 +163,7 @@ def reset(
     if found is None:
         return _reset_page(request, session, token, None)
     link, admin = found
-    if problem := accounts.password_problem(password, password_again):
-        problems = {"password": problem}
+    if problems := accounts.password_problems(password, password_again):
         return _reset_page(
             request, session, token, link, problems=problems, status_code=400
         )

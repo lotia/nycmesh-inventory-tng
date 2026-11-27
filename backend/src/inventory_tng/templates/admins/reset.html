@@ -20,7 +20,7 @@ server for a new recovery token.{% endtrans %}</p>
     {% with name = "password" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   <label>{% trans %}New password again{% endtrans %}
-    <input name="password_again" type="password" autocomplete="new-password" required>
+    <input name="password_again" type="password" autocomplete="new-password" required{{ described_by("password", sent="password_again" in problems) }}>
   </label>
   <button class="primary">{% trans %}Reset{% endtrans %}</button>
 </form>

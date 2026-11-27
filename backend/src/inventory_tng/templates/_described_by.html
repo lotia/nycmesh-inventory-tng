@@ -5,7 +5,8 @@ whose problem sits inside its label (`labelled`) hears it in its name
 already, so is only marked invalid (Ali, 2026-11-26). `name` is the
 problem's, which may differ from the box's own name. `sent`, false when
 the page's problems are another form's, so the box is never refused
-(inventory-tng-gjuq). Imported with context, for `problems`. -#}
+(inventory-tng-gjuq); or, for a box refused by another's problem, as
+Password again by Password's when they differ, whether it is refused. Imported with context, for `problems`. -#}
 {% macro described_by(name, described=[], labelled=false, sent=true) -%}
 {%- set refused = problems.get(name) if sent else none -%}
 {%- set ids = ([name ~ "-problem"] if refused and not labelled else []) + described -%}

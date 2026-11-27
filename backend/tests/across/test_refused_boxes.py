@@ -6,7 +6,8 @@ inventory-tng-gjuq).
 Each refusal below is one form of a page sent wrong. Its page is read
 the same way for each: every box a problem is said for, the boxes inside
 the problem's label and those its id describes, is marked aria-invalid
-when it is in the form sent, and no other box is. A refusal on a page
+when it is in the form sent, and no other box is. Two new passwords
+typed differently mark both boxes, by the one problem. A refusal on a page
 whose problems are page-wide, such as a retire refused with its problem
 beside the name, marks nothing."""
 
@@ -50,6 +51,8 @@ TOO_LONG = "x" * (NAME_MAX + 1)
 BOXES = {"input", "select", "textarea"}
 
 MakeClient = Callable[..., TestClient]
+# A new password and its again box, typed differently: both refused.
+BOTH_PASSWORDS = ("password", "password_again")
 
 
 class Sent(NamedTuple):
@@ -208,6 +211,20 @@ def _set_up(_: Session, make_client: MakeClient) -> Sent:
     return Sent(client, paths.SETUP, data, ("token",))
 
 
+def _set_up_passwords_differ(_: Session, make_client: MakeClient) -> Sent:
+    """Both password boxes marked, by the one problem (Ali, 2026-11-27),
+    and the authenticator's code, as none was typed."""
+    data = {
+        "token": TOKEN,
+        "username": "ada",
+        "password": PASSWORD,
+        "password_again": PASSWORD + "!",
+        "authenticator_name": "Phone",
+    }
+    client = make_client(setup_token=TOKEN)
+    return Sent(client, paths.SETUP, data, (*BOTH_PASSWORDS, "code"))
+
+
 def _recovered(session: Session, make_client: MakeClient) -> Sent:
     new_admin(session)
     client = make_client(recovery_token=TOKEN)
@@ -220,6 +237,13 @@ def _reset(session: Session, make_client: MakeClient) -> Sent:
     data = {"token": reset_link(session, ada), "password": "short"}
     data["password_again"] = "short"
     return Sent(make_client(), paths.RESET, data, ("password",))
+
+
+def _reset_passwords_differ(session: Session, make_client: MakeClient) -> Sent:
+    ada, _ = new_admin(session)
+    data = {"token": reset_link(session, ada), "password": PASSWORD}
+    data["password_again"] = PASSWORD + "!"
+    return Sent(make_client(), paths.RESET, data, BOTH_PASSWORDS)
 
 
 def _invited(session: Session, make_client: MakeClient) -> Sent:
@@ -243,6 +267,12 @@ def _password_changed(session: Session, make_client: MakeClient) -> Sent:
     path = f"{paths.ACCOUNT}/password"
     data = {"password": "short", "password_again": "short"}
     return Sent(_ada(session, make_client), path, data, ("password",))
+
+
+def _password_changed_differ(session: Session, make_client: MakeClient) -> Sent:
+    path = f"{paths.ACCOUNT}/password"
+    data = {"password": PASSWORD, "password_again": PASSWORD + "!"}
+    return Sent(_ada(session, make_client), path, data, BOTH_PASSWORDS)
 
 
 def _authenticator_renamed(session: Session, make_client: MakeClient) -> Sent:
@@ -309,12 +339,15 @@ REFUSALS: dict[str, Callable[[Session, MakeClient], Sent]] = {
     "category renamed": _category_renamed,
     "category retired": _category_retired,
     "set up": _set_up,
+    "set up, passwords differ": _set_up_passwords_differ,
     "recovered": _recovered,
     "reset": _reset,
+    "reset, passwords differ": _reset_passwords_differ,
     "invited": _invited,
     "authenticator added": _authenticator_added,
     "email changed": _email_changed,
     "password changed": _password_changed,
+    "password changed, passwords differ": _password_changed_differ,
     "authenticator renamed": _authenticator_renamed,
     "scan settings": _scan_settings,
     "sign-in settings": _sign_in_settings,
