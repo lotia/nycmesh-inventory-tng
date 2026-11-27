@@ -70,6 +70,7 @@ import { differenceOf } from "./recorded-elsewhere";
 import { aboutLine } from "./refused-line";
 import { type Acted, POINT, Scanner } from "./Scanner";
 import { indexOf } from "./search";
+import { focusInPlace, useKeptSpace } from "./settling";
 import { useTextBoxFocused } from "./text-box-focus";
 import { type Removed, removeLine, undone } from "./undo-remove";
 import { sealedCounts, unseen } from "./unseen-batches";
@@ -212,6 +213,8 @@ export function CartForm({
   // change the name, without stopping anyone saving.
   const checkName = useSignal(askWho(cart.value, catalogue));
   const nameList = useRef<HTMLSelectElement>(null);
+  const nameCheck = useRef<HTMLDivElement>(null);
+  const nameCheckSpace = useKeptSpace();
 
   // Tabs share one cart; a refreshed catalogue clears what it no longer has.
   // Another tab's amounts in a unit this one does not show: this tab's
@@ -380,6 +383,15 @@ export function CartForm({
   const typing = useTextBoxFocused();
   const tooOld = useComputed(() => outbox.builds.newer.value === "too_old");
   const placeRead = useSignal<number | null>(null);
+  const placeQuestion = useRef<HTMLFieldSetElement>(null);
+  const placeQuestionSpace = useKeptSpace();
+  const fromList = useRef<HTMLSelectElement>(null);
+  const toList = useRef<HTMLSelectElement>(null);
+  // The side the question was last answered with.
+  const answeredSide = useRef<Side>("from");
+  /** The From or To list. */
+  const placeList = (side: Side) =>
+    (side === "from" ? fromList : toList).current;
   // What the answer to that question did, in words, till the next label.
   const placeAnswer = useSignal<string | null>(null);
 
@@ -420,9 +432,16 @@ export function CartForm({
 
   /** A place's question answered with From or To, saying what it did as a
    * place's label with one side open does (Ali, 2026-11-24,
-   * inventory-tng-8ary). */
+   * inventory-tng-8ary). Its space stays blank a moment, so what is below
+   * does not move up under the finger, and focus goes, without scrolling,
+   * to the place it filled (inventory-tng-m6dc). */
   function answerPlace(side: Side, locationId: number) {
     const place = indexOf(catalogue).places.get(locationId);
+    placeQuestionSpace.keep(
+      (placeQuestion.current as HTMLElement).getBoundingClientRect().height,
+    );
+    answeredSide.current = side;
+    focusInPlace(placeList(side));
     batch(() => {
       placeAnswer.value = say(
         side === "from" ? PLACE_FROM_HERE : PLACE_TO_HERE,
@@ -752,9 +771,15 @@ export function CartForm({
       ? undefined
       : volunteers.get(cart.value.volunteerId);
 
-  function changeName() {
+  /** Put the name check away, its space kept blank a moment if it was
+   * shown, so what is below does not move up under the finger, and focus
+   * the name list without scrolling (Ali, 2026-11-27, inventory-tng-m6dc). */
+  function answerNameCheck() {
+    if (nameCheck.current !== null) {
+      nameCheckSpace.keep(nameCheck.current.getBoundingClientRect().height);
+    }
     checkName.value = false;
-    nameList.current?.focus();
+    focusInPlace(nameList.current);
   }
   // Undo, while the cart is as removing left it.
   const undoable =
@@ -773,14 +798,14 @@ export function CartForm({
         onPutBack={putInCart}
         after={cartHeading}
       />
-      {checkName.value && name !== undefined && (
-        <div role="alert" class={CAUTION_BOX}>
+      {checkName.value && name !== undefined ? (
+        <div ref={nameCheck} role="alert" class={CAUTION_BOX}>
           <div>{sayParts(ARE_YOU, { name: <strong>{name}</strong> })}</div>
           <div class="actions">
             <button
               type="button"
               onClick={() => {
-                checkName.value = false;
+                answerNameCheck();
                 // Only the time changes, so "Sending" stays on show.
                 kept(store.touch());
               }}
@@ -790,14 +815,16 @@ export function CartForm({
             <button
               type="button"
               onClick={() => {
+                answerNameCheck();
                 set({ volunteerId: null });
-                changeName();
               }}
             >
               {say(NOT_ME)}
             </button>
           </div>
         </div>
+      ) : (
+        nameCheckSpace.space(() => focusInPlace(nameList.current))
       )}
       <Field label={say(YOUR_NAME)}>
         {(id) => (
@@ -841,6 +868,7 @@ export function CartForm({
       {sides.from && (
         <Place
           label={say(cart.value.kind === "open" ? WHERE : FROM)}
+          list={fromList}
           catalogue={catalogue}
           value={cart.value.fromId}
           onPick={(fromId) => set({ fromId })}
@@ -849,6 +877,7 @@ export function CartForm({
       {sides.to && (
         <Place
           label={say(TO)}
+          list={toList}
           catalogue={catalogue}
           value={cart.value.toId}
           onPick={(toId) => set({ toId })}
@@ -904,13 +933,18 @@ export function CartForm({
           {say(SCAN_WITH_CAMERA)}
         </button>
       )}
-      {placeRead.value !== null && (
+      {placeRead.value !== null ? (
         <PlaceSides
+          question={placeQuestion}
           place={placeRead.value}
           name={indexOf(catalogue).places.get(placeRead.value) ?? ""}
           sides={placeSides(cart.value)}
           onPick={answerPlace}
         />
+      ) : (
+        placeQuestionSpace.space(() =>
+          focusInPlace(placeList(answeredSide.current)),
+        )
       )}
 
       <Finder
@@ -1025,7 +1059,7 @@ export function CartForm({
       {name !== undefined && (
         <p>
           {sayParts(RECORDING_AS, { name: <strong>{name}</strong> })}{" "}
-          <button type="button" onClick={changeName}>
+          <button type="button" onClick={answerNameCheck}>
             {say(CHANGE)}
           </button>
         </p>
@@ -1074,18 +1108,20 @@ export const NOT_REMOVED = msg`This item wasn't automatically removed. Record th
 export const CHANGED_BEFORE_DISCARD = msg`The cart was changed in another tab. Check it, then discard it again.`;
 /** From or To, for a place a label named: the side still empty first. */
 function PlaceSides({
+  question,
   place,
   name,
   sides,
   onPick,
 }: {
+  question: RefObject<HTMLFieldSetElement | null>;
   place: number;
   name: string;
   sides: Side[];
   onPick: (side: Side, place: number) => void;
 }) {
   return (
-    <fieldset>
+    <fieldset ref={question}>
       <legend>{name}</legend>
       <div class="actions">
         {sides.map((side) => (
@@ -1109,11 +1145,13 @@ function idOrNull(value: string): number | null {
 
 function Place({
   label,
+  list,
   catalogue,
   value,
   onPick,
 }: {
   label: string;
+  list: RefObject<HTMLSelectElement | null>;
   catalogue: Catalogue;
   value: number | null;
   onPick: (locationId: number | null) => void;
@@ -1124,6 +1162,7 @@ function Place({
       {(id) => (
         <select
           id={id}
+          ref={list}
           value={String(value ?? "")}
           onChange={(event) => onPick(idOrNull(event.currentTarget.value))}
         >

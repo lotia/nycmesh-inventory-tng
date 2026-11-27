@@ -13,7 +13,7 @@ import {
   selected,
   server,
 } from "../testing/scan-page";
-import { NOT_ME, THATS_ME, YOUR_NAME } from "./CartForm";
+import { CHANGE, NOT_ME, THATS_ME, YOUR_NAME } from "./CartForm";
 import { freshCart, storeCart } from "./cart";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
@@ -89,6 +89,88 @@ describe("whose name it is", () => {
     expect(selected(say(YOUR_NAME))).toBe("");
     expect(document.activeElement).toBe(screen.getByLabelText(say(YOUR_NAME)));
     expect(screen.queryByText(/Recording as/)).toBeNull();
+  });
+
+  /** The name check's space, kept blank once answered: what is drawn just
+   * before the Your name field. */
+  const keptSpace = () =>
+    nameList().closest("form > *")?.previousElementSibling as HTMLElement;
+  const nameList = () => screen.getByLabelText(say(YOUR_NAME));
+
+  /** That answering with `answer`, by a pointer's tap, keeps the name
+   * check's 120 px blank until taps are taken again, focuses the name list
+   * without scrolling, and an ignored tap there focuses it again (Ali,
+   * 2026-11-27, inventory-tng-m6dc). */
+  async function expectSpaceKept(answer: string) {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const tall = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ height: 120 } as DOMRect);
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    usedAgo(IDLE + 1000);
+    open();
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: answer }), {
+      detail: 1,
+    });
+    expect(screen.queryByText(/Are you/)).toBeNull();
+    expect(document.activeElement).toBe(nameList());
+    // Once, without scrolling.
+    expect(focus.mock.calls).toEqual([[{ preventScroll: true }]]);
+    const space = keptSpace();
+    expect(space.getAttribute("aria-hidden")).toBe("true");
+    expect(space.style.height).toBe("120px");
+    expect(space.textContent).toBe("");
+    // The second tap of a double tap, on nothing there: focus comes back.
+    nameList().blur();
+    fireEvent.click(space, { detail: 1 });
+    expect(document.activeElement).toBe(nameList());
+    await vi.advanceTimersByTimeAsync(500);
+    expect(document.contains(space)).toBe(false);
+    expect(keptSpace()).toBeNull();
+    tall.mockRestore();
+    focus.mockRestore();
+  }
+
+  test("that's me keeps the name check's space blank a moment, and focuses the name list (inventory-tng-m6dc)", async () => {
+    await expectSpaceKept(say(THATS_ME));
+    expect(selected(say(YOUR_NAME))).toBe("1");
+  });
+
+  test("not me keeps the name check's space blank a moment, and focuses the name list (inventory-tng-m6dc)", async () => {
+    await expectSpaceKept(say(NOT_ME));
+    expect(selected(say(YOUR_NAME))).toBe("");
+  });
+
+  test("Change, with the name check shown, keeps its space blank a moment, and focuses the name list (inventory-tng-m6dc)", async () => {
+    await expectSpaceKept(say(CHANGE));
+    expect(selected(say(YOUR_NAME))).toBe("1");
+  });
+
+  test("Change, with no name check shown, keeps no space", async () => {
+    open();
+    await ready();
+    pick(say(YOUR_NAME), "1");
+    fireEvent.click(screen.getByRole("button", { name: say(CHANGE) }));
+    expect(document.activeElement).toBe(nameList());
+    expect(keptSpace()).toBeNull();
+  });
+
+  test("answered by a key, focus goes to the name list and stays where keys then move it (inventory-tng-m6dc)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    usedAgo(IDLE + 1000);
+    open();
+    await ready();
+    // A key's click has detail 0.
+    fireEvent.click(screen.getByRole("button", { name: say(THATS_ME) }), {
+      detail: 0,
+    });
+    expect(document.activeElement).toBe(nameList());
+    // Tab on to a kind's radio, within the moment: nothing takes focus back.
+    const kind = screen.getAllByRole("radio")[0] as HTMLElement;
+    kind.focus();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(document.activeElement).toBe(kind);
   });
 
   test("picking no name in the list clears it", async () => {

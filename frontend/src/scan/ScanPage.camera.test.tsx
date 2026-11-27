@@ -636,6 +636,40 @@ describe("scanning labels with the camera", () => {
     expect(screen.queryByRole("button", { name: say(FROM) })).toBeNull();
   });
 
+  test("a place's question, answered, keeps its space blank a moment, and focuses the side it filled (inventory-tng-m6dc)", async () => {
+    await opened();
+    await scan("S4HELF");
+    const question = await screen.findByRole("group", {
+      name: "Hub › Shelf A",
+    });
+    const tall = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ height: 90 } as DOMRect);
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    const toList = screen.getByLabelText(say(TO), { selector: "select" });
+    fireEvent.click(screen.getByRole("button", { name: say(TO) }), {
+      detail: 1,
+    });
+    expect(selected(say(TO))).toBe("11");
+    expect(document.contains(question)).toBe(false);
+    expect(document.activeElement).toBe(toList);
+    // Once, without scrolling.
+    expect(focus.mock.calls).toEqual([[{ preventScroll: true }]]);
+    // Where the question was, before the item search.
+    const space = screen.getByLabelText(say(FIND)).closest("form > *")
+      ?.previousElementSibling as HTMLElement;
+    expect(space.getAttribute("aria-hidden")).toBe("true");
+    expect(space.style.height).toBe("90px");
+    // The second tap of a double tap, on nothing there: focus comes back.
+    toList.blur();
+    fireEvent.click(space, { detail: 1 });
+    expect(document.activeElement).toBe(toList);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(document.contains(space)).toBe(false);
+    tall.mockRestore();
+    focus.mockRestore();
+  });
+
   test("a place's label sets the only side a kind has, at once", async () => {
     storeCart({ ...freshCart(), kind: "receipt" });
     await opened();

@@ -14,11 +14,12 @@ export const focusInPlace = (to: HTMLElement | null) =>
   to?.focus({ preventScroll: true });
 
 /**
- * The space a list took, kept blank for SETTLE_MS once a tap took its last
- * entry away, so what is below it does not move up under the finger (Ali,
- * 2026-11-27, inventory-tng-lm1b). `keep` is given the list's height as it
- * was before the tap; `space` is the blank, or null once it has gone, and
- * calls `onTap` when tapped, as a tap on nothing may move focus.
+ * The space something took, kept blank for SETTLE_MS once a tap took it
+ * away, such as a list's last entry or the scan page's name check, so what
+ * is below it does not move up under the finger (Ali, 2026-11-27,
+ * inventory-tng-lm1b, inventory-tng-m6dc). `keep` is given its height as
+ * it was before the tap; `space` is the blank, or null once it has gone,
+ * and calls `onTap` when tapped, as a tap on nothing may move focus.
  */
 export function useKeptSpace() {
   const height = useSignal<number | null>(null);
