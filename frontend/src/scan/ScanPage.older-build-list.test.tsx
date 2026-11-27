@@ -532,9 +532,15 @@ describe("what an older build left", () => {
     // back to the heading, for Enter not to discard it (inventory-tng-bz73).
     const movedUp = discardOf("Cat6 cable: 5 m from an open package");
     movedUp.focus();
-    fireEvent.click(movedUp);
+    fireEvent.click(movedUp, { detail: 1 });
     within(listing()).getByText("Cat6 cable: 5 m from an open package");
     expect(document.activeElement?.id).toBe("older-0");
+    // Moved to it by key, on purpose, and pressed: ignored, but focus
+    // stays where the volunteer put it (a key's click has detail 0).
+    movedUp.focus();
+    fireEvent.click(movedUp, { detail: 0 });
+    within(listing()).getByText("Cat6 cable: 5 m from an open package");
+    expect(document.activeElement).toBe(movedUp);
     fireEvent.click(lastDiscard());
     fireEvent.click(
       within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),

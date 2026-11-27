@@ -62,8 +62,8 @@ export function ConfirmDiscard({
   onKeep,
   describedBy,
 }: {
-  onDiscard: () => void;
-  onKeep: () => void;
+  onDiscard: (event: MouseEvent) => void;
+  onKeep: (event: MouseEvent) => void;
   describedBy?: string;
 }) {
   return (

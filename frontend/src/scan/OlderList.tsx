@@ -152,19 +152,21 @@ export function OlderList({
   }
   /** A tap on one of `on`'s buttons, ignored just after a line of it was
    * discarded: the second tap of a double tap would land on what moved up
-   * in its place (Ali, inventory-tng-0su). Landing, the tap focused that
-   * button, for Enter to take later: focus goes back to the heading
-   * (inventory-tng-bz73). */
-  const unlessSettling = (on: string, tap: () => void) => () => {
-    if (
-      performance.now() - (lineGoneAt.current.get(on) ?? -Infinity) >=
-      SETTLE_MS
-    ) {
-      tap();
-    } else {
-      focusHeading(on);
-    }
-  };
+   * in its place (Ali, inventory-tng-0su). Landing, a pointer's tap
+   * focused that button, for Enter to take later: focus goes back to the
+   * heading (inventory-tng-bz73). A key's (detail 0) leaves focus where
+   * the volunteer moved it. */
+  const unlessSettling =
+    (on: string, tap: () => void) => (event: MouseEvent) => {
+      if (
+        performance.now() - (lineGoneAt.current.get(on) ?? -Infinity) >=
+        SETTLE_MS
+      ) {
+        tap();
+      } else if (event.detail > 0) {
+        focusHeading(on);
+      }
+    };
   /** What to tell the volunteer, under `on`, of its Discard, or a line's,
    * not done: the browser did not keep it, or it changed meanwhile, as
    * listing it again shows; of one gone, nothing. */
