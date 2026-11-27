@@ -75,7 +75,7 @@ import uuid
 from collections.abc import Callable, Collection, Mapping, Sequence
 from decimal import Decimal
 from functools import cache, partial
-from typing import Annotated, Literal, NamedTuple
+from typing import Annotated, NamedTuple
 from urllib.parse import urlencode
 
 import structlog
@@ -210,8 +210,7 @@ areas_brought_back = meter.create_counter(
 # The rules places/locations.restore may refuse an area by, each by the
 # reason it is counted under; any other is a bug, and raised. Not its
 # custodian's: an area has none (location's custody_has_volunteer).
-BringBackRefusal = Literal["parent_kind", "parent_retired"]
-BRING_BACK_REFUSALS: dict[str, BringBackRefusal] = {
+BRING_BACK_REFUSALS = {
     "location_area_parent": "parent_kind",
     "location_parent_current": "parent_retired",
 }
@@ -807,10 +806,9 @@ def count(
     )
     problems |= words
     # Read from `said`, not `words`: a sealed row of a package held nowhere
-    # is shown otherwise with no box to put words beside. Its field has
-    # words all the same (count_forms.changed_words reads every field
-    # typed_named does), so `said` comes with `problems` and the form is
-    # refused here, measured once, not again by the save (inventory-tng-xse9).
+    # is shown otherwise with no box to put words beside. `said` comes with
+    # `problems` all the same (count_forms.changed_words reads every field),
+    # so the form is refused here, measured once (inventory-tng-xse9).
     if said:
         reasons.append("shown_otherwise")
     # Every alert is said above the form, each in its own words: why it was

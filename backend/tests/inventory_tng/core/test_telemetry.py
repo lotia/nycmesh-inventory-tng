@@ -526,6 +526,33 @@ def test_counts_the_places_a_count_was_saved_at(
     assert (after[0] - before[0], after[1] - before[1]) == (1, 2)
 
 
+def emptied_while_counted(
+    client: TestClient, session: Session, place: Place, area: Location
+) -> tuple[str, Answer]:
+    """A radio put in `area`, retired already, and moved to the van while its
+    store's count form was open: the form's path, and the save it refused."""
+    radio = [{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}]
+    write(
+        session,
+        place,
+        from_location_id=place.store.id,
+        to_location_id=area.id,
+        lines=radio,
+    )
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form_at(client, place.store.id)
+    write(
+        session,
+        place,
+        from_location_id=area.id,
+        to_location_id=place.van.id,
+        lines=radio,
+    )
+    refused = client.post(path, data=form)
+    assert refused.status_code == 409
+    return path, refused
+
+
 def test_counts_the_areas_brought_back_from_a_count_form(
     rolled_back: Recorded, session: Session
 ) -> None:
@@ -539,25 +566,7 @@ def test_counts_the_areas_brought_back_from_a_count_form(
         session, Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id)
     )
     retire(session, shelf)
-    radio = [{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}]
-    write(
-        session,
-        place,
-        from_location_id=place.store.id,
-        to_location_id=shelf.id,
-        lines=radio,
-    )
-    path = f"{COUNTS}/{place.store.id}"
-    form = count_form_at(client, place.store.id)
-    write(
-        session,
-        place,
-        from_location_id=shelf.id,
-        to_location_id=place.van.id,
-        lines=radio,
-    )
-    refused = client.post(path, data=form)
-    assert refused.status_code == 409
+    path, refused = emptied_while_counted(client, session, place, shelf)
     name = "inventory.count.areas_brought_back"
     before = counted(reader, name).get((), 0)
     back = client.post(
@@ -582,25 +591,7 @@ def test_counts_the_areas_bring_it_back_refused_by_reason(
     )
     bin_ = add(session, Location(name=f"Bin {tag()}", kind="area", parent_id=shelf.id))
     retire(session, shelf, bin_)
-    radio = [{"item_id": place.item.id, "quantity": "1", "unit": place.item.unit}]
-    write(
-        session,
-        place,
-        from_location_id=place.store.id,
-        to_location_id=bin_.id,
-        lines=radio,
-    )
-    path = f"{COUNTS}/{place.store.id}"
-    form = count_form_at(client, place.store.id)
-    write(
-        session,
-        place,
-        from_location_id=bin_.id,
-        to_location_id=place.van.id,
-        lines=radio,
-    )
-    refused = client.post(path, data=form)
-    assert refused.status_code == 409
+    path, refused = emptied_while_counted(client, session, place, bin_)
     name = "inventory.count.bring_backs_refused"
     before = counted(reader, name)
     brought_before = counted(reader, "inventory.count.areas_brought_back")
