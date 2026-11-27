@@ -79,6 +79,9 @@ export function ScanPage({
   const adder = useRef<AddDifference | null>(null);
   // And what puts a refused batch's other lines in it (add-the-rest.ts).
   const rester = useRef<AddRest | null>(null);
+  // The Cart heading (CartForm), where the outbox's list sends focus once
+  // nothing is listed.
+  const cartHeading = useRef<HTMLHeadingElement>(null);
   // One refresh at a time; one asked for meanwhile follows it.
   const asking = useRef<"no" | "yes" | "again">("no");
 
@@ -266,6 +269,7 @@ export function ScanPage({
           rester={rester}
           reload={reload}
           latest={latest}
+          cartHeading={cartHeading}
         />
       )}
       <OutboxList
@@ -276,6 +280,7 @@ export function ScanPage({
           adder.current?.(entry, difference) ?? null
         }
         onAddRest={(entry, rest) => rester.current?.(entry, rest) ?? null}
+        after={cartHeading}
       />
     </main>
   );

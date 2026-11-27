@@ -2,6 +2,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
+import type { RefObject } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { say, sayParts } from "../shared/i18n";
 import {
@@ -39,6 +40,7 @@ import {
   IN_CART,
   recordedLines,
 } from "./recorded-elsewhere";
+import { useSettledList } from "./settling";
 
 export const CARTS_FROM_DEVICE = msg`Carts from this device`;
 export const REGISTER_TO_SEND_WAITING = msg`<0>Register this browser</0> to send what is waiting.`;
@@ -101,7 +103,12 @@ export type AddRest = (entry: Entry, rest: Body) => NotPut | null;
  * that does not say, what is left to do (SCAN_AGAIN_CHANGED), as the older
  * list does, while the page refreshes the stock (Ali, inventory-tng-g0e,
  * d; inventory-tng-0gg). One refused (422) whose problems name lines
- * offers Add to cart, for the rest (add-the-rest.ts).
+ * offers Add to cart, for the rest (add-the-rest.ts). A tap that takes an
+ * entry away makes every entry's buttons wait a moment, as the older list
+ * does (useSettledList): focus goes to the heading of the entry that moved
+ * up, or of the list; the last taken away, the list's space stays blank a
+ * moment, and focus goes to what follows (`after`) (Ali, 2026-11-27,
+ * inventory-tng-34ns).
  */
 export function OutboxList({
   outbox,
@@ -109,6 +116,7 @@ export function OutboxList({
   cartKey,
   onAddDifference,
   onAddRest,
+  after,
 }: {
   outbox: Outbox;
   /** To name the lines of one refused; null until it is loaded. */
@@ -117,6 +125,8 @@ export function OutboxList({
   cartKey: string | undefined;
   onAddDifference: AddDifference;
   onAddRest: AddRest;
+  /** What focus goes to once nothing is listed. */
+  after: RefObject<HTMLElement | null>;
 }) {
   const online = useOnline();
   // Under which save (batchId), why its difference, or its rest, did not
@@ -141,9 +151,16 @@ export function OutboxList({
     [stored, catalogue],
   );
   const entries = outbox.shown().reverse();
+  const settled = useSettledList({
+    drawn: entries.map((entry) => batchId(entry.body)),
+    listed: () => outbox.shown().map((entry) => batchId(entry.body)),
+    placeId: (at) => `outbox-${at}`,
+    after,
+  });
   if (entries.length === 0) {
-    return null;
+    return settled.space();
   }
+  const { unlessSettling } = settled;
   // Too old, nothing this tab sends is taken, so none waiting is sent
   // until the page is loaded again (Outbox.send).
   const held = outbox.builds.newer.value === "too_old";
@@ -151,8 +168,10 @@ export function OutboxList({
   const needsRegistering =
     !held && entries.some((e) => e.waitingFor === "registration");
   return (
-    <section>
-      <h2>{say(CARTS_FROM_DEVICE)}</h2>
+    <section ref={settled.list}>
+      <h2 ref={settled.heading} tabIndex={-1}>
+        {say(CARTS_FROM_DEVICE)}
+      </h2>
       {needsRegistering && (
         <p>
           {sayParts(REGISTER_TO_SEND_WAITING, {}, [
@@ -175,7 +194,9 @@ export function OutboxList({
           const words = `outbox-${at}`;
           return (
             <li key={id} class="flex flex-col items-start gap-1">
-              <div id={words}>{batchWords(entry.body, entry.summary)}</div>
+              <div id={words} tabIndex={-1}>
+                {batchWords(entry.body, entry.summary)}
+              </div>
               {entry.state === "saved" ? (
                 <small>
                   {say(RECORDED_IN, { transaction: entry.transactionId })}
@@ -210,10 +231,12 @@ export function OutboxList({
                   added={elsewhere?.added === true}
                   cartKey={cartKey}
                   describedBy={words}
-                  onAdd={(difference) => {
-                    const why = onAddDifference(entry, difference);
-                    notAdded.value = why === null ? null : { on: id, why };
-                  }}
+                  onAdd={(difference, event) =>
+                    unlessSettling(id, () => {
+                      const why = onAddDifference(entry, difference);
+                      notAdded.value = why === null ? null : { on: id, why };
+                    })(event)
+                  }
                 />
               )}
               {rest !== null && (
@@ -224,10 +247,10 @@ export function OutboxList({
                   added={reason?.code === "refused" && reason.added === true}
                   inCart={cartKey === rest.key}
                   describedBy={words}
-                  onPut={() => {
+                  onPut={unlessSettling(id, () => {
                     const why = onAddRest(entry, rest);
                     notAdded.value = why === null ? null : { on: id, why };
-                  }}
+                  })}
                 />
               )}
               {notAdded.value?.on === id && (
@@ -245,7 +268,7 @@ export function OutboxList({
                 <button
                   type="button"
                   aria-describedby={words}
-                  onClick={() => outbox.dismiss(entry)}
+                  onClick={unlessSettling(id, () => outbox.dismiss(entry))}
                 >
                   {say(DISMISS)}
                 </button>
@@ -285,7 +308,7 @@ function RecordedElsewhere({
   cartKey: string | undefined;
   /** The id of its entry's words, which describe its button. */
   describedBy: string;
-  onAdd: (difference: Body) => void;
+  onAdd: (difference: Body, event: MouseEvent) => void;
 }) {
   const { was, changes, difference } = useMemo(
     () => ({
@@ -323,7 +346,7 @@ function RecordedElsewhere({
           added={added === true}
           inCart={cartKey === difference.key}
           describedBy={describedBy}
-          onPut={() => onAdd(difference)}
+          onPut={(event) => onAdd(difference, event)}
         />
       )}
     </>
@@ -356,7 +379,7 @@ function PutInCart({
   inCart: boolean;
   /** The id of its entry's words, which describe the button. */
   describedBy: string;
-  onPut: () => void;
+  onPut: (event: MouseEvent) => void;
 }) {
   // Once shown, the in-cart words keep their room when recorded, so Dismiss
   // below does not move; one already recorded as it is first drawn needs

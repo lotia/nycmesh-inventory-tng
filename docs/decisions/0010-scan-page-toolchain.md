@@ -338,6 +338,13 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   difference is recorded, "These are in your cart", if shown, is hidden
   in the same way, not removed, keeping its room. We rejected
   listing the newest last, which changes the order volunteers see.
+  A Dismiss guards a double tap as the older list's taps do: every
+  entry's taps are ignored as long, focus goes, without scrolling, to
+  the heading of the entry that moved up, or the list's, and once the
+  last is dismissed the list's space stays blank as long and focus goes
+  to the Cart heading (Ali, 2026-11-27, inventory-tng-34ns). We
+  rejected asking before a refused save's Dismiss, which slows every
+  one.
   A save refused (422) whose problems name lines offers "Record the
   rest" (Ali, 2026-11-20, inventory-tng-clvh): it puts the save's other
   lines in an empty cart, under a key made from the save's, and the

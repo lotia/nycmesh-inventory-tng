@@ -3,7 +3,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
 import type { RefObject } from "preact";
-import { useEffect, useMemo, useRef } from "preact/hooks";
+import { useMemo } from "preact/hooks";
 import { say } from "../shared/i18n";
 import { MAKE_CHANGES } from "../shared/outbox-notes";
 import { type Event as Reported, telemetry } from "../shared/telemetry";
@@ -25,7 +25,7 @@ import {
 } from "./older-builds";
 import { toCart, withRetired } from "./older-to-cart";
 import { indexOf } from "./search";
-import { focusInPlace, SETTLE_MS, useKeptSpace } from "./settling";
+import { useSettledList } from "./settling";
 
 /** An older build's cart, filled for each kind (olderKind). */
 const CART_KIND_WORDS: Record<Kind, MessageDescriptor> = {
@@ -85,7 +85,7 @@ export const KEPT_ON_NOT_SENT = msg`Kept on this device {when}, not sent.`;
  * entry's buttons wait a moment (SETTLE_MS). A tap that takes its entry
  * away makes every entry's buttons wait, and focus goes to the heading of
  * the entry that moved up, or of the list; the last entry taken away,
- * the list's space stays blank a moment (useKeptSpace), and focus goes to
+ * the list's space stays blank a moment (useSettledList), and focus goes to
  * what follows (`after`). One holding an item retired since, and out of
  * the catalogue, names it from the catalogue's retired items, and goes in
  * the cart only once that line is discarded.
@@ -106,16 +106,6 @@ export function OlderList({
   // The one whose discarding is being confirmed, and what one tap said.
   const discarding = useSignal<string | null>(null);
   const said = useSignal<{ on: string; why: OlderWhy } | null>(null);
-  // When a line of each was last discarded.
-  const lineGoneAt = useRef(new Map<string, number>());
-  // When an entry last went by a tap, and the place it went from.
-  const entryGone = useRef({ when: -Infinity, at: 0 });
-  // The heading to focus once the list is drawn again: `on`'s, or, `on`
-  // gone from place `at`, the one at that place once `on` is not listed.
-  const refocus = useRef<{ on: string; at: number | null } | null>(null);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const list = useRef<HTMLElement>(null);
-  const kept = useKeptSpace();
   const listed = older.listed.value;
   // Each in words once, not on every change to the cart beside it.
   const shown = useMemo(() => {
@@ -148,71 +138,19 @@ export function OlderList({
       };
     });
   }, [listed, catalogue]);
-  /** Where `on` is listed, or -1. */
-  const placeOf = (on: string) =>
-    shown.findIndex(({ each }) => olderId(each) === on);
-  /** Focus the heading of the entry at `at`, or the list's if none is,
-   * or, none listed, what follows the list (Ali, 2026-11-27,
-   * inventory-tng-lm1b). */
-  const focusPlace = (at: number) =>
-    focusInPlace(
-      document.getElementById(`older-${at}`) ??
-        heading.current ??
-        after.current,
-    );
   // After a line's Discard, focus goes to its entry's heading, not to the
   // page; if a tap took the entry away, to the heading of the one that
-  // moved up in its place, or of the list if none did (Ali, 2026-11-27,
-  // inventory-tng-ensw).
-  useEffect(() => {
-    const want = refocus.current;
-    if (want === null) {
-      return;
-    }
-    const n = placeOf(want.on);
-    if (want.at !== null && n >= 0) {
-      // A render from before it went.
-      return;
-    }
-    refocus.current = null;
-    focusPlace(want.at ?? n);
-  }, [shown]);
+  // moved up in its place (Ali, 2026-11-27, inventory-tng-ensw).
+  const settled = useSettledList({
+    drawn: shown.map(({ each }) => olderId(each)),
+    listed: () => older.listed.value.map(olderId),
+    placeId: (at) => `older-${at}`,
+    after,
+  });
   if (shown.length === 0) {
-    return kept.space(() => focusInPlace(after.current));
+    return settled.space();
   }
-  /** A tap on one of `on`'s buttons, ignored just after a line of it was
-   * discarded, or just after a tap took any entry away: the second tap of
-   * a double tap would land on what moved up in its place (Ali,
-   * inventory-tng-0su, inventory-tng-ensw). A pointer's tap focused that
-   * button as it landed, where Enter would later discard it, so focus goes
-   * back to the heading it was given (inventory-tng-bz73): of the entry at
-   * the place of the one that went, or the list's, or else `on`'s. A key's
-   * press (detail 0) leaves focus where the volunteer moved it. */
-  const unlessSettling =
-    (on: string, tap: () => void) => (event: MouseEvent) => {
-      const now = performance.now();
-      const entryWaits = now - entryGone.current.when < SETTLE_MS;
-      if (
-        entryWaits ||
-        now - (lineGoneAt.current.get(on) ?? -Infinity) < SETTLE_MS
-      ) {
-        if (event.detail > 0) {
-          focusPlace(entryWaits ? entryGone.current.at : placeOf(on));
-        }
-        return;
-      }
-      // Measured before the tap redraws the list, drawn as it was tapped.
-      const tall = (list.current as HTMLElement).getBoundingClientRect().height;
-      tap();
-      if (!older.listed.value.some((each) => olderId(each) === on)) {
-        const at = placeOf(on);
-        entryGone.current = { when: performance.now(), at };
-        refocus.current = { on, at };
-        if (older.listed.value.length === 0) {
-          kept.keep(tall);
-        }
-      }
-    };
+  const { unlessSettling } = settled;
   /** What to tell the volunteer, under `on`, of its Discard, or a line's,
    * not done: the browser did not keep it, or it changed meanwhile, as
    * listing it again shows; of one gone, nothing. */
@@ -227,8 +165,8 @@ export function OlderList({
               : ("discard_not_kept" as const),
         };
   return (
-    <section ref={list}>
-      <h2 ref={heading} tabIndex={-1}>
+    <section ref={settled.list}>
+      <h2 ref={settled.heading} tabIndex={-1}>
         {say(CHECKED_OUT)}
       </h2>
       <ul class={RULED_LIST}>
@@ -288,8 +226,7 @@ export function OlderList({
                                 catalogue,
                               );
                               if (done === "done") {
-                                lineGoneAt.current.set(on, performance.now());
-                                refocus.current = { on, at: null };
+                                settled.stayed(on);
                                 recordOlder(each, "line_discarded");
                               } else {
                                 said.value = discardSaid(on, done);

@@ -33,3 +33,40 @@ test("a save's entry keeps its height, Dismiss's room kept unseen, as it is sent
   await expect(entry.getByRole("button", { name: "Dismiss" })).toBeVisible();
   expect((await entry.boundingBox())?.height).toBe(sending?.height);
 });
+
+test("a double tap on a refused save's Dismiss dismisses that one only, and focuses the entry that moved up (inventory-tng-34ns)", async ({
+  page,
+}) => {
+  const cable = await ownCable(page);
+  // Each save refused for its key, so all stay listed alike, to dismiss;
+  // three, so the page is long enough not to scroll back as one goes.
+  await page.route("**/api/transactions", (route) =>
+    route.fulfill({ status: 409, json: { reason: "key_reused" } }),
+  );
+  await page.goto("/scan");
+  const list = page.locator("section", {
+    has: page.getByRole("heading", { name: "Carts from this device" }),
+  });
+  for (const count of [1, 2, 3]) {
+    await fillMove(page, cable);
+    await page.getByRole("button", { name: "Record" }).click();
+    await expect(list.getByRole("button", { name: "Dismiss" })).toHaveCount(
+      count,
+    );
+  }
+  const dismiss = newestCart(page).getByRole("button", { name: "Dismiss" });
+  await dismiss.scrollIntoViewIfNeeded();
+  const box = await dismiss.boundingBox();
+  if (box === null) {
+    throw new Error("the newest save's Dismiss is not shown");
+  }
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.touchscreen.tap(x, y);
+  // A finger's gap between the taps, the list redrawn after the first.
+  await page.waitForTimeout(150);
+  await page.touchscreen.tap(x, y);
+  // The one that moved up under the finger is still listed, focused.
+  await expect(list.getByRole("button", { name: "Dismiss" })).toHaveCount(2);
+  await expect(list.locator("#outbox-0")).toBeFocused();
+});

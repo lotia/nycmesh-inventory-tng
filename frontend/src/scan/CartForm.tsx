@@ -11,7 +11,7 @@ import {
   useComputed,
   useSignal,
 } from "@preact/signals";
-import type { TargetedSubmitEvent } from "preact";
+import type { RefObject, TargetedSubmitEvent } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { Field } from "../shared/Field";
 import { say, sayParts } from "../shared/i18n";
@@ -147,6 +147,7 @@ export function CartForm({
   rester,
   reload,
   latest,
+  cartHeading,
 }: {
   catalogue: Catalogue;
   /** The outbox's batches it does not show (unseen-batches.ts, unseen). */
@@ -173,6 +174,8 @@ export function CartForm({
   /** The catalogue as it is now, which Record checks the cart against
    * first; the one shown if it cannot be had soon (ScanPage). */
   latest: () => Promise<Catalogue>;
+  /** For the Cart heading, which the outbox's list below focuses too. */
+  cartHeading: RefObject<HTMLHeadingElement | null>;
 }) {
   const store = useMemo(() => new CartStore(catalogue), []);
   // The open packages to take from, and how many are sealed where, as the
@@ -203,7 +206,6 @@ export function CartForm({
   // after Remove, and Undo's after Undo.
   const focusNext = useRef<"undo" | "restored" | null>(null);
   const undoButton = useRef<HTMLButtonElement>(null);
-  const cartHeading = useRef<HTMLHeadingElement>(null);
   const restoredRemove = useRef<HTMLButtonElement>(null);
   const restoredId = useRef<number | null>(null);
   // After a while unused, the phone may have changed hands: offer to

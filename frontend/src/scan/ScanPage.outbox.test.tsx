@@ -24,9 +24,9 @@ import {
   server,
 } from "../testing/scan-page";
 import { ITEMS, MOVE } from "./batch";
-import { FROM, SENDING_WHAT, TO, YOUR_NAME } from "./CartForm";
+import { CART, FROM, SENDING_WHAT, TO, YOUR_NAME } from "./CartForm";
 import { KIND_WORDS } from "./cart";
-import { DISMISS, SENDING } from "./OutboxList";
+import { CARTS_FROM_DEVICE, DISMISS, SENDING } from "./OutboxList";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
 vi.mock("./camera", () => ({ openCamera: vi.fn() }));
@@ -265,5 +265,116 @@ describe("the batches listed in the outbox", () => {
     setOnline(onLine, false);
     await screen.findByText(say(OFFLINE));
     onLine.mockRestore();
+  });
+});
+
+describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => {
+  /** Saves refused for their key, each to `to`, listed newest first. */
+  function refusedTo(...places: string[]) {
+    storeOutbox(
+      places.map((to, at) =>
+        outboxEntry({
+          body: moveBody({ key: `00000000-0000-4000-8000-00000000000${at}` }),
+          summary: { from: "Hub", to },
+          queuedAt: at,
+          state: "refused",
+          reason: { code: "key_reused" },
+        }),
+      ),
+    );
+  }
+  const words = (to: string) => `Move: 1 item from Hub to ${to}`;
+  const dismissOf = (to: string) =>
+    screen.getByRole("button", { name: say(DISMISS), description: words(to) });
+  const listHeading = () =>
+    screen.getByRole("heading", { name: say(CARTS_FROM_DEVICE) });
+  const cartHeading = () => screen.getByRole("heading", { name: say(CART) });
+
+  test("one dismissed makes every entry's taps wait, and focuses the heading of the one that moved up", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    refusedTo("Van", "Shelf");
+    open();
+    await ready();
+    fireEvent.click(dismissOf("Shelf"), { detail: 1 });
+    expect(screen.queryByText(words("Shelf"))).toBeNull();
+    await vi.waitFor(() => expect(document.activeElement?.id).toBe("outbox-0"));
+    expect(document.activeElement?.textContent).toBe(words("Van"));
+    // The second tap, on the one moved up: ignored, focus back on its
+    // heading.
+    const movedUp = dismissOf("Van");
+    movedUp.focus();
+    fireEvent.click(movedUp, { detail: 1 });
+    screen.getByText(words("Van"));
+    expect(document.activeElement?.id).toBe("outbox-0");
+    // Pressed by key: ignored, focus left where the volunteer put it.
+    movedUp.focus();
+    fireEvent.click(movedUp, { detail: 0 });
+    screen.getByText(words("Van"));
+    expect(document.activeElement).toBe(movedUp);
+    // Once settled, a tap is taken again.
+    await vi.advanceTimersByTimeAsync(500);
+    fireEvent.click(dismissOf("Van"), { detail: 1 });
+    expect(screen.queryByText(words("Van"))).toBeNull();
+  });
+
+  test("the last listed dismissed focuses the list's heading, and an ignored tap puts it back there", async () => {
+    refusedTo("Van", "Shelf");
+    open();
+    await ready();
+    fireEvent.click(dismissOf("Van"), { detail: 1 });
+    await vi.waitFor(() => expect(document.activeElement).toBe(listHeading()));
+    const above = dismissOf("Shelf");
+    above.focus();
+    fireEvent.click(above, { detail: 1 });
+    screen.getByText(words("Shelf"));
+    expect(document.activeElement).toBe(listHeading());
+  });
+
+  test("the only one dismissed keeps the list's space blank a moment, and focuses the Cart heading", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const tall = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ height: 240 } as DOMRect);
+    refusedTo("Van");
+    open();
+    await ready();
+    fireEvent.click(dismissOf("Van"), { detail: 1 });
+    expect(screen.queryByText(say(CARTS_FROM_DEVICE))).toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(cartHeading()));
+    const space = screen.getByRole("main").lastElementChild as HTMLElement;
+    expect(space.getAttribute("aria-hidden")).toBe("true");
+    expect(space.style.height).toBe("240px");
+    expect(space.textContent).toBe("");
+    // A tap on nothing there, which took focus to the page: it comes back.
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.click(space, { detail: 1 });
+    expect(document.activeElement).toBe(cartHeading());
+    await vi.advanceTimersByTimeAsync(500);
+    expect(document.contains(space)).toBe(false);
+    tall.mockRestore();
+  });
+
+  test("focus moved by a Dismiss never scrolls the page", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    refusedTo("Van", "Shelf");
+    open();
+    await ready();
+    fireEvent.click(dismissOf("Van"), { detail: 1 });
+    await vi.waitFor(() => expect(document.activeElement).toBe(listHeading()));
+    fireEvent.click(dismissOf("Shelf"), { detail: 1 });
+    await vi.advanceTimersByTimeAsync(500);
+    fireEvent.click(dismissOf("Shelf"), { detail: 1 });
+    await vi.waitFor(() => expect(document.activeElement).toBe(cartHeading()));
+    // The list's heading twice, then the Cart's.
+    const onHeadings = focus.mock.calls.filter(
+      (_, at) => (focus.mock.contexts[at] as HTMLElement).tagName === "H2",
+    );
+    expect(onHeadings).toEqual([
+      [{ preventScroll: true }],
+      [{ preventScroll: true }],
+      [{ preventScroll: true }],
+    ]);
+    focus.mockRestore();
   });
 });
