@@ -100,14 +100,21 @@ with nothing sent. #}
     ("manufacturer", _("Manufacturer"), ""),
     ("part_number", _("Part number"), ""),
     ("old_code", _("Old code"), _("the sheet's NYCM- code")),
-    ("minimum", _("Reorder at"), _("total across stores, in %(unit)s; blank never reorders", unit=item.unit)),
+    ("minimum", _("Reorder at"), _("total across stores; blank never reorders")),
     ("notes", _("Notes"), ""),
     ("ordering_notes", _("Ordering notes"), ""),
   ] %}
+  {#- Reorder at's unit right after its box, and in its description, not
+  its name (decision 0019, Amounts; inventory-tng-h39f). #}
+  {% set amount = name == "minimum" %}
+  {% set described = ["unit-" ~ name] if amount else [] %}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
-    {% set stored = item[name] | box_amount(decimal) if name == "minimum" else item[name] %}
-    <input name="{{ name }}" inputmode="{{ values.get('unit', item.unit) | keyboard if name == 'minimum' else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}"
-      {%- if item_sent %}{{ described_by(name, labelled=true) }}{% endif %}>
+    {% set stored = item[name] | box_amount(decimal) if amount else item[name] %}
+    {% if amount %}<span class="with-unit">{% endif %}<input name="{{ name }}" inputmode="{{ values.get('unit', item.unit) | keyboard if amount else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}"
+      {%- if item_sent %}{{ described_by(name, described, labelled=true) }}{% elif amount %} aria-describedby="unit-{{ name }}"{% endif %}>
+    {%- if amount %}
+      <span id="unit-{{ name }}" aria-hidden="true">{{ item.unit }}</span></span>
+    {%- endif %}
     {% include "_field_problem.html" %}
   </label>
   {% if name == "part_number" %}

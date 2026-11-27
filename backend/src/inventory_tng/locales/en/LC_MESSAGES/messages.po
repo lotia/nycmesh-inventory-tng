@@ -5206,6 +5206,14 @@ msgstr[1] ""
 msgid "below; blank: none"
 msgstr ""
 
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+msgid "blank: none"
+msgstr ""
+
+#: src/inventory_tng/templates/catalogue/unit_recount.html
+msgid "blank: not said"
+msgstr ""
+
 #: src/inventory_tng/catalogue/units.py
 msgid "capacitance"
 msgstr ""
@@ -5355,16 +5363,6 @@ msgstr ""
 
 #: src/inventory_tng/site_settings/forms.py
 msgid "hours"
-msgstr ""
-
-#: src/inventory_tng/templates/catalogue/unit_recount.html
-#, python-format
-msgid "in %(unit)s; blank: none"
-msgstr ""
-
-#: src/inventory_tng/templates/catalogue/unit_recount.html
-#, python-format
-msgid "in %(unit)s; blank: not said"
 msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
@@ -5685,8 +5683,7 @@ msgstr ""
 
 #: src/inventory_tng/templates/catalogue/item.html
 #: src/inventory_tng/templates/catalogue/unit_recount.html
-#, python-format
-msgid "total across stores, in %(unit)s; blank never reorders"
+msgid "total across stores; blank never reorders"
 msgstr ""
 
 #. completes "m: fixed …", said of an item or a package with two labels printed

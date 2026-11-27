@@ -8,7 +8,7 @@
  * (inventory-tng-4mcj).
  * What each box says for each unit, and for sealed packages, the backend
  * tests check (test_count_routes_box_units.py,
- * test_items_routes_package_units.py).
+ * test_items_routes_amount_units.py).
  */
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";

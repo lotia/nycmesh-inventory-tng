@@ -1,7 +1,8 @@
-"""The item page's package amounts say their unit right after their box,
-and to a screen reader in its description, not its name (decision 0019,
-Amounts; Ali, 2026-11-26, inventory-tng-0mor): a package's Holds and Too
-short to use, and the Add package form's Holds. Refused for what was
+"""The item page's amounts say their unit right after their box, and to
+a screen reader in its description, not its name (decision 0019,
+Amounts; Ali, 2026-11-26): the item's Reorder at (inventory-tng-h39f), a
+package's Holds and Too short to use, and the Add package form's Holds
+(inventory-tng-0mor). Refused for what was
 typed, such a box is marked invalid, its problem heard in its label
 (inventory-tng-h3tw's rule; inventory-tng-qyf6)."""
 
@@ -17,6 +18,21 @@ from inventory_tng.models.catalogue import Category, ItemPackage
 from helpers.items import new_item
 from helpers.markup import described_and_invalid, problem, read, unit_beside
 from helpers.rows import add, shown
+
+
+@pytest.mark.parametrize("unit", ["m", "ft", "each"])
+def test_reorder_at_says_its_unit_after_its_box(
+    admin_client: TestClient, session: Session, radios: Category, unit: str
+) -> None:
+    """Its hint no longer says the unit."""
+    item = new_item(session, radios, name="Cable", unit=unit)
+    page = read(admin_client.get(f"{ITEMS}/{item.id}").text)
+    form = page.one("form", action=f"{ITEMS}/{item.id}")
+    assert unit_beside(page, form.one("input", name="minimum")) == (
+        unit,
+        [unit],
+        "Reorder at total across stores; blank never reorders",
+    )
 
 
 @pytest.mark.parametrize("unit", ["m", "ft", "each"])

@@ -600,12 +600,13 @@ ITEM_BOXES = {
 
 def _item_boxes_invalid(page: Element, item: Item) -> dict[str, str | None]:
     """Each box of the item's own form, by name: its aria-invalid. Each
-    problem is in its box's label, so none is described by anything."""
+    problem is in its box's label, so none is described by it; Reorder at
+    is described by its unit alone (decision 0019, Amounts)."""
     form = page.one("form", action=f"{ITEMS}/{item.id}")
     marked = {}
     for name, tag in ITEM_BOXES.items():
         described, marked[name] = described_and_invalid(form.one(tag, name=name))
-        assert described is None
+        assert described == ("unit-minimum" if name == "minimum" else None)
     return marked
 
 

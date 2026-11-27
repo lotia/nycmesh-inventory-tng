@@ -973,13 +973,42 @@ def test_a_refused_size_is_marked_invalid_and_keeps_its_unit(
     }
 
 
+def test_reorder_at_on_order_and_units_per_order_say_the_new_unit_after_the_box(
+    admin_client: TestClient, session: Session
+) -> None:
+    """Recounting the bead's example into ft: each box says ft right after
+    it, and to a screen reader in its description, not its name; its hint
+    no longer says the unit (decision 0019, Amounts; Ali, 2026-11-26,
+    inventory-tng-h39f)."""
+    cable = _spools(session).cable
+    page = read(_page(admin_client, cable.id).text)
+    per_order = f"per_order_{_offer(session, cable.id).id}"
+    assert {
+        name: unit_beside(page, page.one("input", name=name))
+        for name in ["minimum", "on_order", per_order]
+    } == {
+        "minimum": (
+            "ft",
+            ["ft"],
+            "Reorder at total across stores; blank never reorders",
+        ),
+        "on_order": ("ft", ["ft"], "On order blank: none"),
+        per_order: (
+            "ft",
+            ["ft"],
+            "Units per order from https://example.org blank: not said",
+        ),
+    }
+
+
 @pytest.mark.parametrize("refused", ["minimum", "on_order", "per_order"])
 def test_a_refused_amount_is_marked_invalid(
     admin_client: TestClient, session: Session, refused: str
 ) -> None:
     """Reorder at, On order or Units per order sent as "lots": only that
-    box is marked invalid, and described by nothing, as its problem is in
-    its label (inventory-tng-h3tw's rule; inventory-tng-qwjj)."""
+    box is marked invalid, still described by its unit alone, as its
+    problem is in its label (inventory-tng-h3tw's rule; inventory-tng-qwjj,
+    inventory-tng-h39f)."""
     cable = _spools(session).cable
     names = {
         "minimum": "minimum",
@@ -993,7 +1022,10 @@ def test_a_refused_amount_is_marked_invalid(
     assert {
         which: described_and_invalid(page.one("input", name=name))
         for which, name in names.items()
-    } == {which: (None, "true" if which == refused else None) for which in names}
+    } == {
+        which: (f"unit-{name}", "true" if which == refused else None)
+        for which, name in names.items()
+    }
 
 
 def test_a_converted_items_retired_package_is_resized_and_stays_retired(
