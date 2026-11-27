@@ -99,11 +99,12 @@ export function OlderList({
   // The one whose discarding is being confirmed, and what one tap said.
   const discarding = useSignal<string | null>(null);
   const said = useSignal<{ on: string; why: OlderWhy } | null>(null);
-  // When a line of each was last discarded, and an entry last went by a
-  // tap; whose heading is to take focus once it is listed again, or, gone
-  // (`at` its place), the heading at its place once it is no longer listed.
+  // When a line of each was last discarded, and when and from what place
+  // an entry last went by a tap; whose heading is to take focus once it is
+  // listed again, or, gone (`at` its place), the heading at its place once
+  // it is no longer listed.
   const lineGoneAt = useRef(new Map<string, number>());
-  const entryGoneAt = useRef(-Infinity);
+  const entryGone = useRef({ when: -Infinity, at: 0 });
   const refocus = useRef<{ on: string; at: number | null } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const listed = older.listed.value;
@@ -145,6 +146,9 @@ export function OlderList({
       document.getElementById(`older-${n}`)?.focus();
     }
   };
+  /** Focus the heading of the entry at `at`, or the list's if none is. */
+  const focusPlace = (at: number) =>
+    (document.getElementById(`older-${at}`) ?? heading.current)?.focus();
   // After a line's Discard, focus goes to its entry's heading, not to the
   // page; if a tap took the entry away, to the heading of the one that
   // moved up in its place, or of the list if none did (Ali, 2026-11-27,
@@ -160,9 +164,7 @@ export function OlderList({
       return;
     }
     refocus.current = null;
-    (
-      document.getElementById(`older-${want.at ?? n}`) ?? heading.current
-    )?.focus();
+    focusPlace(want.at ?? n);
   }, [shown]);
   if (shown.length === 0) {
     return null;
@@ -172,27 +174,29 @@ export function OlderList({
    * a double tap would land on what moved up in its place (Ali,
    * inventory-tng-0su, inventory-tng-ensw). A pointer's tap focused that
    * button as it landed, where Enter would later discard it, so focus goes
-   * back to the heading (inventory-tng-bz73); a key's press (detail 0)
-   * leaves focus where the volunteer moved it. */
+   * back to the heading it was given (inventory-tng-bz73): of the entry at
+   * the place of the one that went, or the list's, or else `on`'s. A key's
+   * press (detail 0) leaves focus where the volunteer moved it. */
   const unlessSettling =
     (on: string, tap: () => void) => (event: MouseEvent) => {
-      const since = Math.max(
-        lineGoneAt.current.get(on) ?? -Infinity,
-        entryGoneAt.current,
-      );
-      if (performance.now() - since < SETTLE_MS) {
-        if (event.detail > 0) {
+      const now = performance.now();
+      const entryWaits = now - entryGone.current.when < SETTLE_MS;
+      if (
+        entryWaits ||
+        now - (lineGoneAt.current.get(on) ?? -Infinity) < SETTLE_MS
+      ) {
+        if (event.detail > 0 && entryWaits) {
+          focusPlace(entryGone.current.at);
+        } else if (event.detail > 0) {
           focusHeading(on);
         }
         return;
       }
       tap();
       if (!older.listed.value.some((each) => olderId(each) === on)) {
-        entryGoneAt.current = performance.now();
-        refocus.current = {
-          on,
-          at: shown.findIndex(({ each }) => olderId(each) === on),
-        };
+        const at = shown.findIndex(({ each }) => olderId(each) === on);
+        entryGone.current = { when: performance.now(), at };
+        refocus.current = { on, at };
       }
     };
   /** What to tell the volunteer, under `on`, of its Discard, or a line's,

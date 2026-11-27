@@ -200,6 +200,10 @@ the compressed copy (fiddly header code ServeStatic already gets right).
   entry's buttons are ignored for half a second, so a double tap's second
   cannot discard the line that moves up (Ali, 2026-11-13). We rejected
   asking before each line's Discard, which slows every one.
+  When a tap takes the entry itself away (its last line's Discard, its
+  own Discard confirmed, or Add to cart), every entry's taps are ignored
+  as long, and focus goes to the heading of the entry that moved up, or
+  the list's if none did (Ali, 2026-11-27, inventory-tng-ensw).
   A save keeps its batch key while its lines go, as
   one put back and changed in the cart does: an older tab may have sent
   it as it was, and the key then has the server take it once. We
