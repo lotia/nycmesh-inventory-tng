@@ -1,4 +1,4 @@
-{#- An item's name field, as adding and saving one show it: the naming convention as a hint, and items with similar names or aliases (saying which alias), when the name sent was close to theirs, with that name kept in `different`, so sending it again unchanged saves it (docs/decisions/0021). `default` is the name shown with nothing sent, `again` the words asking to send it again; `sent_back`, true when this form was sent back, as the route says: only then is a refused name marked invalid (inventory-tng-qwjj) and its answers about units kept; unset, it marks nothing. #}
+{#- An item's name field, as adding and saving one show it: the naming convention as a hint, and items with similar names or aliases (saying which alias), when the name sent was close to theirs, with that name kept in `different`, so sending it again unchanged saves it (docs/decisions/0021). `default` is the name shown with nothing sent, `again` the words asking to send it again; `values`, only this form's, as sent back; `sent_back`, true when this form was sent back, as the route says: only then is a refused name marked invalid (inventory-tng-qwjj); unset, it marks nothing. #}
 {% from "_described_by.html" import described_by with context %}
 <label>{% trans %}Name{% endtrans %} <span class="hint">{% trans %}what it is, then what tells it apart from the
   items nearest it, such as LiteBeam 5AC Gen2, or Cat6 cable, outdoor,
@@ -6,8 +6,7 @@
   <input name="name" inputmode="text" value="{{ values.get('name', default) }}" maxlength="{{ name_max }}" required{{ described_by("name", labelled=true, sent=sent_back) }}>
   {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
 </label>
-{#- Only the name's own form's answers: another form sent back holds its own. #}
-{% with typed = values.get('name', default), sent = values if sent_back else {} %}{% include "catalogue/_units_read.html" %}{% endwith %}
+{% with typed = values.get('name', default), sent = values %}{% include "catalogue/_units_read.html" %}{% endwith %}
 {% if similar %}
 {% set items -%}
   {% for close in similar -%}

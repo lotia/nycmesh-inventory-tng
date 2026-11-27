@@ -16,11 +16,11 @@ take the {{ left }} {{ unit }} left, until it runs out.{% endtrans %}{% else %}{
 None is left, so nobody can pick it.{% endtrans %}{% endif %}{% endcall %}
 {% endif %}
 {#- Which of the page's forms was sent back, as the route says
-(`sent_form`, catalogue/items_routes.py): only that form's boxes show
-what was typed and are marked refused, as several share box names
-(inventory-tng-1rmm). A refused bring-back puts its problem on the name
+(`form_sent_back`, ItemForm in catalogue/items_routes.py): only that
+form's boxes show what was typed and are marked refused, as several
+share box names (inventory-tng-1rmm). A refused bring-back puts its problem on the name
 with no form sent, so it marks nothing (inventory-tng-qwjj). #}
-{% set item_sent = sent_form == "item" %}
+{% set item_sent = form_sent_back == item_forms.ITEM %}
 {% set item_values = values if item_sent else {} %}
 <form method="post" action="{{ here }}">
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
@@ -180,7 +180,7 @@ with no form sent, so it marks nothing (inventory-tng-qwjj). #}
     {% endfor %}
   {% endcall %}
   {% if not retired %}
-  {% set alias_sent = sent_form == "alias" %}
+  {% set alias_sent = form_sent_back == item_forms.ALIAS %}
   {% set sent = values if alias_sent else {} %}
   <form method="post" action="{{ here }}/aliases" class="actions">
     <label>{% trans %}Alias{% endtrans %} <input name="alias_name" inputmode="text" value="{{ sent.get('alias_name', '') }}" maxlength="{{ name_max }}" required
@@ -202,7 +202,7 @@ with no form sent, so it marks nothing (inventory-tng-qwjj). #}
     {% set own = package.track_opened is not none %}
     {% set followed = package.track_opened if own else item.track_opened %}
     {#- What was sent, and its problems, beside the package it was for. #}
-    {% set package_sent = sent_form == "package-" ~ package.id %}
+    {% set package_sent = form_sent_back == package_form(package.id) %}
     {% set sent = values if package_sent else {} %}
     {% set short = package.short_below | box_amount(decimal) if package.short_below is not none else '' %}
     {% set keep = package.minimum_sealed if package.minimum_sealed is not none else '' %}
@@ -294,7 +294,7 @@ with no form sent, so it marks nothing (inventory-tng-qwjj). #}
     {% endfor %}
   {% endcall %}
   {% if not retired %}
-  {% set adding = sent_form == "new_package" %}
+  {% set adding = form_sent_back == item_forms.NEW_PACKAGE %}
   {% set new = values if adding else {} %}
   <form method="post" action="{{ here }}/packages" class="actions" id="add-package">
     <input type="hidden" name="unit_shown" value="{{ item.unit }}">

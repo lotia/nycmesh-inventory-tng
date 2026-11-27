@@ -69,8 +69,11 @@ def admin_page(
     unset (None) values, so page()'s defaults for problems and values hold.
     Unless given, its status says what the context does: 409 with an alert,
     such as a row changed since its form was shown (CHANGED), 400 with
-    problems, else 200."""
+    problems, else 200. `sent_back`, unless given, whether values were:
+    on a page with one form, that its problems are its boxes', not, as a
+    refused retire's, the page's (inventory-tng-1rmm)."""
     given = {key: value for key, value in context.items() if value is not None}
+    given.setdefault("sent_back", "values" in given)
     if status_code is None:
         status_code = (
             409 if given.get("alert") else 400 if given.get("problems") else 200

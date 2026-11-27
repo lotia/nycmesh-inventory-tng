@@ -11,6 +11,7 @@ never received (docs/decisions/0003)."""
 
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
+from enum import StrEnum
 from functools import partial
 from typing import Annotated, NamedTuple
 
@@ -400,18 +401,21 @@ OPEN_SORTING = Sorting(
 )
 
 
-# Which of the item page's forms was sent back (`sent_form`): only its
-# boxes show what was typed and are marked refused, as several share box
-# names, package_name and size in every package's form and in Add a
-# package (inventory-tng-1rmm). Compared by item.html.
-ITEM_FORM = "item"
-ALIAS_FORM = "alias"
-NEW_PACKAGE_FORM = "new_package"
+class ItemForm(StrEnum):
+    """Which of the item page's forms was sent back (`form_sent_back`):
+    only its boxes show what was typed and are marked refused, as several
+    share box names, package_name and size in every package's form and in
+    Add a package (inventory-tng-1rmm). item.html compares them by name
+    (`item_forms`), a package's own by `package_form`."""
+
+    ITEM = "item"
+    ALIAS = "alias"
+    NEW_PACKAGE = "new_package"
 
 
 def _package_form(package_id: int) -> str:
     """A package's own forms, its name and size and its settings, as
-    `sent_form` names them: one name for both, as no box either reads
+    `form_sent_back` names them: one name for both, as no box either reads
     back from what was sent has a name the other's has (each sends a
     hidden unit_shown, never read back)."""
     return f"package-{package_id}"
@@ -441,7 +445,7 @@ def _short_shown(
     packages: Sequence[ItemPackage],
     short_fraction: int | None,
     problems: Mapping[str, Words] | None,
-    sent_form: str | None,
+    form_sent_back: str | None,
 ) -> set[int]:
     """The packages whose Too short to use box the item page shows: those
     whose opened ones are followed, as it only says when an open package is
@@ -457,7 +461,7 @@ def _short_shown(
         if tracks_opened(item.track_opened, package.track_opened)
         or package.id == short_fraction
         or (each and forms.short_has_fraction(package))
-        or (resized and sent_form == _package_form(package.id))
+        or (resized and form_sent_back == _package_form(package.id))
     }
 
 
@@ -516,7 +520,7 @@ def _item_page(
     *,
     problems: Mapping[str, Words] | None = None,
     values: Mapping[str, str] | None = None,
-    sent_form: str | None = None,
+    form_sent_back: str | None = None,
     alert: Words | None = None,
     similar: Sequence[items.Close] = (),
     undo: str | None = None,
@@ -531,8 +535,8 @@ def _item_page(
     status_code: int | None = None,
 ) -> HTMLResponse:
     """The item's page; its open packages sorted as `asked`, all of them.
-    `values` and `problems`, those of the form `sent_form` names, sent
-    back refused or asking more (ITEM_FORM and the rest).
+    `values` and `problems`, those of the form `form_sent_back` names, sent
+    back refused or asking more (ItemForm, _package_form).
     `asking_unit`, the form sent back asks whether what was recorded was
     in its unit, Yes and No in place of Save (unit_changes.UNIT_UNCONFIRMED).
     With `held_back`, a retired package not brought back for its size's
@@ -606,14 +610,16 @@ def _item_page(
             "zone": site_zone(session),
             "problems": problems,
             "values": values,
-            "sent_form": sent_form,
+            "form_sent_back": form_sent_back,
+            "item_forms": ItemForm,
+            "package_form": _package_form,
             "short_fraction": short_fraction,
             "alert": alert,
             "held_back": held_back,
             "short_to_set": short_to_set,
             "set_whole": short_to_set and forms.short_to_set(short_to_set),
             "short_shown": _short_shown(
-                item, packages, short_fraction, problems, sent_form
+                item, packages, short_fraction, problems, form_sent_back
             ),
             "followed_now": _followed_now(item, packages, opened),
             **_name_field(session, similar),
@@ -879,7 +885,7 @@ def save_item(
                 signed,
                 found,
                 values=form,
-                sent_form=ITEM_FORM,
+                form_sent_back=ItemForm.ITEM,
                 similar=asked or (),
             )
         if broken in ITEM_ALERTS:
@@ -892,7 +898,7 @@ def save_item(
                 signed,
                 found,
                 values=form,
-                sent_form=ITEM_FORM,
+                form_sent_back=ItemForm.ITEM,
                 asking_unit=True,
             )
     if problems:
@@ -903,7 +909,7 @@ def save_item(
             found,
             problems=problems,
             values=form,
-            sent_form=ITEM_FORM,
+            form_sent_back=ItemForm.ITEM,
         )
     _decided(session, typed, item_id=item_id)
     session.commit()
@@ -940,7 +946,7 @@ def _unit_declined(
             signed,
             item,
             values=form,
-            sent_form=ITEM_FORM,
+            form_sent_back=ItemForm.ITEM,
             fixed_by=fixed_by,
         )
     log.info("unit change declined", item_id=item.id, reason=why)
@@ -959,7 +965,7 @@ def _unit_declined(
         item,
         problems=problems,
         values=values,
-        sent_form=ITEM_FORM,
+        form_sent_back=ItemForm.ITEM,
         unit_declined=None if retired else why,
         unit_declined_to=unit,
         unit_example=example,
@@ -1107,7 +1113,7 @@ def add_package(
         found,
         problems=problems,
         values=values,
-        sent_form=NEW_PACKAGE_FORM,
+        form_sent_back=ItemForm.NEW_PACKAGE,
     )
 
 
@@ -1185,7 +1191,7 @@ def save_package(
             found,
             problems=problems,
             values=values | {"package_version": str(package.edit_version)},
-            sent_form=_package_form(package_id),
+            form_sent_back=_package_form(package_id),
             status_code=409,
         )
     parsed, problems = read()
@@ -1228,7 +1234,7 @@ def save_package(
         found,
         problems=problems,
         values=values,
-        sent_form=_package_form(package_id),
+        form_sent_back=_package_form(package_id),
     )
 
 
@@ -1391,7 +1397,7 @@ def package_settings(
         found,
         problems=problems,
         values=values,
-        sent_form=_package_form(package_id),
+        form_sent_back=_package_form(package_id),
     )
 
 
@@ -1444,7 +1450,7 @@ def add_alias(
         found,
         problems=problems,
         values=values,
-        sent_form=ALIAS_FORM,
+        form_sent_back=ItemForm.ALIAS,
     )
 
 
