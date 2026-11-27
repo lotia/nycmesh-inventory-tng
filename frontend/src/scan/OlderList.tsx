@@ -99,12 +99,12 @@ export function OlderList({
   // The one whose discarding is being confirmed, and what one tap said.
   const discarding = useSignal<string | null>(null);
   const said = useSignal<{ on: string; why: OlderWhy } | null>(null);
-  // When a line of each was last discarded, and when and from what place
-  // an entry last went by a tap; whose heading is to take focus once it is
-  // listed again, or, gone (`at` its place), the heading at its place once
-  // it is no longer listed.
+  // When a line of each was last discarded.
   const lineGoneAt = useRef(new Map<string, number>());
+  // When an entry last went by a tap, and the place it went from.
   const entryGone = useRef({ when: -Infinity, at: 0 });
+  // The heading to focus once the list is drawn again: `on`'s, or, `on`
+  // gone from place `at`, the one at that place once `on` is not listed.
   const refocus = useRef<{ on: string; at: number | null } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const listed = older.listed.value;
@@ -139,13 +139,9 @@ export function OlderList({
       };
     });
   }, [listed, catalogue]);
-  /** Focus `on`'s heading, while it is listed. */
-  const focusHeading = (on: string) => {
-    const n = shown.findIndex(({ each }) => olderId(each) === on);
-    if (n >= 0) {
-      document.getElementById(`older-${n}`)?.focus();
-    }
-  };
+  /** Where `on` is listed, or -1. */
+  const placeOf = (on: string) =>
+    shown.findIndex(({ each }) => olderId(each) === on);
   /** Focus the heading of the entry at `at`, or the list's if none is. */
   const focusPlace = (at: number) =>
     (document.getElementById(`older-${at}`) ?? heading.current)?.focus();
@@ -158,7 +154,7 @@ export function OlderList({
     if (want === null) {
       return;
     }
-    const n = shown.findIndex(({ each }) => olderId(each) === want.on);
+    const n = placeOf(want.on);
     if (want.at !== null && n >= 0) {
       // A render from before it went.
       return;
@@ -185,16 +181,14 @@ export function OlderList({
         entryWaits ||
         now - (lineGoneAt.current.get(on) ?? -Infinity) < SETTLE_MS
       ) {
-        if (event.detail > 0 && entryWaits) {
-          focusPlace(entryGone.current.at);
-        } else if (event.detail > 0) {
-          focusHeading(on);
+        if (event.detail > 0) {
+          focusPlace(entryWaits ? entryGone.current.at : placeOf(on));
         }
         return;
       }
       tap();
       if (!older.listed.value.some((each) => olderId(each) === on)) {
-        const at = shown.findIndex(({ each }) => olderId(each) === on);
+        const at = placeOf(on);
         entryGone.current = { when: performance.now(), at };
         refocus.current = { on, at };
       }
