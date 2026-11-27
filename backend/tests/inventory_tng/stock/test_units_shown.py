@@ -18,7 +18,7 @@ from inventory_tng.core.db_locking import UNGUARDED_INFO
 from inventory_tng.core.phrases import Words
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Item, ItemPackage
-from inventory_tng.stock import count_routes, counts_routes
+from inventory_tng.stock import count_refusals, count_routes, counts_routes
 from inventory_tng.stock.count_forms import (
     CLOSED_MEANWHILE,
     NO_SUCH_OPEN_PACKAGE,
@@ -623,12 +623,12 @@ def test_a_count_refused_by_a_rule_after_a_switch_says_both(
         # Another administrator's edit, as the test's own rows are written.
         to_feet(setting_up(session), place.cable)
         del session.info[UNGUARDED_INFO]
-        return None, count_routes.ONCE
+        return None, count_refusals.ONCE
 
     monkeypatch.setattr(count_routes, "refusal", refused_once)
     response = admin_client.post(f"{COUNTS}/{place.store.id}", data=form)
     assert response.status_code == 400
-    assert str(RULES[count_routes.ONCE]) in text(response)
+    assert str(RULES[count_refusals.ONCE]) in text(response)
     assert problem(response.text, "extra_quantity") == now_counted_in("ft")
     assert box_values(response.text, "extra_quantity") == ["50"]
     assert counts_written(session) == []

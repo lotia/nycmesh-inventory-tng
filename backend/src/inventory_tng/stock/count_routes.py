@@ -75,7 +75,7 @@ import uuid
 from collections.abc import Callable, Collection, Mapping, Sequence
 from decimal import Decimal
 from functools import cache, partial
-from typing import Annotated, Literal, NamedTuple
+from typing import Annotated, NamedTuple
 from urllib.parse import urlencode
 
 import structlog
@@ -123,7 +123,6 @@ from inventory_tng.stock.count_forms import (
     NONE_GONE,
     PICKED,
     TYPE_IT_HERE,
-    CountForm,
     Figures,
     Gone,
     Listed,
@@ -136,11 +135,18 @@ from inventory_tng.stock.count_forms import (
 )
 from inventory_tng.stock.count_gone_areas import gone_words, moved_sections
 from inventory_tng.stock.count_groups import Group
+from inventory_tng.stock.count_refusals import (
+    RULE_REFUSALS,
+    SENT_AGAIN,
+    CountRefusal,
+    box_refusals,
+    count_refused,
+)
 from inventory_tng.stock.count_units_shown import (
     asked_again,
     kept_as_now,
 )
-from inventory_tng.stock.counts import COUNTABLE, WHOLE, NotCountable
+from inventory_tng.stock.counts import COUNTABLE, NotCountable
 from inventory_tng.stock.forms import shown_field, shown_in
 from inventory_tng.stock.ledger import by_item, tracks_opened
 from inventory_tng.stock.moments import (
@@ -158,7 +164,6 @@ from inventory_tng.stock.store_counts import (
     record_store_count,
 )
 from inventory_tng.stock.units_shown import (
-    SHOWN_OTHERWISE,
     Now,
     ShownOtherwise,
 )
@@ -173,14 +178,6 @@ meter = metrics.get_meter(__name__)
 
 router = APIRouter(include_in_schema=False)
 
-# An open package found that its item does not follow once opened, and a
-# form counted twice: said as rules are.
-UNTRACKED = "open_package_untracked"
-ONCE = "movement_item_once"
-# A form saved, sent again saying otherwise (stock/store_counts.py):
-# nothing is written, and Counts says so (Ali, 2026-11-22,
-# inventory-tng-53im, inventory-tng-kro9).
-SENT_AGAIN = "count_sent_otherwise"
 TWICE = lazy_gettext(
     "An item is on this form more than once. Each item is counted once, so "
     "it isn't clear which number is right: nothing was saved."
@@ -219,37 +216,6 @@ moves_fixed = meter.create_counter(
     unit="{move}",
     description="Moves from retired areas emptied while counted whose amount "
     "a count form fixed, by whether more arrived (found) or less (lost)",
-)
-
-# Why a count form was refused, nothing written: on the form, an item
-# named twice, something else here listed elsewhere, a package it counts
-# closed meanwhile, a box's own problem (such as no number), a unit or
-# package size shown otherwise, or nothing typed; or, as it was saved, the
-# rules of RULE_REFUSALS, a place retired since included, though answered
-# as not found. A form that is not as the page sends it is not found, and
-# not counted.
-CountRefusal = Literal[
-    "named_twice",
-    "listed_elsewhere",
-    "closed_meanwhile",
-    "box_problem",
-    "shown_otherwise",
-    "nothing_typed",
-    "changed_since_shown",
-    "not_countable",
-    "sent_again",
-]
-# Why a count form is refused for its boxes, as logged too: a package it
-# counts closed meanwhile, or a box's own problem, such as no number
-# (inventory-tng-0k3a). An item named twice and something else here
-# listed elsewhere are logged on their own.
-CLOSED: CountRefusal = "closed_meanwhile"
-BOX_PROBLEM: CountRefusal = "box_problem"
-refused = meter.create_counter(
-    "inventory.counts.refused",
-    unit="{count}",
-    description="Count forms refused, nothing written, by reason: one refused "
-    "for several is counted under each",
 )
 
 
@@ -374,21 +340,6 @@ def _shown_places(
     for place in by_name(session, Location, Location.id.in_(gone)):
         shown.append((place, (place.name,)))
     return shown
-
-
-def _box_refusals(sent: CountForm) -> list[CountRefusal]:
-    """Why read_count's problems refuse the count, from CLOSED and
-    BOX_PROBLEM, leaving out the boxes of an item named twice and the line
-    something else here should be typed on."""
-    reasons: list[CountRefusal] = [CLOSED] if CLOSED_MEANWHILE in sent.problems else []
-    if any(
-        field != CLOSED_MEANWHILE
-        and field not in sent.twice
-        and words is not TYPE_IT_HERE
-        for field, words in sent.problems.items()
-    ):
-        reasons.append(BOX_PROBLEM)
-    return reasons
 
 
 def _listed_words(
@@ -814,7 +765,10 @@ def count(
     if place.id not in place_ids and not any(asked.values()):
         # Only a recount of some areas leaves its own place off.
         return not_found()
+    # Why it is refused, if it is, measured once that is certain.
+    reasons: list[CountRefusal] = []
     if sent.twice:
+        reasons.append("named_twice")
         log.info(
             "count refused: an item named twice",
             location_id=place.id,
@@ -837,10 +791,8 @@ def count(
         others=sent.problems,
     )
     problems |= words
-    # Measured once a refusal is certain, each reason once. Shown otherwise
-    # by `said`, as a sealed row of a package held nowhere has no box for
-    # words beside.
-    reasons: list[CountRefusal] = ["named_twice"] if sent.twice else []
+    # Shown otherwise by `said`, as a sealed row of a package held nowhere
+    # has no box for words beside.
     if said:
         reasons.append("shown_otherwise")
     # Every alert is said above the form, each in its own words: why it was
@@ -868,9 +820,9 @@ def count(
         off_form = None if sent.listed.on_form else sent.listed
         reasons.append("listed_elsewhere")
     if problems:
-        if boxes := _box_refusals(sent):
+        if boxes := box_refusals(sent):
             log.info("count refused for its boxes", location_id=place.id, reasons=boxes)
-        _refused(*reasons, *boxes)
+        count_refused(*reasons, *boxes)
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.
         return as_sent(
@@ -900,7 +852,7 @@ def count(
         # Nothing typed at any place: nothing to count, so the form again,
         # as sent, saying so (inventory-tng-fxsy).
         log.info("count refused: nothing typed", location_id=place.id)
-        _refused("nothing_typed")
+        count_refused("nothing_typed")
         return as_sent(alert=NOTHING_TYPED, left=left(), status_code=400)
 
     # Bound again, as checked, for put_right.
@@ -935,7 +887,7 @@ def count(
     result, broken = refusal(session, put_right, *RULE_REFUSALS)
     if broken is not None:
         log.info("count refused by a rule", location_id=place.id, rule=broken)
-        _refused(RULE_REFUSALS[broken])
+        count_refused(RULE_REFUSALS[broken])
         if broken == SENT_AGAIN:
             # The saved count is listed on Counts, to see what went through.
             return redirect(COUNTS, notice="count_saved_already", section="count")
@@ -1059,27 +1011,6 @@ def count(
         gone=NONE_GONE,
         status_code=409,
     )
-
-
-# The rules that may refuse a count as it is saved, each by the reason it
-# is counted under: a fraction where whole units are counted, or an open
-# package found that its item does not follow, is a box's problem.
-RULE_REFUSALS: dict[str, CountRefusal] = {
-    WHOLE: BOX_PROBLEM,
-    COUNTABLE: "not_countable",
-    UNTRACKED: BOX_PROBLEM,
-    ONCE: "named_twice",
-    CLOSED_MEANWHILE: CLOSED,
-    CHANGED: "changed_since_shown",
-    SENT_AGAIN: "sent_again",
-    SHOWN_OTHERWISE: "shown_otherwise",
-}
-
-
-def _refused(*reasons: CountRefusal) -> None:
-    """Measure a count form refused, under each of its reasons once."""
-    for reason in dict.fromkeys(reasons):
-        refused.add(1, {"reason": reason})
 
 
 def _saved(place_id: int, result: StoreCounted, fixes: Sequence[Fix]) -> None:

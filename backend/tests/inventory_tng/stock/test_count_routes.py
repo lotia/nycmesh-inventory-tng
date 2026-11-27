@@ -17,7 +17,7 @@ from inventory_tng.core.phrases import speaking
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.base import INTEGER_MAX
 from inventory_tng.models.stock import Movement
-from inventory_tng.stock import count_routes
+from inventory_tng.stock import count_refusals, count_routes
 from inventory_tng.stock.count_forms import (
     CLOSED_MEANWHILE,
     ON_THE_FORM_TWICE,
@@ -183,7 +183,7 @@ def test_a_count_refuses_what_is_not_a_quantity(
         assert {
             "event": "count refused for its boxes",
             "location_id": place.store.id,
-            "reasons": [count_routes.BOX_PROBLEM],
+            "reasons": [count_refusals.BOX_PROBLEM],
             "log_level": "info",
         } in logs
     assert counts_written(session) == []
@@ -254,7 +254,7 @@ def test_a_count_named_twice_and_closed_meanwhile_says_both_alerts(
     )
     # Closed meanwhile is logged as that; named twice has a line of its
     # own, so its boxes are not logged again (inventory-tng-0k3a).
-    assert boxes_refused(logs) == ([[count_routes.CLOSED]] if closed else [])
+    assert boxes_refused(logs) == ([[count_refusals.CLOSED]] if closed else [])
     assert counts_written(session) == written
 
 
