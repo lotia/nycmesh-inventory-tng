@@ -158,12 +158,13 @@ def test_stock_moved_gives_a_place_and_links_to_the_recount(
         f"recount it in {into}: its records are set to nothing, its unit "
         f"becomes {into}, and you count each place in {into}."
     )
-    note = read(page).one("span", id="unit-problem")
+    shown = read(page)
+    note = shown.one("span", id="unit-problem")
     note.one("a", f"recount it in {into}", href=unit_recount(cable.id, into))
     assert note.all("a", href=item_labels(cable.id)) == []
     # Nothing typed was refused: the unit kept is not marked invalid
     # (inventory-tng-qwjj).
-    unit_box = read(page).one("select", name="unit")
+    unit_box = shown.one("select", name="unit")
     assert described_and_invalid(unit_box) == (None, None)
 
 

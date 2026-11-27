@@ -37,6 +37,7 @@ from inventory_tng.web.forms import NAME_MAX, RULES, name_up_to
 
 from helpers.items import NOW, item_form, new_item, shown_item_form
 from helpers.markup import (
+    Element,
     box_values,
     described_and_invalid,
     hidden_fields,
@@ -597,10 +598,10 @@ ITEM_BOXES = {
 }
 
 
-def _item_boxes_invalid(page: str, item: Item) -> dict[str, str | None]:
+def _item_boxes_invalid(page: Element, item: Item) -> dict[str, str | None]:
     """Each box of the item's own form, by name: its aria-invalid. Each
     problem is in its box's label, so none is described by anything."""
-    form = read(page).one("form", action=f"{ITEMS}/{item.id}")
+    form = page.one("form", action=f"{ITEMS}/{item.id}")
     marked = {}
     for name, tag in ITEM_BOXES.items():
         described, marked[name] = described_and_invalid(form.one(tag, name=name))
@@ -639,10 +640,13 @@ def test_a_refused_item_box_is_marked_invalid(
         ),
     )
     item = new_item(session, radios)
-    page = admin_client.post(f"{ITEMS}/{item.id}", data=shown_item_form(item, **sent))
-    assert page.status_code == 400
-    assert all(problem(page.text, name) for name in refused)
-    marked = _item_boxes_invalid(page.text, item)
+    sent_back = admin_client.post(
+        f"{ITEMS}/{item.id}", data=shown_item_form(item, **sent)
+    )
+    assert sent_back.status_code == 400
+    page = read(sent_back.text)
+    assert all(problem(page, name) for name in refused)
+    marked = _item_boxes_invalid(page, item)
     assert {name for name, invalid in marked.items() if invalid} == refused
     assert set(marked.values()) == {"true", None}
 
@@ -658,8 +662,9 @@ def test_a_refused_bring_back_marks_no_item_box(
     session.flush()
     refused = admin_client.post(f"{ITEMS}/{item.id}/restore")
     assert refused.status_code == 400
-    assert problem(refused.text, "name")
-    assert set(_item_boxes_invalid(refused.text, item).values()) == {None}
+    page = read(refused.text)
+    assert problem(page, "name")
+    assert set(_item_boxes_invalid(page, item).values()) == {None}
 
 
 def test_an_edit_with_a_problem_changes_nothing(

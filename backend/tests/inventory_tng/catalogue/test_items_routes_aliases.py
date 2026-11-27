@@ -40,8 +40,8 @@ def test_a_refused_alias_is_marked_invalid(
         f"{ITEMS}/{item.id}/aliases", data={"alias_name": "- ?"}
     )
     assert refused.status_code == 400
-    assert problem(refused.text, "alias_name")
     page = read(refused.text)
+    assert problem(page, "alias_name")
     alias = page.one("form", action=f"{ITEMS}/{item.id}/aliases")
     name = page.one("form", action=f"{ITEMS}/{item.id}")
     assert described_and_invalid(alias.one("input", name="alias_name")) == (
