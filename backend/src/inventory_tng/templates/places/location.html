@@ -21,12 +21,12 @@ the name with nothing sent. #}
   <fieldset class="contents" {% if retired %}disabled{% endif %}>
   <input type="hidden" name="version" value="{{ values.get('version', location.edit_version) }}">
   <label>{% trans %}Name{% endtrans %}
-    <input name="name" inputmode="text" value="{{ values.get('name', location.name) }}" maxlength="{{ name_max }}" required{% if location_sent %}{{ described_by("name", labelled=true) }}{% endif %}>
+    <input name="name" inputmode="text" value="{{ values.get('name', location.name) }}" maxlength="{{ name_max }}" required{{ described_by("name", labelled=true, sent=location_sent) }}>
     {% with name = "name" %}{% include "_field_problem.html" %}{% endwith %}
   </label>
   {% if location.kind == "area" %}
   <label>{% trans %}Part of{% endtrans %}
-    <select name="parent_id" required{% if location_sent %}{{ described_by("parent_id", labelled=true) }}{% endif %}>
+    <select name="parent_id" required{{ described_by("parent_id", labelled=true, sent=location_sent) }}>
       {% set chosen = values.get('parent_id', location.parent_id | string) %}
       {% for parent in parents %}<option value="{{ parent.id }}" {% if chosen == parent.id | string %}selected{% endif %}>{{ parent.name }}</option>{% endfor %}
     </select>
@@ -34,7 +34,7 @@ the name with nothing sent. #}
   </label>
   {% endif %}
   <label>{% trans %}Time zone{% endtrans %} <span class="hint">{% trans %}what its times are shown in; times already recorded keep theirs{% endtrans %}</span>
-    <select name="time_zone"{% if location_sent %}{{ described_by("time_zone", labelled=true) }}{% endif %}>
+    <select name="time_zone"{{ described_by("time_zone", labelled=true, sent=location_sent) }}>
       {% set zone = values.get('time_zone', location.time_zone or '') %}
       <option value="" {% if not zone %}selected{% endif %}>
         {%- if location.parent_id %}{% trans zone=inherited %}Its parent's ({{ zone }}){% endtrans %}

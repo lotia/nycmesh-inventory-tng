@@ -20,18 +20,14 @@ TAKEN = lazy_gettext(
 )
 PICK_WHAT = lazy_gettext("Pick what it is.")
 PICK_WHERE = lazy_gettext("Pick where it is.")
-# The rules places/locations.py refuses a place's parent by, said beside
-# Part of; a zone's beside Time zone; any other beside the name.
-PARENT_RULES = frozenset(
-    {"location_area_parent", "location_parent_current", "location_no_cycle"}
-)
-
-
-def refused_field(rule: str) -> str:
-    """The field whose box a place refused by `rule` is said by."""
-    if rule in PARENT_RULES:
-        return "parent_id"
-    return "time_zone" if rule == "location_time_zone" else "name"
+# The rules places/locations.py refuses a place by, besides its name's,
+# and the field each is shown by; any other is shown by the name.
+REFUSED_FIELDS = {
+    "location_area_parent": "parent_id",
+    "location_parent_current": "parent_id",
+    "location_no_cycle": "parent_id",
+    "location_time_zone": "time_zone",
+}
 
 
 def new_place(

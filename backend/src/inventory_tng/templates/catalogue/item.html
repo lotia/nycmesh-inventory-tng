@@ -25,7 +25,7 @@ with nothing sent. #}
   <input type="hidden" name="version" value="{{ values.get('version', item.edit_version) }}">
   {% with default = item.name, again = _("A different item? Save it again."), sent_back = item_sent %}{% include "catalogue/_item_name.html" %}{% endwith %}
   <label>{% trans %}Category{% endtrans %}
-    <select name="category_id" required{% if item_sent %}{{ described_by("category_id", labelled=true) }}{% endif %}>
+    <select name="category_id" required{{ described_by("category_id", labelled=true, sent=item_sent) }}>
       {% set chosen = values.get('category_id', item.category_id | string) %}
       {% for category in categories %}
       <option value="{{ category.id }}" {% if chosen == category.id | string %}selected{% endif %}>{{ category.name }}</option>
@@ -35,7 +35,7 @@ with nothing sent. #}
   </label>
   {#- A unit change answered No (recount_to) says what to do instead
   beside the unit kept: nothing typed was refused, so it is not marked. #}
-  {% set unit_refused = described_by("unit", labelled=true) if item_sent and not recount_to else "" %}
+  {% set unit_refused = described_by("unit", labelled=true, sent=item_sent and not recount_to) %}
   <label>{% trans %}Unit{% endtrans %}
     {#- Fixed, an item in a length may still change to another, converting
     what is recorded once its question is answered Yes (Ali, 2026-11-24). #}
@@ -121,7 +121,7 @@ with nothing sent. #}
   <label>{{ label }}{% if hint %} <span class="hint">{{ hint }}</span>{% endif %}
     {% set stored = item[name] | box_amount(decimal) if amount else item[name] %}
     {% if amount %}<span class="with-unit">{% endif %}<input name="{{ name }}" inputmode="{{ read_in | keyboard if amount else 'text' }}" value="{{ values.get(name, stored if stored is not none else '') }}"
-      {%- if item_sent %}{{ described_by(name, described, labelled=true) }}{% elif described %} aria-describedby="{{ described | join(' ') }}"{% endif %}>
+      {{- described_by(name, described, labelled=true, sent=item_sent) }}>
     {%- if amount %}
       <span id="unit-{{ name }}" aria-hidden="true"{% if not unit_fixed %} data-unit-of="unit"{% endif %}>{{ read_in }}</span></span>
     {%- endif %}
@@ -181,7 +181,7 @@ with nothing sent. #}
   {% set sent = values if 'alias_name' in values else {} %}
   <form method="post" action="{{ here }}/aliases" class="actions">
     <label>{% trans %}Alias{% endtrans %} <input name="alias_name" inputmode="text" value="{{ sent.get('alias_name', '') }}" maxlength="{{ name_max }}" required
-      {%- if sent %}{{ described_by("alias_name", labelled=true) }}{% endif %}>
+      {{- described_by("alias_name", labelled=true, sent=sent) }}>
       {% if sent %}{% with name = "alias_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = sent.get('alias_name', '') %}{% include "catalogue/_units_read.html" %}{% endwith %}
@@ -208,7 +208,7 @@ with nothing sent. #}
           <input type="hidden" name="package_version" value="{{ sent.get('package_version', package.edit_version) }}">
           <label>{% trans %}Name{% endtrans %}
             <input name="package_name" inputmode="text" value="{{ sent.get('package_name', package.name) }}" required
-              {%- if sent %}{{ described_by("package_name", labelled=true) }}{% endif %}>
+              {{- described_by("package_name", labelled=true, sent=sent) }}>
             {% if sent %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           {% with typed = sent.get('package_name', package.name) %}{% include "catalogue/_units_read.html" %}{% endwith %}
@@ -219,7 +219,7 @@ with nothing sent. #}
           inventory-tng-0mor). #}
           <label>{{ holds }} <span class="hint">{% trans %}fixed once some has moved or been opened, or while it is labelled{% endtrans %}</span>
             <span class="with-unit"><input name="size" inputmode="{{ package.unit | keyboard }}" value="{{ sent.get('size', package.size | box_amount(decimal)) }}" required
-              {%- if sent %}{{ described_by("size", ["unit-size-" ~ package.id], labelled=true) }}{% else %} aria-describedby="unit-size-{{ package.id }}"{% endif %}>
+              {{- described_by("size", ["unit-size-" ~ package.id], labelled=true, sent=sent) }}>
               <span id="unit-size-{{ package.id }}" aria-hidden="true">{{ package.unit }}</span></span>
             {% if sent %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
@@ -265,8 +265,7 @@ with nothing sent. #}
             <span class="with-unit"><input name="short_below" inputmode="{{ package.unit | keyboard }}" value="{{ sent.get('short_below', short) }}"
               {%- if package.id == short_fraction %} aria-invalid="true" aria-describedby="unit-problem {{ unit_id }}"
               {%- elif to_set %} aria-invalid="true" aria-describedby="short-to-set {{ unit_id }}" autofocus
-              {%- elif sent %}{{ described_by("short_below", [unit_id], labelled=true) }}
-              {%- else %} aria-describedby="{{ unit_id }}"{% endif %}>
+              {%- else %}{{ described_by("short_below", [unit_id], labelled=true, sent=sent) }}{% endif %}>
               <span id="{{ unit_id }}" aria-hidden="true">{{ package.unit }}</span></span>
             {% if to_set %}<span class="problem" id="short-to-set">{{ set_whole }}</span>{% endif %}
             {% if sent %}{% with name = "short_below" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
@@ -274,7 +273,7 @@ with nothing sent. #}
           {% endif %}
           <label>{% trans %}Keep sealed{% endtrans %} <span class="hint">{% trans %}in the stores; blank: no minimum{% endtrans %}</span>
             <input name="minimum_sealed" inputmode="numeric" value="{{ sent.get('minimum_sealed', keep) }}"
-              {%- if sent %}{{ described_by("minimum_sealed", labelled=true) }}{% endif %}>
+              {{- described_by("minimum_sealed", labelled=true, sent=sent) }}>
             {% if sent %}{% with name = "minimum_sealed" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
           </label>
           <button>{% trans %}Save{% endtrans %}<span class="sr-only"> {{ package.name_shown }}</span></button>
@@ -297,13 +296,13 @@ with nothing sent. #}
   <form method="post" action="{{ here }}/packages" class="actions" id="add-package">
     <input type="hidden" name="unit_shown" value="{{ item.unit }}">
     <label>{% trans %}Package{% endtrans %} <input name="package_name" inputmode="text" value="{{ new.get('package_name', '') }}" placeholder="{% trans %}Box{% endtrans %}" required
-      {%- if adding %}{{ described_by("package_name", labelled=true) }}{% endif %}>
+      {{- described_by("package_name", labelled=true, sent=adding) }}>
       {% if adding %}{% with name = "package_name" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>
     {% with typed = new.get('package_name', ''), sent = new %}{% include "catalogue/_units_read.html" %}{% endwith %}
     <label>{{ holds }} <span class="with-unit"><input name="size" value="{{ new.get('size', '') }}" inputmode="{{ item.unit | keyboard }}" required
       {%- if held_back %} aria-invalid="true" aria-describedby="held-back unit-size" autofocus
-      {%- elif adding %}{{ described_by("size", ["unit-size"], labelled=true) }}{% else %} aria-describedby="unit-size"{% endif %}>
+      {%- else %}{{ described_by("size", ["unit-size"], labelled=true, sent=adding) }}{% endif %}>
       <span id="unit-size" aria-hidden="true">{{ item.unit }}</span></span>
       {% if adding %}{% with name = "size" %}{% include "_field_problem.html" %}{% endwith %}{% endif %}
     </label>

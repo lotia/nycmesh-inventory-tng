@@ -24,10 +24,10 @@ from inventory_tng.models.places import STORE_KINDS, Location
 from inventory_tng.places import locations, queries
 from inventory_tng.places.forms import (
     KINDS,
+    REFUSED_FIELDS,
     TAKEN,
     new_place,
     place_change,
-    refused_field,
 )
 from inventory_tng.places.paths import LOCATIONS
 from inventory_tng.places.queries import changeable
@@ -166,7 +166,7 @@ def add_location(
             session, lambda: locations.add(session, name, kind, under)
         )
     if broken:
-        problems[refused_field(broken)] = rule_words(broken, TAKEN)
+        problems[REFUSED_FIELDS.get(broken, "name")] = rule_words(broken, TAKEN)
     if location is None:
         return _list_page(request, session, signed, problems=problems, values=form)
     session.commit()
@@ -218,7 +218,7 @@ def save_location(
             alert = RULES[broken]
             return _location_page(request, session, signed, found, alert=alert)
         if broken:
-            problems[refused_field(broken)] = rule_words(broken, TAKEN)
+            problems[REFUSED_FIELDS.get(broken, "name")] = rule_words(broken, TAKEN)
     if problems:
         values = {
             "name": name,

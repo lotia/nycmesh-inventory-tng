@@ -372,9 +372,8 @@ def test_a_refused_box_is_marked_invalid_only_in_the_form_sent(
     ]
     assert forms, f"no {sent.method} form to {sent.path}"
     marked = [box for box in _boxes(page) if box.attrs.get("aria-invalid") == "true"]
-    # Marked, the boxes of the form sent that a problem is said for...
     assert [box.attrs.get("name") for box in marked] == list(sent.marked)
+    # Marked, the boxes of the form sent that a problem is said for, and
+    # no box of another form.
     refused = [box for box in refused_boxes(page) if _within(box, forms)]
     assert [id(box) for box in marked] == [id(box) for box in refused]
-    # ...and no box of another form.
-    assert all(_within(box, forms) for box in marked)

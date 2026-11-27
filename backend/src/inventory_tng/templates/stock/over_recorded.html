@@ -12,9 +12,9 @@ refusal's alert, when drawn, is where it was sent from. #}
 <fieldset>
   <legend>{% trans %}Why it is right as it is{% endtrans %}</legend>
   {% for value, words in reasons.items() %}
-  <label><input type="radio" name="reason" value="{{ value }}"{% if chosen == value %} checked{% endif %}{% if sent %}{{ described_by(name) }}{% endif %} required> {{ words }}</label>
+  <label><input type="radio" name="reason" value="{{ value }}"{% if chosen == value %} checked{% endif %}{{ described_by(name, sent=sent) }} required> {{ words }}</label>
   {% endfor %}
-  <input name="words" inputmode="text" value="{{ values.get('words-' ~ row.id, '') if sent }}" maxlength="{{ words_max }}" aria-label="{% trans %}Put right another way{% endtrans %}"{% if sent %}{{ described_by(name) }}{% endif %}>
+  <input name="words" inputmode="text" value="{{ values.get('words-' ~ row.id, '') if sent }}" maxlength="{{ words_max }}" aria-label="{% trans %}Put right another way{% endtrans %}"{{ described_by(name, sent=sent) }}>
   {% if sent %}{% include "_field_problem.html" %}{% endif %}
 </fieldset>
 {% endmacro %}
