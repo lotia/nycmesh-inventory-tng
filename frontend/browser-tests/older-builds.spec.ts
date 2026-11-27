@@ -9,7 +9,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
 import { itemIdOf, ownCable, record } from "./own-rows";
-import { pick, SAM, SHELF } from "./scan-page";
+import { pick, SAM, SHELF, settled } from "./scan-page";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
 const PUT_BACK = "Added back to cart. Review before Record.";
@@ -346,6 +346,9 @@ test("what a save another tab recorded first adds waits on a button while the ca
   const release = await holdSaves(page);
   await page.getByRole("button", { name: "Record" }).click();
   await expect(page.getByText("Nothing in the cart yet.")).toBeVisible();
+  // A moment later, as the page ignores taps once one moved what was
+  // below (docs/decisions/0019, Double taps).
+  await settled(page);
   await pick(page, cable);
   await page.getByLabel(/^Loose/).fill("5");
   const refused = answered(page, 409);

@@ -13,6 +13,7 @@ import {
   status,
   statuses,
   storedCart,
+  tap,
 } from "../testing/scan-page";
 import { CART, DISCARD_CART, YOUR_NAME } from "./CartForm";
 import { REMOVE } from "./CartLine";
@@ -64,8 +65,7 @@ async function opened(cart: Cart = FILLED) {
 
 const removeButtons = () =>
   screen.getAllByRole("button", { name: say(REMOVE) });
-const removeAt = (at: number) =>
-  fireEvent.click(removeButtons()[at] as Element);
+const removeAt = (at: number) => tap(removeButtons()[at] as Element);
 /** The cart changed in another tab, and this tab told. */
 function changedInAnotherTab() {
   storeCart({ ...FILLED, revision: "theirs" });
@@ -92,7 +92,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
       storedCart().lines.map((line: { itemId: number }) => line.itemId),
     ).toEqual([100, 99]);
 
-    fireEvent.click(undoButton() as Element);
+    tap(undoButton() as Element);
     expect(undoButton()).toBeNull();
     expect(statuses()).toEqual([]);
     // Where it was, with what it held, under the same key.
@@ -110,7 +110,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
     removeAt(0);
     expect(storedCart().lines).toEqual([]);
     expect(storedCart()).not.toHaveProperty("batchKey");
-    fireEvent.click(undoButton() as Element);
+    tap(undoButton() as Element);
     const stored = storedCart();
     expect(stored.lines).toEqual(only.lines);
     expect(stored.batchKey).toBe(FILLED.batchKey);
@@ -140,7 +140,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
       "Undo putting nothing back",
       () => {
         storeCart({ ...FILLED, revision: "theirs" });
-        fireEvent.click(undoButton() as Element);
+        tap(undoButton() as Element);
       },
     ],
   ])(
@@ -162,7 +162,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
       "an item added",
       () => {
         find("litebeam");
-        fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+        tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
       },
     ],
     [
@@ -177,10 +177,8 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
     [
       "the cart discarded",
       () => {
-        fireEvent.click(
-          screen.getByRole("button", { name: say(DISCARD_CART) }),
-        );
-        fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+        tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
+        tap(screen.getByRole("button", { name: say(DISCARD) }));
       },
     ],
     ["the cart recorded", save],
@@ -204,7 +202,7 @@ describe("Undo after Remove (Ali, inventory-tng-5uy, 2026-11-13)", () => {
     removeAt(1);
     const theirs = { ...FILLED, lines: [], revision: "theirs" };
     storeCart(theirs);
-    fireEvent.click(undoButton() as Element);
+    tap(undoButton() as Element);
     expect(undoButton()).toBeNull();
     expect(storedCart().lines).toEqual([]);
   });

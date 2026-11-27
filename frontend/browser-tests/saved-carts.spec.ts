@@ -8,7 +8,7 @@ import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
 import { ownCable } from "./own-rows";
-import { fillMove, newestCart } from "./scan-page";
+import { fillMove, newestCart, settled } from "./scan-page";
 
 test("a save's entry keeps its height, Dismiss's room kept unseen, as it is sent and recorded", async ({
   page,
@@ -53,6 +53,9 @@ test("a double tap on a refused save's Dismiss dismisses that one only, and focu
     await expect(list.getByRole("button", { name: "Dismiss" })).toHaveCount(
       count,
     );
+    // A moment later, as the page ignores taps once one moved what was
+    // below (docs/decisions/0019, Double taps).
+    await settled(page);
   }
   const dismiss = newestCart(page).getByRole("button", { name: "Dismiss" });
   await dismiss.scrollIntoViewIfNeeded();

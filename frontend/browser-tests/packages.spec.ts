@@ -7,7 +7,7 @@
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { ownCable, record } from "./own-rows";
-import { fillMove, fillOpening, pick, SAM, SHELF } from "./scan-page";
+import { fillMove, fillOpening, pick, SAM, SHELF, settled } from "./scan-page";
 
 test("a package counted on the scan page is saved sealed", async ({ page }) => {
   const cable = await ownCable(page);
@@ -152,6 +152,9 @@ test("opening, an item fills its package sealed where it is opened", async ({
   await expect(
     page.getByRole("heading", { name: "Cart", exact: true }),
   ).toBeFocused();
+  // A moment later, as the page ignores taps once one moved what was
+  // below (docs/decisions/0019, Double taps).
+  await settled(page);
   await pick(page, cable);
   await expect(box).toHaveValue("1");
   await where.selectOption({ label: "Van" });

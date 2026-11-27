@@ -7,7 +7,7 @@
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { itemIdOf, ownCable, record } from "./own-rows";
-import { fillMove, newestCart, pick } from "./scan-page";
+import { fillMove, newestCart, pick, settled } from "./scan-page";
 
 const BOX = "Box of 305 m";
 const ADD_TO_CART = "Add to cart";
@@ -50,6 +50,9 @@ test("a save refused for a line goes back without it, saying why, and the rest i
   await page.unroute("**/api/catalogue**");
   await expect(entry.getByText(WITHOUT_REFUSED)).toBeVisible();
 
+  // A moment later, as the page ignores taps once one moved what was
+  // below (docs/decisions/0019, Double taps).
+  await settled(page);
   await entry.getByRole("button", { name: ADD_TO_CART, exact: true }).click();
   await expect(
     page.getByRole("status").getByText(`${boxed}: taken off. ${NONE_LEFT}`),

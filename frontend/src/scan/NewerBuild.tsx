@@ -10,6 +10,7 @@ import {
 } from "../shared/build";
 import { say, sayParts } from "../shared/i18n";
 import type { Outbox } from "../shared/outbox";
+import { focusInPlace, ignoreTaps } from "../shared/settling";
 import { CAUTION_BOX } from "./Notes";
 
 /** The Upgrade button's id, which the status lines link to while too
@@ -105,6 +106,8 @@ function toUpgrade(event: MouseEvent) {
   if (button !== null) {
     event.preventDefault();
     button.scrollIntoView({ block: "center" });
-    button.focus({ preventScroll: true });
+    focusInPlace(button);
+    // Everything moved under the finger (inventory-tng-r3jx).
+    ignoreTaps(document, () => button);
   }
 }

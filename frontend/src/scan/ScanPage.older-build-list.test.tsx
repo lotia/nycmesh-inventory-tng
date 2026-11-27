@@ -2,6 +2,7 @@ import { fireEvent, screen, within } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { STORAGE_KEY as OUTBOX_KEY } from "../shared/outbox";
+import { SETTLE_MS } from "../shared/settling";
 import { telemetry } from "../shared/telemetry";
 import { json, TOO_OLD } from "../testing/fetch";
 import {
@@ -38,6 +39,7 @@ import {
   server,
   status,
   storedCart,
+  tap,
   UUID,
 } from "../testing/scan-page";
 import { refusingWrites } from "../testing/storage";
@@ -225,9 +227,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     const setItem = refusingWrites();
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     setItem.mockRestore();
     expect(within(listing()).getByText(NOT_KEPT).tagName).toBe("STRONG");
     // Not filled either: saved from here, then put back, it would go twice.
@@ -249,8 +249,8 @@ describe("what an older build left", () => {
     await ready();
     const setItem = refusingWrites();
     const [save] = within(listing()).getAllByRole("listitem");
-    fireEvent.click(lastDiscard(save as HTMLElement));
-    fireEvent.click(lastDiscard(save as HTMLElement));
+    tap(lastDiscard(save as HTMLElement));
+    tap(lastDiscard(save as HTMLElement));
     setItem.mockRestore();
     expect(within(listing()).getByText(NOT_DISCARDED).tagName).toBe("STRONG");
     expect(
@@ -270,7 +270,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     const setItem = refusingWrites("inventory.outbox.v3");
-    fireEvent.click(
+    tap(
       within(listing()).getAllByRole("button", {
         name: say(ADD_TO_CART),
       })[0] as HTMLElement,
@@ -285,8 +285,8 @@ describe("what an older build left", () => {
     leaveCart();
     open();
     await ready();
-    fireEvent.click(lastDiscard());
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
+    tap(lastDiscard());
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
     expect(record).toHaveBeenCalledWith({
       kind: "older_storage",
@@ -300,10 +300,10 @@ describe("what an older build left", () => {
     leaveSave();
     open();
     await ready();
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
     // Sent by an older tab, the storage event not yet heard.
     localStorage.removeItem("inventory.outbox.v3");
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
     expect(screen.queryByText(HEADING)).toBeNull();
   });
 
@@ -393,9 +393,7 @@ describe("what an older build left", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
     screen.getByText(ADDED_BACK);
@@ -453,7 +451,7 @@ describe("what an older build left", () => {
     );
     expect(entry?.getAttribute("aria-describedby")).toBe("older-0");
     // Without asking: one line goes.
-    fireEvent.click(line as HTMLElement);
+    tap(line as HTMLElement);
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
     expect(record).toHaveBeenLastCalledWith({
@@ -470,7 +468,7 @@ describe("what an older build left", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
+    tap(discardOf("Cat6 cable: 3 m from an open package"));
     // What is left goes back whole, so in the empty cart without a tap,
     // saying "Added back to cart. Review before Record." and nothing
     // left out to say (Ali, 2026-11-13, inventory-tng-0su).
@@ -503,7 +501,7 @@ describe("what an older build left", () => {
     await ready();
     const first = discardOf("Cat6 cable: 3 m from an open package");
     first.focus();
-    fireEvent.click(first);
+    tap(first);
     // Focus left on it, a second press would discard the next, unasked:
     // it goes to the entry's heading.
     await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
@@ -527,7 +525,7 @@ describe("what an older build left", () => {
     );
     open();
     await ready();
-    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
+    tap(discardOf("Cat6 cable: 3 m from an open package"));
     await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
     // The second tap of a double tap, on what moved up in its place and
     // focusing it, as a browser does: ignored, with focus back on the
@@ -543,26 +541,20 @@ describe("what an older build left", () => {
     fireEvent.click(movedUp, { detail: 0 });
     within(listing()).getByText("Cat6 cable: 5 m from an open package");
     expect(document.activeElement).toBe(movedUp);
-    fireEvent.click(lastDiscard());
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(lastDiscard());
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(500);
-    fireEvent.click(lastDiscard());
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    tap(lastDiscard());
     within(listing()).getByText(say(CONFIRM_DISCARD));
     // Asked, a line discarded meanwhile holds the answer back too.
-    fireEvent.click(discardOf("Cat6 cable: 5 m from an open package"));
-    fireEvent.click(lastDiscard());
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(KEEP_IT) }),
-    );
+    tap(discardOf("Cat6 cable: 5 m from an open package"));
+    tap(lastDiscard());
+    tap(within(listing()).getByRole("button", { name: say(KEEP_IT) }));
     within(listing()).getByText(say(CONFIRM_DISCARD));
-    await vi.advanceTimersByTimeAsync(500);
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(KEEP_IT) }),
-    );
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    tap(within(listing()).getByRole("button", { name: say(KEEP_IT) }));
     expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
   });
 
@@ -574,7 +566,7 @@ describe("what an older build left", () => {
     });
     open();
     await ready();
-    fireEvent.click(
+    tap(
       within(
         screen
           .getByText(/^No longer in the catalogue\./)
@@ -599,7 +591,7 @@ describe("what an older build left", () => {
     await ready();
     const unread = "Could not read 1 previously added item, scan it again.";
     expectBold(within(listing()).getByText(noted(unread)), unread, ["1"]);
-    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
+    tap(discardOf("Cat6 cable: 3 m from an open package"));
     expect(
       within(listing()).queryByText("Cat6 cable: 3 m from an open package"),
     ).toBeNull();
@@ -611,9 +603,9 @@ describe("what an older build left", () => {
         .getAllByRole("button")
         .map((each) => each.textContent),
     ).toEqual([say(DISCARD)]);
-    await vi.advanceTimersByTimeAsync(500);
-    fireEvent.click(lastDiscard());
-    fireEvent.click(lastDiscard());
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    tap(lastDiscard());
+    tap(lastDiscard());
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
   });
@@ -623,7 +615,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     const setItem = refusingWrites();
-    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
+    tap(discardOf("Cat6 cable: 3 m from an open package"));
     setItem.mockRestore();
     within(listing()).getByText(NOT_DISCARDED);
     within(listing()).getByText(noted(RESCAN));
@@ -637,7 +629,7 @@ describe("what an older build left", () => {
       localStorage.getItem("inventory.outbox.v3") ?? "",
     );
     keep("inventory.outbox.v3", [{ ...first, state: "refused", note: "No." }]);
-    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
+    tap(discardOf("Cat6 cable: 3 m from an open package"));
     expect(within(listing()).queryByText(NOT_DISCARDED)).toBeNull();
     expect(
       within(listing()).getByText(say(CHANGED_NOT_DISCARDED)).tagName,
@@ -653,9 +645,7 @@ describe("what an older build left", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     save();
     await screen.findByText(/^Sending: /);
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
@@ -674,9 +664,7 @@ describe("what an older build left", () => {
     leaveCart();
     open();
     await ready();
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     expect(localStorage.getItem("inventory.cart.v1")).toBeNull();
     expect(selected(say(YOUR_NAME))).toBe("2");
     expect(
@@ -689,9 +677,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     fillMove();
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     expect(within(listing()).getByText(say(CART_NOT_EMPTY)).tagName).toBe(
       "STRONG",
     );
@@ -733,7 +719,7 @@ describe("what an older build left", () => {
     leaveSavesAlike();
     open();
     await ready();
-    fireEvent.click(discardOf(THREE));
+    tap(discardOf(THREE));
     await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
     expect(within(listing()).queryByText(THREE)).toBeNull();
     // The second tap, on the next entry's line, moved up: ignored, focus
@@ -748,9 +734,9 @@ describe("what an older build left", () => {
     fireEvent.click(movedUp, { detail: 0 });
     within(listing()).getByText(FIVE);
     expect(document.activeElement).toBe(movedUp);
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
     expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
     fireEvent.click(movedUp, { detail: 1 });
     expect(screen.queryByText(HEADING)).toBeNull();
   });
@@ -760,16 +746,16 @@ describe("what an older build left", () => {
     leaveSavesAlike();
     open();
     await ready();
-    fireEvent.click(lastDiscard(entryOf(THREE)));
-    fireEvent.click(lastDiscard(entryOf(THREE)));
+    tap(lastDiscard(entryOf(THREE)));
+    tap(lastDiscard(entryOf(THREE)));
     await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
     expect(within(listing()).queryByText(THREE)).toBeNull();
     // The next entry's Discard, moved up: ignored.
     fireEvent.click(lastDiscard(), { detail: 1 });
     expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
     expect(document.activeElement?.id).toBe("older-0");
-    await vi.advanceTimersByTimeAsync(500);
-    fireEvent.click(lastDiscard());
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    tap(lastDiscard());
     within(listing()).getByText(say(CONFIRM_DISCARD));
   });
 
@@ -789,9 +775,7 @@ describe("what an older build left", () => {
     keep("inventory.outbox.v3", [first, second]);
     open();
     await ready();
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     await screen.findByText(ADDED_BACK);
     await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
     expect(within(listing()).queryByText(THREE)).toBeNull();
@@ -804,7 +788,7 @@ describe("what an older build left", () => {
     leaveSavesAlike(["3", "5", "7"]);
     open();
     await ready();
-    fireEvent.click(discardOf(THREE));
+    tap(discardOf(THREE));
     await vi.waitFor(() => expect(document.activeElement?.id).toBe("older-0"));
     // A tall entry gone, the tap lands two below.
     const below = discardOf(SEVEN);
@@ -819,7 +803,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     const list = screen.getByRole("heading", { name: HEADING });
-    fireEvent.click(discardOf(FIVE));
+    tap(discardOf(FIVE));
     await vi.waitFor(() => expect(document.activeElement).toBe(list));
     const above = discardOf(THREE);
     above.focus();
@@ -836,14 +820,14 @@ describe("what an older build left", () => {
     await ready();
     const list = screen.getByRole("heading", { name: HEADING });
     // To the list's heading, the entry below gone.
-    fireEvent.click(discardOf(FIVE));
+    tap(discardOf(FIVE));
     await vi.waitFor(() => expect(document.activeElement).toBe(list));
     // Back there, on an ignored tap.
     fireEvent.click(discardOf(THREE), { detail: 1 });
     expect(document.activeElement).toBe(list);
     // To the Cart heading, the last entry gone.
-    await vi.advanceTimersByTimeAsync(500);
-    fireEvent.click(discardOf(THREE));
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    tap(discardOf(THREE));
     await vi.waitFor(() =>
       expect(document.activeElement).toBe(
         screen.getByRole("heading", { name: say(CART) }),
@@ -862,8 +846,8 @@ describe("what an older build left", () => {
     leaveSavesAlike();
     open();
     await ready();
-    fireEvent.click(lastDiscard(entryOf(FIVE)));
-    fireEvent.click(lastDiscard(entryOf(FIVE)));
+    tap(lastDiscard(entryOf(FIVE)));
+    tap(lastDiscard(entryOf(FIVE)));
     await vi.waitFor(() =>
       expect(document.activeElement).toBe(
         screen.getByRole("heading", { name: HEADING }),
@@ -910,7 +894,7 @@ describe("what an older build left", () => {
     (document.activeElement as HTMLElement).blur();
     fireEvent.click(space, { detail: 1 });
     expect(document.activeElement).toBe(cartHeading());
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
     expect(keptSpace()).not.toBe(space);
     expect(document.contains(space)).toBe(false);
     tall.mockRestore();
@@ -918,23 +902,21 @@ describe("what an older build left", () => {
 
   test("the last line's Discard, taking the last entry away, keeps the list's space blank a moment, and focuses the Cart heading (inventory-tng-lm1b)", async () => {
     await expectSpaceKept(() => {
-      fireEvent.click(discardOf(THREE));
+      tap(discardOf(THREE));
     });
   });
 
   test("the last entry's Discard, confirmed, keeps the list's space blank a moment, and focuses the Cart heading (inventory-tng-lm1b)", async () => {
     await expectSpaceKept(() => {
-      fireEvent.click(lastDiscard());
-      fireEvent.click(lastDiscard());
+      tap(lastDiscard());
+      tap(lastDiscard());
     });
   });
 
   test("Add to cart on the last entry keeps the list's space blank a moment, and focuses the Cart heading (inventory-tng-lm1b)", async () => {
     await expectSpaceKept(
       async () => {
-        fireEvent.click(
-          within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-        );
+        tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
         await screen.findByText(ADDED_BACK);
       },
       // The entry fills a cart too, with radios beside its line.
@@ -947,17 +929,18 @@ describe("what an older build left", () => {
     const confirm = vi.fn();
     vi.stubGlobal("confirm", confirm);
     const record = vi.spyOn(telemetry, "record");
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     leaveSave();
     open();
     await ready();
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
     within(listing()).getByText(say(CONFIRM_DISCARD));
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(KEEP_IT) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(KEEP_IT) }));
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
-    fireEvent.click(lastDiscard());
-    fireEvent.click(lastDiscard());
+    // Keep it took the question's alert away: its entry's taps wait.
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    tap(lastDiscard());
+    tap(lastDiscard());
     expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(confirm).not.toHaveBeenCalled();
@@ -981,7 +964,7 @@ describe("what an older build left", () => {
     const sent = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
     sent[0].state = "saved";
     keep("inventory.outbox.v3", sent);
-    fireEvent.click(button);
+    tap(button);
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(screen.getByText(say(NOTHING_IN_CART))).not.toBeNull();
   });
@@ -1002,16 +985,14 @@ describe("what an older build left", () => {
       "Not saved: its key was already used for a different batch. Please report this.";
     kept[0] = { ...kept[0], state: "refused", note: words };
     keep("inventory.outbox.v3", kept);
-    fireEvent.click(button);
+    tap(button);
     screen.getByText(say(NOTHING_IN_CART));
     expect(localStorage.getItem(CART_KEY)).toBeNull();
     // Listed as it is now, it goes back without its key.
     within(listing()).getByText(
       noted(`${words} Add it to the cart, fix that, then record it.`),
     );
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     expect(boxes()).toBe("2");
     // Under a key of its own, made as it went in.
     expect(storedCart().batchKey).toMatch(UUID);
@@ -1029,7 +1010,7 @@ describe("what an older build left", () => {
     const kept = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
     kept[0] = { ...kept[0], state: "refused", note: "No." };
     keep("inventory.outbox.v3", kept);
-    fireEvent.click(button);
+    tap(button);
     screen.getByText(say(NOTHING_IN_CART));
     expect(within(listing()).getByText(say(CHANGED_ELSEWHERE)).tagName).toBe(
       "STRONG",
@@ -1039,9 +1020,7 @@ describe("what an older build left", () => {
       noted("No. Add it to the cart, fix that, then record it."),
     );
     // Checked, it goes in.
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     expect(boxes()).toBe("2");
   });
 
@@ -1074,7 +1053,7 @@ describe("what an older build left", () => {
       );
       kept[0] = { ...kept[0], body: { ...kept[0].body, lines } };
       keep("inventory.outbox.v3", kept);
-      fireEvent.click(button);
+      tap(button);
       screen.getByText(say(NOTHING_IN_CART));
       expect(
         within(listing()).getByText(say(CHANGED_CHECK_AGAIN)).tagName,
@@ -1095,12 +1074,12 @@ describe("what an older build left", () => {
     leaveSave();
     open();
     await ready();
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
     // Refused there, the storage event not yet heard.
     const kept = JSON.parse(localStorage.getItem("inventory.outbox.v3") ?? "");
     kept[0] = { ...kept[0], state: "refused", note: "No." };
     keep("inventory.outbox.v3", kept);
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
     expect(
       within(listing()).getByText(say(CHANGED_NOT_DISCARDED)).tagName,
     ).toBe("STRONG");
@@ -1111,8 +1090,8 @@ describe("what an older build left", () => {
       noted("No. Add it to the cart, fix that, then record it."),
     );
     // Checked, it goes.
-    fireEvent.click(lastDiscard());
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
+    tap(lastDiscard());
     expect(screen.queryByText(HEADING)).toBeNull();
   });
 
@@ -1120,11 +1099,11 @@ describe("what an older build left", () => {
     leaveCart();
     open();
     await ready();
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
     const kept = JSON.parse(localStorage.getItem("inventory.cart.v1") ?? "");
     const changed = { ...kept, installNumber: "789" };
     keep("inventory.cart.v1", changed);
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
     within(listing()).getByText(say(CHANGED_NOT_DISCARDED));
     expect(JSON.parse(localStorage.getItem("inventory.cart.v1") ?? "")).toEqual(
       changed,
@@ -1142,9 +1121,7 @@ describe("what an older build left", () => {
       revision: "theirs",
     };
     storeCart(theirs);
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     expect(within(listing()).getByText(say(CART_NOT_EMPTY)).tagName).toBe(
       "STRONG",
     );
@@ -1173,9 +1150,7 @@ describe("what an older build left", () => {
     fillMove();
     save();
     await screen.findByText(/^Sending: /);
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     screen.getByText(ADDED_BACK);
     expect(screen.queryByText(/^Sending: /)).toBeNull();
   });

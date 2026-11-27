@@ -36,6 +36,7 @@ import {
   saveQueued,
   server,
   status,
+  tap,
 } from "../testing/scan-page";
 import { refusingRemovals, refusingWrites } from "../testing/storage";
 import {
@@ -94,7 +95,7 @@ describe("a newer build", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     newerTab();
     await vi.waitFor(() => expect(banner()).toBe(UPDATED));
-    fireEvent.click(reloadButton() as HTMLElement);
+    tap(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
   });
 
@@ -205,7 +206,7 @@ describe("a newer build", () => {
     await saveQueued(outbox, 3);
     await vi.waitFor(() => expectAllHeld(3));
     expect(screen.queryByRole("button", { name: say(DISMISS) })).toBeNull();
-    fireEvent.click(reloadButton() as HTMLElement);
+    tap(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
     // Loaded again, as the build now current: each is sent as the build
     // that queued it, which the server still holds back, so each is listed
@@ -322,8 +323,7 @@ describe("a newer build", () => {
     [
       "a pick from its list",
       "LiteBeam",
-      () =>
-        fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" })),
+      () => tap(screen.getByRole("button", { name: "LiteBeam 5AC" })),
     ],
   ])(
     "too old, %s in the item search adds nothing, and its line says to upgrade",
@@ -359,7 +359,7 @@ describe("a newer build", () => {
     outbox.builds.learn("too_old");
     await vi.waitFor(() => expect(banner()).toBe(say(MUST_UPGRADE_NOT_KEPT)));
     // Still offered: the volunteer may note the cart first.
-    fireEvent.click(reloadButton() as HTMLElement);
+    tap(reloadButton() as HTMLElement);
     expect(reload).toHaveBeenCalledOnce();
   });
 
@@ -379,8 +379,8 @@ describe("a newer build", () => {
     fillMove();
     refusingWrites(CART_KEY);
     refusingRemovals(CART_KEY);
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+    tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    tap(screen.getByRole("button", { name: say(DISCARD) }));
     screen.getByText(say(NOTHING_IN_CART));
     screen.getByText(say(NOT_KEEPING));
     outbox.builds.learn("too_old");

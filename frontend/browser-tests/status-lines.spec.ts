@@ -9,7 +9,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { prepared } from "./prepared";
-import { looseBox, pick, startMove } from "./scan-page";
+import { looseBox, pick, settled, startMove } from "./scan-page";
 
 const NOT_ADDED = "Not added. Fix the incorrect amount below, then scan again.";
 const TYPING = "Not reading while you type. Tap the picture to scan.";
@@ -56,6 +56,9 @@ test("too old, the camera's line says to upgrade in its room, and its link goes 
   await page.getByRole("button", { name: "Record" }).click();
   await expect(line).toHaveText("Scanner updated. Upgrade to keep saving.");
   expect(await placed(line, below)).toEqual(added);
+  // A moment later, as the page ignores taps once one moved what was
+  // below (docs/decisions/0019, Double taps).
+  await settled(page);
   await line.getByRole("link", { name: "Upgrade" }).click();
   const upgrade = page
     .getByRole("alert")
@@ -92,6 +95,9 @@ test("the camera's status line keeps its room as a refusal appears and clears", 
   const added = await placed(line, below);
   // Read again by a camera opened again, it is refused.
   await camera.getByRole("button", { name: "Done" }).click();
+  // A moment later, as the page ignores taps once one moved what was
+  // below (docs/decisions/0019, Double taps).
+  await settled(page);
   await looseBox(page, prepared().labelled).fill("abc");
   await scan.click();
   await expect(line).toHaveText(NOT_ADDED, { timeout: 15_000 });

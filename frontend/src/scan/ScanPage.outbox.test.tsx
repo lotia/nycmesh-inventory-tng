@@ -9,6 +9,7 @@ import {
   OFFLINE,
   PROBLEMS,
 } from "../shared/outbox-notes";
+import { SETTLE_MS } from "../shared/settling";
 import { CATALOGUE } from "../testing/catalogue";
 import { deferred, json, saved } from "../testing/fetch";
 import { KEY, moveBody, outboxEntry, storeOutbox } from "../testing/saves";
@@ -23,6 +24,7 @@ import {
   save,
   saveQueued,
   server,
+  tap,
 } from "../testing/scan-page";
 import { ITEMS, MOVE } from "./batch";
 import { CART, FROM, SENDING_WHAT, TO, YOUR_NAME } from "./CartForm";
@@ -49,7 +51,7 @@ describe("the batches listed in the outbox", () => {
     await ready();
     fillMove();
     find("LiteBeam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     save();
     const note = await screen.findByText(
       (_, element) =>
@@ -110,7 +112,7 @@ describe("the batches listed in the outbox", () => {
     const dismiss = (what: string) =>
       screen.getByRole("button", { name: say(DISMISS), description: what });
     expect(row(first).contains(dismiss(first))).toBe(true);
-    fireEvent.click(dismiss(second));
+    tap(dismiss(second));
     expect(screen.queryByText(second)).toBeNull();
     screen.getByText(first);
     expect(outbox.entries.value).toHaveLength(1);
@@ -207,7 +209,7 @@ describe("the batches listed in the outbox", () => {
     pick(say(FROM), "10");
     pick(say(TO), "12");
     find("3");
-    fireEvent.click(screen.getByRole("button", { name: "3" }));
+    tap(screen.getByRole("button", { name: "3" }));
     fireEvent.input(screen.getByLabelText("Loose m"), {
       target: { value: "1.2345" },
     });
@@ -227,10 +229,10 @@ describe("the batches listed in the outbox", () => {
     const outbox = open(api);
     await ready();
     pick(say(YOUR_NAME), "2");
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.receipt)));
+    tap(screen.getByLabelText(say(KIND_WORDS.receipt)));
     pick(say(TO), "11");
     find("cable");
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    tap(screen.getByRole("button", { name: "Cat6 cable" }));
     save();
     // A failure, in the alert's style, in bold, but not read out: every
     // note in the list is there as the page loads (Ali, inventory-tng-93z).
@@ -317,7 +319,7 @@ describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => 
     screen.getByText(words("Van"));
     expect(document.activeElement).toBe(movedUp);
     // Once settled, a tap is taken again.
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
     fireEvent.click(dismissOf("Van"), { detail: 1 });
     expect(screen.queryByText(words("Van"))).toBeNull();
   });
@@ -386,7 +388,7 @@ describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => 
     (document.activeElement as HTMLElement).blur();
     fireEvent.click(space, { detail: 1 });
     expect(document.activeElement).toBe(cartHeading());
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
     expect(document.contains(space)).toBe(false);
     tall.mockRestore();
   });
@@ -400,7 +402,7 @@ describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => 
     fireEvent.click(dismissOf("Van"), { detail: 1 });
     await vi.waitFor(() => expect(document.activeElement).toBe(listHeading()));
     fireEvent.click(dismissOf("Shelf"), { detail: 1 });
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
     fireEvent.click(dismissOf("Shelf"), { detail: 1 });
     await vi.waitFor(() => expect(document.activeElement).toBe(cartHeading()));
     // The list's heading twice, then the Cart's.

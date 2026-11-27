@@ -6,7 +6,7 @@
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { ownCable, record } from "./own-rows";
-import { fillMove, pick } from "./scan-page";
+import { fillMove, pick, settled } from "./scan-page";
 
 test("a line removed is put back where it was by Undo, from the keyboard", async ({
   page,
@@ -30,6 +30,8 @@ test("a line removed is put back where it was by Undo, from the keyboard", async
   await expect(lines).toHaveCount(1);
   const undo = notice.getByRole("button", { name: "Undo" });
   await expect(undo).toBeFocused();
+  // A moment later, as the page ignores presses as the lines moved up.
+  await settled(page);
   await page.keyboard.press("Enter");
 
   await expect(notice).toHaveCount(0);

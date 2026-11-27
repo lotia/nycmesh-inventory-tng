@@ -1,6 +1,7 @@
 import { fireEvent, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
+import { SETTLE_MS } from "../shared/settling";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, json } from "../testing/fetch";
 import {
@@ -127,7 +128,7 @@ describe("whose name it is", () => {
     nameList().blur();
     fireEvent.click(space, { detail: 1 });
     expect(document.activeElement).toBe(nameList());
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
     expect(document.contains(space)).toBe(false);
     expect(keptSpace()).toBeNull();
     tall.mockRestore();
@@ -160,6 +161,13 @@ describe("whose name it is", () => {
     expect(focus.mock.calls).toEqual([[]]);
     expect(keptSpace()).toBeNull();
     focus.mockRestore();
+    // The page scrolled under the finger: the second tap of a double tap,
+    // on a kind's radio there, is ignored, focus back on the name list
+    // (inventory-tng-r3jx).
+    const kind = screen.getAllByRole("radio")[1] as HTMLInputElement;
+    fireEvent.click(kind, { detail: 1 });
+    expect(kind.checked).toBe(false);
+    expect(document.activeElement).toBe(nameList());
   });
 
   test("answered by a key, focus goes to the name list and stays where keys then move it (inventory-tng-m6dc)", async () => {
@@ -175,7 +183,7 @@ describe("whose name it is", () => {
     // Tab on to a kind's radio, within the moment: nothing takes focus back.
     const kind = screen.getAllByRole("radio")[0] as HTMLElement;
     kind.focus();
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
     expect(document.activeElement).toBe(kind);
   });
 

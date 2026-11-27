@@ -10,6 +10,7 @@ import {
   sharedOutbox,
 } from "../shared/outbox";
 import { NOT_REGISTERED } from "../shared/registration";
+import { focusInPlace, ignoreTaps } from "../shared/settling";
 import { telemetry } from "../shared/telemetry";
 import { CartForm } from "./CartForm";
 import { STORAGE_KEY as CART_KEY, type Catalogue, loadCart } from "./cart";
@@ -82,6 +83,7 @@ export function ScanPage({
   // The Cart heading (CartForm), where the outbox's list sends focus once
   // nothing is listed.
   const cartHeading = useRef<HTMLHeadingElement>(null);
+  const pageHeading = useRef<HTMLHeadingElement>(null);
   // One refresh at a time; one asked for meanwhile follows it.
   const asking = useRef<"no" | "yes" | "again">("no");
 
@@ -227,7 +229,9 @@ export function ScanPage({
   const current = loaded.value;
   return (
     <main class="volunteer page-width">
-      <h1>{say(SCAN)}</h1>
+      <h1 ref={pageHeading} tabIndex={-1}>
+        {say(SCAN)}
+      </h1>
       {/* With the cart, below the camera and the item search (CartForm). */}
       {current.state !== "ready" && (
         <NewerBuild
@@ -251,7 +255,16 @@ export function ScanPage({
       {current.state === "unavailable" && (
         <p role="alert">
           <strong>{say(COULD_NOT_LOAD)}</strong>{" "}
-          <button type="button" onClick={load}>
+          <button
+            type="button"
+            onClick={() => {
+              // The alert gives way to Loading, and the list below moves
+              // up (Ali, 2026-11-27, inventory-tng-r3jx).
+              load();
+              focusInPlace(pageHeading.current);
+              ignoreTaps(document, () => pageHeading.current);
+            }}
+          >
             {say(TRY_AGAIN)}
           </button>
         </p>

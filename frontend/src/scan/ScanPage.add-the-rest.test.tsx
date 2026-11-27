@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from "@testing-library/preact";
+import { screen, within } from "@testing-library/preact";
 import { expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import type { Problem } from "../shared/outbox";
@@ -15,6 +15,7 @@ import {
   saves,
   server,
   storedCart,
+  tap,
   UUID,
 } from "../testing/scan-page";
 import { REST_IN_CART, REST_WITHOUT_REFUSED, TAKEN_OFF } from "./add-the-rest";
@@ -72,7 +73,7 @@ test("Add to cart, under a refused batch, puts the other lines in the cart, says
   const hint = within(entry).getByText(say(REST_WITHOUT_REFUSED));
   expect(hint.closest("strong, .alert, [role=alert]")).toBeNull();
   expect(hint.nextElementSibling).toBe(addTheRest(entry));
-  fireEvent.click(addTheRest(entry) as HTMLElement);
+  tap(addTheRest(entry) as HTMLElement);
   const cart = storedCart();
   expect(cart.lines.map((line: { itemId: number }) => line.itemId)).toEqual([
     101,
@@ -121,7 +122,7 @@ test("Add to cart, under a refused batch, puts the other lines in the cart, says
 test("Add to cart, under a refused batch, takes only an empty cart, saying so, and is offered still", async () => {
   const { entry } = await refusedWith(RETIRED_NONE_LEFT);
   fillMove();
-  fireEvent.click(addTheRest(entry) as HTMLElement);
+  tap(addTheRest(entry) as HTMLElement);
   expectBold(within(entry).getByRole("alert"), say(CART_NOT_EMPTY));
   expect(
     storedCart().lines.map((line: { itemId: number }) => line.itemId),

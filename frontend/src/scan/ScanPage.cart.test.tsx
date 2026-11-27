@@ -19,6 +19,7 @@ import {
   server,
   status,
   storedCart,
+  tap,
   UUID,
 } from "../testing/scan-page";
 import { refusingWrites } from "../testing/storage";
@@ -58,7 +59,7 @@ describe("filling and saving a cart", () => {
     const key = storedCart().batchKey;
     expect(key).toMatch(UUID);
     find("litebeam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     expect(storedCart().batchKey).toBe(key);
     save();
     await vi.waitFor(() => expect(saves(sent)).toHaveLength(1));
@@ -142,7 +143,7 @@ describe("filling and saving a cart", () => {
       screen.queryByRole("button", { name: say(DISCARD_CART) }),
     ).toBeNull();
     fillMove();
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
     // Row 15's pattern (Ali, inventory-tng-wyq).
     expect(screen.getByRole("alert").textContent).toBe(say(CONFIRM_DISCARD));
     expect(
@@ -151,11 +152,11 @@ describe("filling and saving a cart", () => {
     expect(
       screen.queryByRole("button", { name: say(DISCARD_CART) }),
     ).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: say(KEEP_IT) }));
+    tap(screen.getByRole("button", { name: say(KEEP_IT) }));
     screen.getByText("Cat6 cable");
     expect(screen.queryByText(say(CONFIRM_DISCARD))).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+    tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    tap(screen.getByRole("button", { name: say(DISCARD) }));
     screen.getByText(say(NOTHING_IN_CART));
     expect(screen.queryByText(say(CONFIRM_DISCARD))).toBeNull();
     expect(
@@ -180,7 +181,7 @@ describe("filling and saving a cart", () => {
       open();
       await ready();
       fillMove();
-      fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+      tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
       // Another tab counts 4 m, which this tab's volunteer never confirmed.
       const theirs = {
         ...freshCart(),
@@ -197,7 +198,7 @@ describe("filling and saving a cart", () => {
           screen.getByText("4 m in all");
         });
       }
-      fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+      tap(screen.getByRole("button", { name: say(DISCARD) }));
       expect(screen.getByRole("alert").textContent).toBe(
         say(CHANGED_BEFORE_DISCARD),
       );
@@ -214,7 +215,7 @@ describe("filling and saving a cart", () => {
     open();
     await ready();
     fillMove();
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
     screen.getByText(say(CONFIRM_DISCARD));
     const other = (lines: ReturnType<typeof freshCart>["lines"]) => {
       storeCart({ ...freshCart(), volunteerId: 1, lines, revision: "x" });
@@ -237,7 +238,7 @@ describe("filling and saving a cart", () => {
     pick(say(FROM), "10");
     pick(say(TO), "12");
     find("beam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     fireEvent.input(screen.getByLabelText("Box (4 each)"), {
       target: { value: "1" },
     });
@@ -307,7 +308,7 @@ describe("filling and saving a cart", () => {
     open();
     await ready();
     find("litebeam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     // A pick that adds says nothing: its line shows it.
     expect(screen.queryByText("Added one: LiteBeam 5AC.")).toBeNull();
     // Its live region, just after the search's field, is there and empty
@@ -319,7 +320,7 @@ describe("filling and saving a cart", () => {
     const loose = screen.getByLabelText<HTMLInputElement>("Loose units");
     fireEvent.input(loose, { target: { value: "2,5" } });
     find("litebeam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     expect(live.textContent).toBe(say(NOT_ADDED));
     expect(loose.value).toBe("2,5");
     // The next change to the search clears it.
@@ -332,12 +333,12 @@ describe("filling and saving a cart", () => {
     await ready();
     for (const name of ["Cat6 cable", "LiteBeam 5AC"]) {
       find(name);
-      fireEvent.click(screen.getByRole("button", { name }));
+      tap(screen.getByRole("button", { name }));
     }
     const loose = screen.getByLabelText<HTMLInputElement>("Loose units");
     fireEvent.input(loose, { target: { value: "2,5" } });
     find("litebeam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     const live = screen.getByText(say(NOT_ADDED));
     // Another line changed: the refusal stays.
     fireEvent.input(screen.getByLabelText("Loose m"), {
@@ -400,7 +401,7 @@ describe("filling and saving a cart", () => {
     open(api);
     await ready();
     find("cat6");
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    tap(screen.getByRole("button", { name: "Cat6 cable" }));
     expect(
       screen.getByLabelText("Spool (305 m), retired: taking only"),
     ).toBeDefined();
@@ -409,7 +410,7 @@ describe("filling and saving a cart", () => {
   test("an install asks for its number and has no To", async () => {
     open();
     await ready();
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.install)));
+    tap(screen.getByLabelText(say(KIND_WORDS.install)));
     expect(screen.getByLabelText(/install number/)).toBeDefined();
     expect(screen.queryByLabelText(say(TO))).toBeNull();
     expect(screen.getByLabelText(say(FROM))).toBeDefined();
@@ -419,21 +420,19 @@ describe("filling and saving a cart", () => {
     open();
     await ready();
     find("cable");
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    tap(screen.getByRole("button", { name: "Cat6 cable" }));
     find("litebeam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     fireEvent.input(screen.getByLabelText("Loose m"), {
       target: { value: "2" },
     });
     expect(screen.getByText("2 m in all")).toBeDefined();
     expect(screen.getByText("1 each in all")).toBeDefined();
     // The LiteBeam, picked last, is the first line.
-    fireEvent.click(
-      screen.getAllByRole("button", { name: say(REMOVE) })[0] as Element,
-    );
+    tap(screen.getAllByRole("button", { name: say(REMOVE) })[0] as Element);
     expect(screen.queryByText("1 each in all")).toBeNull();
     expect(screen.getByText("2 m in all")).toBeDefined();
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.install)));
+    tap(screen.getByLabelText(say(KIND_WORDS.install)));
     const number = screen.getByLabelText(/install number/) as HTMLInputElement;
     fireEvent.input(number, { target: { value: "1234" } });
     expect(number.value).toBe("1234");
@@ -443,7 +442,7 @@ describe("filling and saving a cart", () => {
     open();
     await ready();
     find("cable");
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    tap(screen.getByRole("button", { name: "Cat6 cable" }));
     document.body.innerHTML = "";
     open();
     await ready();

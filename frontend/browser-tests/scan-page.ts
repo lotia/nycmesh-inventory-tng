@@ -4,15 +4,25 @@
  * saved last, as the outbox lists it.
  */
 import type { Locator, Page } from "@playwright/test";
+import { SETTLE_MS } from "../src/shared/settling";
 
 /** The seed's volunteer and shelf, as the scan page names them. */
 export const SAM = "Sam Example";
 export const SHELF = "Supernode 1 › Shelf A";
 
-/** Picks `cable` on the scan page, from a search for it. */
+/** Picks `cable` on the scan page, from a search for it; then waits as
+ * the page ignores taps a moment, as the matches went (docs/decisions/0019,
+ * Double taps), so the next tap is taken. */
 export async function pick(page: Page, cable: string): Promise<void> {
   await page.getByLabel(/Find an item/).fill(cable);
   await page.getByRole("button", { name: cable, exact: true }).click();
+  await settled(page);
+}
+
+/** Waits till the page takes taps again, after one that moved what was
+ * under the finger (docs/decisions/0019, Double taps). */
+export async function settled(page: Page): Promise<void> {
+  await page.waitForTimeout(SETTLE_MS);
 }
 
 /** The newest of the carts this device saved, as the page lists them. */

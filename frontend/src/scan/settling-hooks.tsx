@@ -1,17 +1,10 @@
-/** A moment's wait after a tap moved what was under the finger, so the
- * second tap of a double tap lands on nothing new. */
+/** The scan page's hooks that keep the space of what a tap took away,
+ * or settle a list's taps, so the second tap of a double tap lands on
+ * nothing new (shared/settling.ts, docs/decisions/0019, Double taps). */
 import { useSignal } from "@preact/signals";
 import type { RefObject } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-
-/** How long taps wait, and a list's emptied space stays, after a tap took
- * something away, in milliseconds. */
-export const SETTLE_MS = 500;
-
-/** Focus `to`, if there is one, without scrolling it into view: the page
- * moving would put something new under the finger (Ali, 2026-11-27). */
-export const focusInPlace = (to: HTMLElement | null) =>
-  to?.focus({ preventScroll: true });
+import { focusInPlace, SETTLE_MS } from "../shared/settling";
 
 /**
  * The space something took, kept blank for SETTLE_MS once a tap took it

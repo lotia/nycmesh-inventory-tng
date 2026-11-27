@@ -17,6 +17,7 @@ import { Field } from "../shared/Field";
 import { say, sayParts } from "../shared/i18n";
 import { type Body, batchId, type Entry, type Outbox } from "../shared/outbox";
 import { type Said, wordsOf } from "../shared/outbox-notes";
+import { focusInPlace, focusInView, ignoreTaps } from "../shared/settling";
 import { MOST_SECONDS, telemetry } from "../shared/telemetry";
 import { takenOff } from "./add-the-rest";
 import { BackToCamera } from "./BackToCamera";
@@ -70,8 +71,8 @@ import { differenceOf } from "./recorded-elsewhere";
 import { aboutLine } from "./refused-line";
 import { type Acted, POINT, Scanner } from "./Scanner";
 import { indexOf } from "./search";
-import { focusInPlace, useKeptSpaceOf } from "./settling";
-import { useTextBoxFocused } from "./text-box-focus";
+import { useKeptSpaceOf } from "./settling-hooks";
+import { isTextBox, useTextBoxFocused } from "./text-box-focus";
 import { type Removed, removeLine, undone } from "./undo-remove";
 import { sealedCounts, unseen } from "./unseen-batches";
 
@@ -203,10 +204,12 @@ export function CartForm({
   const putBack = useSignal<Gaps | null>(null);
   // The line last removed, while Undo may put it back (undo-remove.ts).
   const removed = useSignal<Removed | null>(null);
-  // Where focus goes once the page has rendered: Remove's button is gone
-  // after Remove, and Undo's after Undo.
-  const focusNext = useRef<"undo" | "restored" | null>(null);
+  // Where focus goes once the page has rendered, as what had it may be
+  // gone: Remove's button after Remove, and Undo's after Undo.
+  const focusNext = useRef<(() => HTMLElement | null) | null>(null);
   const undoButton = useRef<HTMLButtonElement>(null);
+  const discardButton = useRef<HTMLButtonElement>(null);
+  const scanButton = useRef<HTMLButtonElement>(null);
   const restoredRemove = useRef<HTMLButtonElement>(null);
   const restoredId = useRef<number | null>(null);
   // After a while unused, the phone may have changed hands: offer to
@@ -271,13 +274,40 @@ export function CartForm({
     problems.value = stored ? [] : [[say(NOT_KEEPING)]];
   }
 
-  function change(next: Cart) {
+  /** How many of what is said above the lines and Record are shown:
+   * Added back, Undo's offer, the problems, Sending. */
+  const saidAbove = () =>
+    (putBack.value === null ? 0 : 1) +
+    (removed.value?.revision === cart.value.revision ? 1 : 0) +
+    problems.value.length +
+    (saved.value === null ? 0 : 1);
+
+  /** A tap took away what was above other controls, which moved up: taps
+   * are ignored a moment, and focus goes, without scrolling, to `to` once
+   * it is drawn (Ali, 2026-11-27, inventory-tng-r3jx). */
+  function settle(to: () => HTMLElement | null) {
+    focusNext.current = to;
+    ignoreTaps(document, to);
+  }
+
+  /** Change the cart. What a tap's change takes away of what is said
+   * above the lines and Record moves what is below up, so taps are ignored
+   * a moment, an ignored one focusing what had focus (inventory-tng-r3jx).
+   * Typed in a box, or `picked` in a list's picker, no finger is on the
+   * page to land again. */
+  function change(next: Cart, picked = false) {
+    const said = saidAbove();
+    // Focus is on an HTML or SVG element, either of which takes focus().
+    const focused = document.activeElement as HTMLElement | null;
     saved.value = null;
     putBack.value = null;
     discarding.value = null;
     removed.value = null;
     focusNext.current = null;
     kept(store.change(next));
+    if (saidAbove() < said && !picked && !isTextBox(focused)) {
+      ignoreTaps(document, () => focused);
+    }
   }
 
   /** Take the line for this item out, offering Undo. */
@@ -290,7 +320,8 @@ export function CartForm({
     }
     change(taken.next);
     removed.value = { ...taken.removed, revision: cart.value.revision };
-    focusNext.current = "undo";
+    // The lines below move up: Undo, above them, takes the focus.
+    settle(() => undoButton.current);
     telemetry.record({ kind: "line_removed" });
   }
 
@@ -301,11 +332,12 @@ export function CartForm({
     const current = store.forSaving();
     if (offer === null || current?.revision !== offer.revision) {
       removed.value = null;
+      settle(() => cartHeading.current);
       return;
     }
     change(reconcile(undone(current, offer), catalogue));
     restoredId.current = offer.line.itemId;
-    focusNext.current = "restored";
+    settle(() => restoredRemove.current);
     telemetry.record({ kind: "removal_undone" });
   }
 
@@ -315,25 +347,29 @@ export function CartForm({
   const undoFocused =
     undoButton.current !== null &&
     document.activeElement === undoButton.current;
-  // Once its target is rendered, which may be a render after the cart's.
+  // Once its target is rendered, which may be a render after the cart's;
+  // without scrolling, as the page moving would put something new under
+  // the finger.
   useEffect(() => {
     const want = focusNext.current;
     const target =
-      want === "undo"
-        ? undoButton.current
-        : want === "restored"
-          ? restoredRemove.current
-          : undoFocused && undoButton.current === null
-            ? cartHeading.current
-            : null;
+      want !== null
+        ? want()
+        : undoFocused && undoButton.current === null
+          ? cartHeading.current
+          : null;
     if (target !== null) {
       focusNext.current = null;
-      target.focus();
+      focusInPlace(target);
     }
   });
 
-  function set(fields: Partial<Cart>) {
-    change(placed(cart.value, { ...cart.value, ...fields }, catalogue, sealed));
+  /** Change the cart's `fields`, `picked` in a list's picker or not. */
+  function set(fields: Partial<Cart>, picked = false) {
+    change(
+      placed(cart.value, { ...cart.value, ...fields }, catalogue, sealed),
+      picked,
+    );
   }
 
   /** Add one, and say what: opening, an item is the package it opens
@@ -544,6 +580,7 @@ export function CartForm({
       // Already queued, or listed as recorded elsewhere, saying so: no new
       // save, so nothing is sending and no time to save is counted.
       change(freshCart(current));
+      emptied();
       return;
     }
     if (current.startedAt > 0) {
@@ -556,6 +593,13 @@ export function CartForm({
     }
     change(freshCart(current));
     saved.value = batch;
+    emptied();
+  }
+
+  /** The cart's lines went, by Record or Discard cart, and what is below
+   * them moved up: focus goes to the Cart heading. */
+  function emptied() {
+    settle(() => cartHeading.current);
   }
 
   /** Drop the cart's lines, and with them its batch key, as Record does,
@@ -568,9 +612,11 @@ export function CartForm({
     if (current === null || current.revision !== asked) {
       discarding.value = null;
       problems.value = [[say(CHANGED_BEFORE_DISCARD)]];
+      settle(() => discardButton.current);
       return;
     }
     change(freshCart(current));
+    emptied();
     telemetry.record({ kind: "cart_discarded" });
   }
 
@@ -773,12 +819,15 @@ export function CartForm({
    * shown, so what is below does not move up under the finger, and focus
    * the name list: without scrolling, from the check's own answers (Ali,
    * 2026-11-27, inventory-tng-m6dc); scrolled into view if it is not, from
-   * Change, far below it, whose tap would otherwise show nothing. */
+   * Change, far below it, whose tap would otherwise show nothing, the
+   * page's taps then ignored a moment as everything moved
+   * (inventory-tng-r3jx). */
   function answerNameCheck({ scroll = false } = {}) {
     nameCheck.going();
     checkName.value = false;
     if (scroll) {
-      nameList.current?.focus();
+      focusInView(nameList.current);
+      ignoreTaps(document, () => nameList.current);
     } else {
       focusInPlace(nameList.current);
     }
@@ -835,7 +884,7 @@ export function CartForm({
             ref={nameList}
             value={String(cart.value.volunteerId ?? "")}
             onChange={(event) =>
-              set({ volunteerId: idOrNull(event.currentTarget.value) })
+              set({ volunteerId: idOrNull(event.currentTarget.value) }, true)
             }
           >
             <option value="">{say(NO_NAME_PICKED)}</option>
@@ -873,7 +922,7 @@ export function CartForm({
           list={fromList}
           catalogue={catalogue}
           value={cart.value.fromId}
-          onPick={(fromId) => set({ fromId })}
+          onPick={(fromId) => set({ fromId }, true)}
         />
       )}
       {sides.to && (
@@ -882,7 +931,7 @@ export function CartForm({
           list={toList}
           catalogue={catalogue}
           value={cart.value.toId}
-          onPick={(toId) => set({ toId })}
+          onPick={(toId) => set({ toId }, true)}
         />
       )}
       {cart.value.kind === "install" && (
@@ -914,7 +963,9 @@ export function CartForm({
             };
           }}
           onDone={() => {
+            // The camera goes, and what is below it moves up a screen.
             scanning.value = false;
+            settle(() => scanButton.current);
           }}
           onPicture={(video) => {
             picture.value = video;
@@ -931,7 +982,11 @@ export function CartForm({
           reloadKeepsCart={cartKept.value}
         />
       ) : (
-        <button type="button" onClick={() => (scanning.value = true)}>
+        <button
+          type="button"
+          ref={scanButton}
+          onClick={() => (scanning.value = true)}
+        >
           {say(SCAN_WITH_CAMERA)}
         </button>
       )}
@@ -953,6 +1008,7 @@ export function CartForm({
         onAdd={add}
         onLabel={actOn}
         tooOld={tooOld}
+        after={cartHeading}
       />
 
       {/* Below the camera, as a scan may take it away (Ali, 2026-11-24,
@@ -1080,12 +1136,14 @@ export function CartForm({
             onDiscard={discard}
             onKeep={() => {
               discarding.value = null;
+              settle(() => discardButton.current);
             }}
           />
         ) : (
           <button
             type="button"
             class="self-start"
+            ref={discardButton}
             onClick={() => {
               discarding.value = cart.value.revision;
             }}

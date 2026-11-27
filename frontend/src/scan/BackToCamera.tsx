@@ -13,6 +13,7 @@ import { msg } from "@lingui/core/macro";
 import type { ReadonlySignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { say } from "../shared/i18n";
+import { focusInPlace, ignoreTaps } from "../shared/settling";
 import { telemetry } from "../shared/telemetry";
 
 export const BACK_TO_CAMERA = msg`Back to camera`;
@@ -48,8 +49,12 @@ export function BackToCamera({
       onClick={() => {
         camera.scrollIntoView({ block: "start" });
         // The button goes once the picture shows: focus goes to the
-        // camera's region (Scanner), not lost to the page.
-        camera.closest("section")?.focus({ preventScroll: true });
+        // camera's region (Scanner), not lost to the page, and taps wait
+        // a moment, as everything moved under the finger
+        // (inventory-tng-r3jx).
+        const region = () => camera.closest("section");
+        focusInPlace(region());
+        ignoreTaps(document, region);
         telemetry.record({ kind: "back_to_camera" });
       }}
     >

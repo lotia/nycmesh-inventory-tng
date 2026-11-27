@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { CATALOGUE, openSpool } from "../testing/catalogue";
 import { answering, json, saved } from "../testing/fetch";
-import { find, open, pick, ready, server } from "../testing/scan-page";
+import { find, open, pick, ready, server, tap } from "../testing/scan-page";
 import { FROM, TO, WHERE } from "./CartForm";
 import { KIND_WORDS } from "./cart";
 import {
@@ -29,7 +29,7 @@ describe("open packages", () => {
     await ready();
     pick(say(FROM), "10");
     find("cat6");
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    tap(screen.getByRole("button", { name: "Cat6 cable" }));
   }
 
   const CUT = "Cut or take from the Spool opened 2026-11-03 (m)";
@@ -67,7 +67,7 @@ describe("open packages", () => {
       "Your cut uses up the Spool, so “Nothing usable left on it” is ticked. Untick it if cable is left. An administrator confirms.",
     );
     // Unticked by the volunteer: no note.
-    fireEvent.click(screen.getByLabelText(NOTHING_LEFT));
+    tap(screen.getByLabelText(NOTHING_LEFT));
     expect(ticked()).toBe(false);
     expect(note()).toBe("");
     // Another cut: the box follows it again.
@@ -81,11 +81,11 @@ describe("open packages", () => {
     fireEvent.input(field, { target: { value: "20" } });
     expect(ticked()).toBe(false);
     // Moved whole: no cut, no box.
-    fireEvent.click(screen.getByLabelText(say(ALL_OF_IT)));
+    tap(screen.getByLabelText(say(ALL_OF_IT)));
     expect(field.value).toBe("120");
     expect(field.disabled).toBe(true);
     expect(screen.queryByLabelText(NOTHING_LEFT)).toBeNull();
-    fireEvent.click(screen.getByLabelText(say(ALL_OF_IT)));
+    tap(screen.getByLabelText(say(ALL_OF_IT)));
     expect(field.value).toBe("");
     // Another place: what was taken from this one's packages goes.
     fireEvent.input(field, { target: { value: "20" } });
@@ -106,7 +106,7 @@ describe("open packages", () => {
     ).toBeDefined();
     fireEvent.input(screen.getByLabelText(CUT), { target: { value: "" } });
     expect(screen.queryByLabelText(now)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: say(WRONG_LENGTH) }));
+    tap(screen.getByRole("button", { name: say(WRONG_LENGTH) }));
     const field = screen.getByLabelText(now) as HTMLInputElement;
     fireEvent.input(field, { target: { value: "90" } });
     expect(field.value).toBe("90");
@@ -266,14 +266,14 @@ describe("open packages", () => {
   test("opening packages asks where, not from and to; an item adds its package", async () => {
     open();
     await ready();
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    tap(screen.getByLabelText(say(KIND_WORDS.open)));
     expect(screen.getByLabelText(say(WHERE))).toBeDefined();
     expect(screen.queryByLabelText(say(TO))).toBeNull();
     // Only whole packages are opened: the radio's box sealed here, not a
     // radio.
     pick(say(WHERE), "10");
     find("beam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     expect(
       (screen.getByLabelText("Box (4 each)") as HTMLInputElement).value,
     ).toBe("1");
@@ -282,11 +282,11 @@ describe("open packages", () => {
   test("opening, a place picked fills what was added before and not typed", async () => {
     open();
     await ready();
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    tap(screen.getByLabelText(say(KIND_WORDS.open)));
     const box = () => (screen.getByLabelText(/^Box/) as HTMLInputElement).value;
     // No place yet: the radio's one package (inventory-tng-prp).
     find("beam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     expect(box()).toBe("1");
     // None sealed at the van; one at the hub.
     pick(say(WHERE), "12");
@@ -295,13 +295,13 @@ describe("open packages", () => {
     expect(box()).toBe("1");
     // Picked again, then through a place with none: still two.
     find("beam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     pick(say(WHERE), "12");
     pick(say(WHERE), "10");
     expect(box()).toBe("2");
     // Switched to another kind and back, the place kept: as it was.
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.move)));
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    tap(screen.getByLabelText(say(KIND_WORDS.move)));
+    tap(screen.getByLabelText(say(KIND_WORDS.open)));
     expect(box()).toBe("2");
     // Typed into: never filled again.
     fireEvent.input(screen.getByLabelText(/^Box/), { target: { value: "3" } });
@@ -338,13 +338,13 @@ describe("open packages", () => {
     const { api } = answering(() => json(withOld, 200));
     open(api);
     await ready();
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    tap(screen.getByLabelText(say(KIND_WORDS.open)));
     const field = (name: RegExp) =>
       (screen.getByLabelText(name) as HTMLInputElement).value;
     // At the van only the old crate is sealed (inventory-tng-f9h).
     pick(say(WHERE), "12");
     find("beam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     expect([field(/^Box/), field(/^Old crate/)]).toEqual(["", "1"]);
     // At the hub both are: neither is picked for the volunteer.
     pick(say(WHERE), "10");
@@ -352,7 +352,7 @@ describe("open packages", () => {
       target: { value: "" },
     });
     find("beam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     // Nor a loose one: only whole packages are opened.
     expect([field(/^Box/), field(/^Old crate/), field(/^Loose/)]).toEqual([
       "",

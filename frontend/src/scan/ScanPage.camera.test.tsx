@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { UPGRADE } from "../shared/build";
 import { say } from "../shared/i18n";
 import { STORAGE_KEY as OUTBOX_KEY, Outbox } from "../shared/outbox";
+import { SETTLE_MS } from "../shared/settling";
 import { pass } from "../testing/camera";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, deferred, json, saved } from "../testing/fetch";
@@ -19,6 +20,7 @@ import {
   save,
   selected,
   server,
+  tap,
 } from "../testing/scan-page";
 import { refusingRemovals, refusingWrites } from "../testing/storage";
 import { BACK_TO_CAMERA } from "./BackToCamera";
@@ -88,9 +90,7 @@ describe("scanning labels with the camera", () => {
 
   /** The volunteer opens the camera. */
   function startCamera() {
-    fireEvent.click(
-      screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }),
-    );
+    tap(screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) }));
   }
 
   async function opened(api = server().api) {
@@ -105,7 +105,7 @@ describe("scanning labels with the camera", () => {
   /** Ada opens the van's sealed spool, by its label. */
   async function openSpoolInVan() {
     pick(say(YOUR_NAME), "1");
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    tap(screen.getByLabelText(say(KIND_WORDS.open)));
     pick(say(WHERE), "12");
     await scan("K7QX2M");
     await screen.findByText("Added a Spool: Cat6 cable.");
@@ -198,7 +198,7 @@ describe("scanning labels with the camera", () => {
     expect(search.value).toBe("cable");
     screen.getByRole("button", { name: "Cat6 cable" });
     // A pick from its list.
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    tap(screen.getByRole("button", { name: "Cat6 cable" }));
     expect(search.value).toBe("");
     // A code typed, as a scanner gun types one.
     find("b3zt9w");
@@ -215,7 +215,7 @@ describe("scanning labels with the camera", () => {
     const back = () =>
       screen.queryByRole("button", { name: say(BACK_TO_CAMERA) });
     expect(back()).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
+    tap(screen.getByRole("button", { name: say(DONE) }));
     expect(back()).toBeNull();
     expect(view.watched()).toBe(0);
   });
@@ -305,7 +305,7 @@ describe("scanning labels with the camera", () => {
       const status = (await screen.findByText(
         "Hub › Shelf A: from here, or to here?",
       )) as HTMLElement;
-      fireEvent.click(screen.getByRole("button", { name: say(side) }));
+      tap(screen.getByRole("button", { name: say(side) }));
       expect(status.textContent).toBe(words);
       expect(status.getAttribute("role")).toBe("status");
     },
@@ -333,7 +333,7 @@ describe("scanning labels with the camera", () => {
     const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
     find("s4helf");
     fireEvent.keyDown(search, { key: "Enter" });
-    fireEvent.click(screen.getByRole("button", { name: say(TO) }));
+    tap(screen.getByRole("button", { name: say(TO) }));
     expect(status.textContent).toBe("Hub › Shelf A: to here.");
   });
 
@@ -343,7 +343,7 @@ describe("scanning labels with the camera", () => {
     const status = (await screen.findByText(
       "Hub › Shelf A: from here, or to here?",
     )) as HTMLElement;
-    fireEvent.click(screen.getByRole("button", { name: say(TO) }));
+    tap(screen.getByRole("button", { name: say(TO) }));
     const search = screen.getByLabelText<HTMLInputElement>(say(FIND));
     act(() => search.focus());
     act(() => search.blur());
@@ -373,7 +373,7 @@ describe("scanning labels with the camera", () => {
     await scan("B3ZT9W");
     await pass(2);
     expect(lineNames()).toEqual([]);
-    fireEvent.click(document.querySelector("video") as HTMLVideoElement);
+    tap(document.querySelector("video") as HTMLVideoElement);
     expect(document.activeElement).not.toBe(search);
     await screen.findByText("Added one: LiteBeam 5AC.");
   });
@@ -414,8 +414,14 @@ describe("scanning labels with the camera", () => {
       name: say(UPGRADE),
     });
     expect(link.getAttribute("href")).toBe(`#${button.id}`);
-    fireEvent.click(link);
+    tap(link);
     expect(scroll.mock.contexts).toEqual([button]);
+    expect(document.activeElement).toBe(button);
+    // Everything moved under the finger: the second tap of a double tap
+    // is ignored, and focus goes back to Upgrade (inventory-tng-r3jx).
+    const done = screen.getByRole("button", { name: say(DONE) });
+    done.focus();
+    expect(fireEvent.click(done, { detail: 1 })).toBe(false);
     expect(document.activeElement).toBe(button);
   });
 
@@ -442,7 +448,7 @@ describe("scanning labels with the camera", () => {
 
   test("opening, an item's label asks which package if none is sealed there", async () => {
     await opened();
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    tap(screen.getByLabelText(say(KIND_WORDS.open)));
     // The radio's box is sealed at the hub, not the van.
     pick(say(WHERE), "12");
     await scan("B3ZT9W");
@@ -462,7 +468,7 @@ describe("scanning labels with the camera", () => {
     save();
     await screen.findByText(/^Sending: Opening/);
     find("cable");
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    tap(screen.getByRole("button", { name: "Cat6 cable" }));
     expect(
       (screen.getByLabelText("Spool (305 m)") as HTMLInputElement).value,
     ).toBe("");
@@ -506,7 +512,7 @@ describe("scanning labels with the camera", () => {
     // The radio's box, sealed at the hub.
     pick(say(WHERE), "10");
     find("beam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     save();
     await vi.waitFor(() =>
       expect(screen.getAllByText(/^Recorded \(/)).toHaveLength(2),
@@ -559,7 +565,7 @@ describe("scanning labels with the camera", () => {
     save();
     await screen.findByText("Recorded (transaction 77).");
     await vi.waitFor(() => expect(asked).toBe(3));
-    fireEvent.click(screen.getByRole("button", { name: say(DISMISS) }));
+    tap(screen.getByRole("button", { name: say(DISMISS) }));
     expect(screen.queryByText(/^Recorded \(/)).toBeNull();
     const [batch] = outbox.entries.value;
     return { api, outbox, later, key: batch?.body.key ?? "" };
@@ -568,7 +574,7 @@ describe("scanning labels with the camera", () => {
   /** The van's one sealed spool is taken off: opening fills none. */
   function spoolTakenOff() {
     find("cable");
-    fireEvent.click(screen.getByRole("button", { name: "Cat6 cable" }));
+    tap(screen.getByRole("button", { name: "Cat6 cable" }));
     expect(
       (screen.getByLabelText("Spool (305 m)") as HTMLInputElement).value,
     ).toBe("");
@@ -580,11 +586,11 @@ describe("scanning labels with the camera", () => {
     // The next catalogue, asked for after the next save, shows it: the
     // outbox forgets it.
     later.answer = () => json({ ...CATALOGUE, saved: [key] }, 200);
-    fireEvent.click(screen.getByRole("button", { name: say(REMOVE) }));
+    tap(screen.getByRole("button", { name: say(REMOVE) }));
     // The radio's box, sealed at the hub.
     pick(say(WHERE), "10");
     find("beam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     save();
     await vi.waitFor(() =>
       expect(outbox.entries.value.map((each) => each.summary)).toEqual([
@@ -615,7 +621,7 @@ describe("scanning labels with the camera", () => {
       ),
     };
     await opened(answering(() => json(loose, 200)).api);
-    fireEvent.click(screen.getByLabelText(say(KIND_WORDS.open)));
+    tap(screen.getByLabelText(say(KIND_WORDS.open)));
     pick(say(WHERE), "10");
     await scan("B3ZT9W");
     await screen.findByText("LiteBeam 5AC comes in no package to open.");
@@ -631,7 +637,7 @@ describe("scanning labels with the camera", () => {
       .getAllByRole("button", { name: /^(From|To)$/ })
       .map((button) => button.textContent);
     expect(sides).toEqual([say(FROM), say(TO)]);
-    fireEvent.click(screen.getByRole("button", { name: say(TO) }));
+    tap(screen.getByRole("button", { name: say(TO) }));
     expect(selected(say(TO))).toBe("11");
     expect(screen.queryByRole("button", { name: say(FROM) })).toBeNull();
   });
@@ -664,7 +670,7 @@ describe("scanning labels with the camera", () => {
     toList.blur();
     fireEvent.click(space, { detail: 1 });
     expect(document.activeElement).toBe(toList);
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
     expect(document.contains(space)).toBe(false);
     tall.mockRestore();
     focus.mockRestore();
@@ -718,7 +724,7 @@ describe("scanning labels with the camera", () => {
     await ready();
     find("s4helf");
     fireEvent.keyDown(screen.getByLabelText(say(FIND)), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("button", { name: say(TO) }));
+    tap(await screen.findByRole("button", { name: say(TO) }));
     expect(selected(say(TO))).toBe("11");
   });
 
@@ -726,8 +732,31 @@ describe("scanning labels with the camera", () => {
     await opened();
     await scan("OLD-FORM");
     await screen.findByText("That label isn't in the inventory (OLD-FORM).");
-    fireEvent.click(screen.getByRole("button", { name: say(DONE) }));
+    tap(screen.getByRole("button", { name: say(DONE) }));
     screen.getByRole("button", { name: say(SCAN_WITH_CAMERA) });
+  });
+
+  test("Done: the camera goes, taps wait a moment, and Scan with the camera has focus, without scrolling (Ali, 2026-11-27, inventory-tng-r3jx)", async () => {
+    await opened();
+    await scan("B3ZT9W");
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    tap(screen.getByRole("button", { name: say(DONE) }));
+    const scanButton = screen.getByRole("button", {
+      name: say(SCAN_WITH_CAMERA),
+    });
+    await vi.waitFor(() => expect(document.activeElement).toBe(scanButton));
+    expect(focus.mock.calls).toEqual([[{ preventScroll: true }]]);
+    // The second tap of a double tap, on the line's Remove moved up under
+    // the finger: ignored, focus back on Scan with the camera.
+    const remove = () => screen.getByRole("button", { name: say(REMOVE) });
+    remove().focus();
+    fireEvent.click(remove(), { detail: 1 });
+    expect(document.activeElement).toBe(scanButton);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    fireEvent.click(remove(), { detail: 1 });
+    expect(screen.queryByRole("button", { name: say(REMOVE) })).toBeNull();
   });
 
   test("a camera not allowed offers to reload the page", async () => {
@@ -739,7 +768,7 @@ describe("scanning labels with the camera", () => {
     await ready();
     startCamera();
     await screen.findByText(say(NOT_ALLOWED.bold));
-    fireEvent.click(screen.getByRole("button", { name: say(RELOAD_PAGE) }));
+    tap(screen.getByRole("button", { name: say(RELOAD_PAGE) }));
     expect(reload).toHaveBeenCalledOnce();
   });
 
@@ -787,7 +816,7 @@ describe("scanning labels with the camera", () => {
     fillMove();
     refusingWrites(CART_KEY);
     refusingRemovals(CART_KEY);
-    fireEvent.click(screen.getByRole("button", { name: say(REMOVE) }));
+    tap(screen.getByRole("button", { name: say(REMOVE) }));
     screen.getByText(say(NOTHING_IN_CART));
     screen.getByText(say(NOT_KEEPING));
     startCamera();

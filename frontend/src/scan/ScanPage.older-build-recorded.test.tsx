@@ -48,6 +48,7 @@ import {
   saves,
   server,
   storedCart,
+  tap,
   UUID,
 } from "../testing/scan-page";
 import { refusingWrites } from "../testing/storage";
@@ -112,9 +113,7 @@ describe("what an older build left", () => {
     await ready();
     within(listing()).getByText(noted(RETIRED));
     within(listing()).getByText("LiteBeam 5AC: 1 × Box");
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     screen.getByText(`LiteBeam 5AC: ${RETIRED}`);
     expect(boxes()).toBe("1");
     save();
@@ -142,9 +141,7 @@ describe("what an older build left", () => {
     open();
     await ready();
     within(listing()).getByText(noted(RETIRED));
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     screen.getByText(`LiteBeam 5AC: ${RETIRED}`);
     expect(boxes()).toBe("1");
   });
@@ -181,7 +178,7 @@ describe("what an older build left", () => {
     within(listing()).getByText("LiteBeam 5AC: 2 × Old box");
     within(listing()).getByText("LiteBeam 5AC: 3 × Old box");
     within(listing()).getByText("LiteBeam 5AC: 1 × a removed package or item");
-    fireEvent.click(
+    tap(
       within(listing()).getAllByRole("button", {
         name: say(ADD_TO_CART),
       })[0] as HTMLElement,
@@ -352,7 +349,7 @@ describe("what an older build left", () => {
     await vi.waitFor(() => expect(catalogues()).toBe(before + 1));
     await new Promise((settled) => setTimeout(settled, 50));
     expect(catalogues()).toBe(before + 1);
-    fireEvent.click(within(entry).getByRole("button", { name: say(DISMISS) }));
+    tap(within(entry).getByRole("button", { name: say(DISMISS) }));
     expect(screen.queryByText(say(SOME_NOT_RECORDED))).toBeNull();
     expect(catalogues()).toBe(before + 1);
   });
@@ -560,12 +557,12 @@ describe("what an older build left", () => {
       name: say(ADD_DIFFERENCE),
       description: "Move: 1 item from Hub to Van",
     });
-    fireEvent.click(add);
+    tap(add);
     expectBold(within(entry).getByRole("alert"), say(CART_NOT_EMPTY));
     expect(itemsInCart()).toEqual([101]);
     expect(within(entry).queryByText(say(IN_CART))).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+    tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    tap(screen.getByRole("button", { name: say(DISCARD) }));
     await vi.waitFor(() => expect(boxes()).toBe("1"));
     within(entry).getByText(say(IN_CART));
   });
@@ -581,9 +578,7 @@ describe("what an older build left", () => {
     refused?.mockRestore();
     // None stored: a reload brings the cart back empty (CartStore.write).
     expect(localStorage.getItem(CART_KEY)).toBeNull();
-    fireEvent.click(
-      within(entry).getByRole("button", { name: say(ADD_DIFFERENCE) }),
-    );
+    tap(within(entry).getByRole("button", { name: say(ADD_DIFFERENCE) }));
     expect(boxes()).toBe("1");
     within(entry).getByText(say(IN_CART));
     expect(
@@ -594,8 +589,8 @@ describe("what an older build left", () => {
   test("its difference put in the cart, but not kept as put there, says so (inventory-tng-0gg)", async () => {
     await differing([boxed(1)], "2", fillMove);
     const refused = refusingWrites(OUTBOX_KEY);
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+    tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    tap(screen.getByRole("button", { name: say(DISCARD) }));
     await vi.waitFor(() => expect(boxes()).toBe("1"));
     refused.mockRestore();
     screen.getByText(say(NOT_REMOVED_PHRASE));
@@ -631,8 +626,8 @@ describe("what an older build left", () => {
       window.dispatchEvent(new StorageEvent("storage", { key: CART_KEY }));
     });
     within(entry).getByRole("button", { name: say(ADD_DIFFERENCE) });
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+    tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    tap(screen.getByRole("button", { name: say(DISCARD) }));
     await vi.waitFor(() => expect(boxes()).toBe("1"));
     within(entry).getByText(say(IN_CART));
   });
@@ -666,7 +661,7 @@ describe("what an older build left", () => {
     const written = new Map([[KEY, first.body.lines]]);
     open(ledger(written).api);
     await ready();
-    fireEvent.click(discardOf("Cat6 cable: 3 m from an open package"));
+    tap(discardOf("Cat6 cable: 3 m from an open package"));
     await screen.findByText(ADDED_BACK);
     save();
     await screen.findByText(say(SOME_NOT_RECORDED));
@@ -676,8 +671,8 @@ describe("what an older build left", () => {
   test("discarded, a cart that went back drops its key, and what fills it next goes under a new one", async () => {
     const { outbox } = await putBackSavedFirst();
     expect(storedCart().batchKey).toBe(KEY);
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD_CART) }));
-    fireEvent.click(screen.getByRole("button", { name: say(DISCARD) }));
+    tap(screen.getByRole("button", { name: say(DISCARD_CART) }));
+    tap(screen.getByRole("button", { name: say(DISCARD) }));
     expect(storedCart()).not.toHaveProperty("batchKey");
     fillMove();
     save();
@@ -688,7 +683,7 @@ describe("what an older build left", () => {
   test("emptied, a cart that went back saves what fills it next under a new key", async () => {
     const { outbox } = await putBackSavedFirst();
     const radio = screen.getByText("LiteBeam 5AC").closest("li") as HTMLElement;
-    fireEvent.click(within(radio).getByRole("button", { name: say(REMOVE) }));
+    tap(within(radio).getByRole("button", { name: say(REMOVE) }));
     fillMove();
     save();
     await screen.findByText("Recorded (transaction 2).");
@@ -728,9 +723,7 @@ describe("what an older build left", () => {
     const { api, sent } = server();
     const outbox = open(api);
     await ready();
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     const key = storedCart().batchKey;
     expect(key).toMatch(UUID);
     save();
@@ -755,8 +748,8 @@ describe("what an older build left", () => {
     expect(
       within(listing()).queryByRole("button", { name: say(ADD_TO_CART) }),
     ).toBeNull();
-    fireEvent.click(lastDiscard());
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
+    tap(lastDiscard());
     expect(screen.queryByText(HEADING)).toBeNull();
     expect(screen.getByText(say(NOTHING_IN_CART))).toBeDefined();
   });
@@ -772,9 +765,7 @@ describe("what an older build left", () => {
     within(listing()).getByText(
       noted(`${say(KEY_REUSED)} Add it to the cart, fix that, then record it.`),
     );
-    fireEvent.click(
-      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
-    );
+    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
     save();
     await screen.findByText("Recorded (transaction 2).");
     expect(outbox.entries.value[0]?.body.key).not.toBe(KEY);
@@ -844,9 +835,7 @@ describe("what an older build left", () => {
     }) as HTMLButtonElement;
     expect(add.disabled).toBe(true);
     expect(screen.queryByText(ADDED_BACK)).toBeNull();
-    fireEvent.click(
-      within(retired).getByRole("button", { name: say(DISCARD) }),
-    );
+    tap(within(retired).getByRole("button", { name: say(DISCARD) }));
     // The rest, whole now, goes in the empty cart without a tap, and is
     // saved as it is, without the line discarded.
     await screen.findByText(ADDED_BACK);
@@ -875,8 +864,8 @@ describe("what an older build left", () => {
     ]);
     open();
     await ready();
-    fireEvent.click(lastDiscard());
-    fireEvent.click(lastDiscard());
+    tap(lastDiscard());
+    tap(lastDiscard());
     expect(screen.queryByText(HEADING)).toBeNull();
   });
 });

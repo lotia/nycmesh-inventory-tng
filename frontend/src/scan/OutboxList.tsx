@@ -40,7 +40,7 @@ import {
   IN_CART,
   recordedLines,
 } from "./recorded-elsewhere";
-import { useSettledList } from "./settling";
+import { useSettledList } from "./settling-hooks";
 
 export const CARTS_FROM_DEVICE = msg`Carts from this device`;
 export const REGISTER_TO_SEND_WAITING = msg`<0>Register this browser</0> to send what is waiting.`;

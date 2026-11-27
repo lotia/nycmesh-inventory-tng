@@ -10,6 +10,7 @@ import { FIND } from "../scan/Finder";
 import { ScanPage } from "../scan/ScanPage";
 import { say } from "../shared/i18n";
 import { Outbox } from "../shared/outbox";
+import { stopIgnoringTaps } from "../shared/settling";
 import { fakeCamera } from "./camera";
 import { CATALOGUE } from "./catalogue";
 import { answering, json, saved } from "./fetch";
@@ -97,6 +98,15 @@ export function status(): HTMLElement {
   return only;
 }
 
+/** A tap on `element` a moment after the one before, as a volunteer's
+ * next tap comes: taps that one left ignored, as it moved what was below
+ * (shared/settling.ts, ignoreTaps), are taken again. A double tap's second
+ * tap is fireEvent.click, at once. */
+export function tap(element: Element) {
+  stopIgnoringTaps(document);
+  fireEvent.click(element);
+}
+
 export function find(text: string) {
   fireEvent.input(screen.getByLabelText(say(FIND)), {
     target: { value: text },
@@ -109,11 +119,11 @@ export function fillMove(cable = "Cat6 cable") {
   pick(say(FROM), "10");
   pick(say(TO), "12");
   find("cable");
-  fireEvent.click(screen.getByRole("button", { name: cable }));
+  tap(screen.getByRole("button", { name: cable }));
 }
 
 export const save = () =>
-  fireEvent.click(screen.getByRole("button", { name: say(RECORD) }));
+  tap(screen.getByRole("button", { name: say(RECORD) }));
 
 /** Record, then wait until `outbox` holds `count` batches: Record asks for
  * the catalogue before it queues the cart (inventory-tng-h7ua). */

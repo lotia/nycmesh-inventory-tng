@@ -11,6 +11,7 @@ import {
   type Page,
   type Response,
 } from "@playwright/test";
+import { SETTLE_MS } from "../src/shared/settling";
 import { assertNone, test as base, watch } from "./csp-violations";
 import { prepared } from "./prepared";
 
@@ -158,9 +159,12 @@ export async function invite(
 
 /**
  * Records the scan page's cart, and gives its answer once the page lists it
- * saved: the answer reaches the test before the page has used it.
+ * saved: the answer reaches the test before the page has used it. A moment
+ * after the tap before, which may have left the page's taps ignored
+ * (docs/decisions/0019, Double taps).
  */
 export async function record(page: Page): Promise<Response> {
+  await page.waitForTimeout(SETTLE_MS);
   const saving = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/transactions") &&
@@ -174,6 +178,8 @@ export async function record(page: Page): Promise<Response> {
   await expect(
     page.getByText(`Recorded (transaction ${saved}).`),
   ).toBeVisible();
+  // The cart's lines went: taps are taken again a moment later.
+  await page.waitForTimeout(SETTLE_MS);
   return response;
 }
 

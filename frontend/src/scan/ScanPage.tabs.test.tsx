@@ -16,6 +16,7 @@ import {
   saves,
   selected,
   server,
+  tap,
 } from "../testing/scan-page";
 import { NOTHING_IN_CART, TO, YOUR_NAME } from "./CartForm";
 import { STORAGE_KEY as CART_KEY, freshCart, storeCart } from "./cart";
@@ -97,7 +98,7 @@ describe("other tabs and a changing catalogue", () => {
     await ready();
     fillMove();
     find("beam");
-    fireEvent.click(screen.getByRole("button", { name: "LiteBeam 5AC" }));
+    tap(screen.getByRole("button", { name: "LiteBeam 5AC" }));
     fireEvent.input(screen.getByLabelText("Box (4 each)"), {
       target: { value: "2" },
     });

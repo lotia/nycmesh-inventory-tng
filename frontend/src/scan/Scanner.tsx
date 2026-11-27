@@ -35,6 +35,7 @@ import {
 } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { say } from "../shared/i18n";
+import { focusInPlace } from "../shared/settling";
 import { openCamera, type Session } from "./camera";
 import {
   CameraReport,
@@ -239,7 +240,7 @@ export function Scanner({
   // place; unless something else on the page holds it.
   useEffect(() => {
     if (document.activeElement === document.body) {
-      (reloadButton.current ?? refusalWords.current)?.focus();
+      focusInPlace(reloadButton.current ?? refusalWords.current);
     }
   }, [refusal]);
 

@@ -109,6 +109,17 @@ describe("Back to camera", () => {
     expect(document.activeElement).toBe(region);
   });
 
+  test("the second tap of a double tap, on what scrolled under the finger, is ignored, focus back on the camera's region (inventory-tng-r3jx)", () => {
+    camera.scrollIntoView = vi.fn();
+    const { box } = page("checkbox");
+    view.inView(camera, 0);
+    fireEvent.click(back() as Element, { detail: 1 });
+    view.inView(camera, 1);
+    box.focus();
+    expect(fireEvent.click(box, { detail: 1 })).toBe(false);
+    expect(document.activeElement).toBe(region);
+  });
+
   test("keeps room at the page's bottom while it may show, and none after", () => {
     const { unmount } = page();
     expect(document.documentElement.classList.contains(ROOM)).toBe(true);

@@ -25,7 +25,7 @@ import {
 } from "./older-builds";
 import { toCart, withRetired } from "./older-to-cart";
 import { indexOf } from "./search";
-import { useSettledList } from "./settling";
+import { useSettledList } from "./settling-hooks";
 
 /** An older build's cart, filled for each kind (olderKind). */
 const CART_KIND_WORDS: Record<Kind, MessageDescriptor> = {
@@ -262,7 +262,10 @@ export function OlderList({
                     }
                   })}
                   onKeep={unlessSettling(on, () => {
+                    // The question's alert goes, and the entries below
+                    // move up (inventory-tng-r3jx).
                     discarding.value = null;
+                    settled.stayed(on);
                   })}
                 />
               ) : (
