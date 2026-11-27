@@ -156,8 +156,11 @@ def add_reason(
             session, lambda: adjustment_reasons.add(session, name), "unique"
         )
     if added is None:
+        # Refused, its box holds what was typed, beside its problem
+        # (inventory-tng-ikx2).
         problems = {"reason": problem or forms.REASON_TAKEN}
-        return _page(request, session, signed, problems=problems)
+        values = {"reason": name}
+        return _page(request, session, signed, problems=problems, values=values)
     session.commit()
     return redirect(SETTINGS, notice="added", section="reasons")
 

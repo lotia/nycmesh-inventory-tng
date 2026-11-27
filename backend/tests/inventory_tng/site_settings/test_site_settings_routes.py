@@ -215,6 +215,26 @@ def test_a_refused_reason_rename_keeps_the_name_typed(
     assert names(stale.text) == [["Gifted"], ["Lent out"]]
 
 
+@pytest.mark.parametrize("typed", ["  Donated  ", '"<b>' + "x" * NAME_MAX])
+def test_a_refused_new_reason_keeps_the_name_typed(
+    admin_client: TestClient, session: Session, typed: str
+) -> None:
+    """Refused as taken or too long, the New reason box holds what was
+    typed, trimmed and escaped; added, the page comes back with it empty
+    (inventory-tng-ikx2)."""
+    add(session, AdjustmentReason(name="Donated"))
+    path = f"{SETTINGS}/reasons"
+
+    def new_box(page: str) -> list[str | None]:
+        return box_values(read(page).one("form", action=path), "name")
+
+    refused = admin_client.post(path, data={"name": typed})
+    assert refused.status_code == 400
+    assert new_box(refused.text) == [typed.strip()]
+    assert admin_client.post(path, data={"name": "Lent out"}).status_code == 303
+    assert new_box(admin_client.get(SETTINGS).text) == [""]
+
+
 @pytest.mark.parametrize("action", ["retire", "restore"])
 def test_a_refused_retire_or_bring_back_shows_the_name_stored(
     admin_client: TestClient, session: Session, action: str
