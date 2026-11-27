@@ -70,7 +70,7 @@ import { differenceOf } from "./recorded-elsewhere";
 import { aboutLine } from "./refused-line";
 import { type Acted, POINT, Scanner } from "./Scanner";
 import { indexOf } from "./search";
-import { focusInPlace, useKeptSpace } from "./settling";
+import { focusInPlace, useKeptSpaceOf } from "./settling";
 import { useTextBoxFocused } from "./text-box-focus";
 import { type Removed, removeLine, undone } from "./undo-remove";
 import { sealedCounts, unseen } from "./unseen-batches";
@@ -213,8 +213,7 @@ export function CartForm({
   // change the name, without stopping anyone saving.
   const checkName = useSignal(askWho(cart.value, catalogue));
   const nameList = useRef<HTMLSelectElement>(null);
-  const nameCheck = useRef<HTMLDivElement>(null);
-  const nameCheckSpace = useKeptSpace();
+  const nameCheck = useKeptSpaceOf<HTMLDivElement>(() => nameList.current);
 
   // Tabs share one cart; a refreshed catalogue clears what it no longer has.
   // Another tab's amounts in a unit this one does not show: this tab's
@@ -383,8 +382,6 @@ export function CartForm({
   const typing = useTextBoxFocused();
   const tooOld = useComputed(() => outbox.builds.newer.value === "too_old");
   const placeRead = useSignal<number | null>(null);
-  const placeQuestion = useRef<HTMLFieldSetElement>(null);
-  const placeQuestionSpace = useKeptSpace();
   const fromList = useRef<HTMLSelectElement>(null);
   const toList = useRef<HTMLSelectElement>(null);
   // The side the question was last answered with.
@@ -392,6 +389,9 @@ export function CartForm({
   /** The From or To list. */
   const placeList = (side: Side) =>
     (side === "from" ? fromList : toList).current;
+  const placeQuestion = useKeptSpaceOf<HTMLFieldSetElement>(() =>
+    placeList(answeredSide.current),
+  );
   // What the answer to that question did, in words, till the next label.
   const placeAnswer = useSignal<string | null>(null);
 
@@ -437,9 +437,7 @@ export function CartForm({
    * to the place it filled (inventory-tng-m6dc). */
   function answerPlace(side: Side, locationId: number) {
     const place = indexOf(catalogue).places.get(locationId);
-    placeQuestionSpace.keep(
-      (placeQuestion.current as HTMLElement).getBoundingClientRect().height,
-    );
+    placeQuestion.going();
     answeredSide.current = side;
     focusInPlace(placeList(side));
     batch(() => {
@@ -777,9 +775,7 @@ export function CartForm({
    * 2026-11-27, inventory-tng-m6dc); scrolled into view if it is not, from
    * Change, far below it, whose tap would otherwise show nothing. */
   function answerNameCheck({ scroll = false } = {}) {
-    if (nameCheck.current !== null) {
-      nameCheckSpace.keep(nameCheck.current.getBoundingClientRect().height);
-    }
+    nameCheck.going();
     checkName.value = false;
     if (scroll) {
       nameList.current?.focus();
@@ -805,7 +801,7 @@ export function CartForm({
         after={cartHeading}
       />
       {checkName.value && name !== undefined ? (
-        <div ref={nameCheck} role="alert" class={CAUTION_BOX}>
+        <div ref={nameCheck.shown} role="alert" class={CAUTION_BOX}>
           <div>{sayParts(ARE_YOU, { name: <strong>{name}</strong> })}</div>
           <div class="actions">
             <button
@@ -830,7 +826,7 @@ export function CartForm({
           </div>
         </div>
       ) : (
-        nameCheckSpace.space(() => focusInPlace(nameList.current))
+        nameCheck.space()
       )}
       <Field label={say(YOUR_NAME)}>
         {(id) => (
@@ -941,16 +937,14 @@ export function CartForm({
       )}
       {placeRead.value !== null ? (
         <PlaceSides
-          question={placeQuestion}
+          question={placeQuestion.shown}
           place={placeRead.value}
           name={indexOf(catalogue).places.get(placeRead.value) ?? ""}
           sides={placeSides(cart.value)}
           onPick={answerPlace}
         />
       ) : (
-        placeQuestionSpace.space(() =>
-          focusInPlace(placeList(answeredSide.current)),
-        )
+        placeQuestion.space()
       )}
 
       <Finder

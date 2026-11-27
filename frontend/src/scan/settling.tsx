@@ -48,6 +48,30 @@ export function useKeptSpace() {
 }
 
 /**
+ * The space of one thing drawn (`shown`, its ref) that a tap takes away,
+ * kept blank for SETTLE_MS (useKeptSpace), such as the scan page's name
+ * check (Ali, 2026-11-27, inventory-tng-m6dc). `going` measures it, called
+ * as the tap lands, and keeps nothing if it is not drawn; `space` is the
+ * blank, whose tap focuses `refocus()` without scrolling, as a tap on
+ * nothing may move focus.
+ */
+export function useKeptSpaceOf<T extends HTMLElement>(
+  refocus: () => HTMLElement | null,
+) {
+  const shown = useRef<T>(null);
+  const kept = useKeptSpace();
+  return {
+    shown,
+    going: () => {
+      if (shown.current !== null) {
+        kept.keep(shown.current.getBoundingClientRect().height);
+      }
+    },
+    space: () => kept.space(() => focusInPlace(refocus())),
+  };
+}
+
+/**
  * Taps on a list's entries, ignored a moment once a tap took an entry
  * away, as the second tap of a double tap would land on what moved up in
  * its place; or once a tap changed `on` but left it listed (`stayed`), on
