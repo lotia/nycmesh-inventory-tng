@@ -87,7 +87,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.core.db_errors import Gone as RowGone
-from inventory_tng.core.db_errors import attempt, refusal
+from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, ngettext
 from inventory_tng.core.sent_forms import form_key
@@ -207,15 +207,13 @@ areas_brought_back = meter.create_counter(
     description="Retired areas emptied while they were counted, brought back "
     "from the count form",
 )
-# Why Bring it back refused an area, nothing changed, by the rule that
-# refused it (places/locations.restore); one no rule there names, other.
-BringBackRefusal = Literal[
-    "parent_kind", "parent_retired", "custodian_retired", "other"
-]
+# The rules places/locations.restore may refuse an area by, each by the
+# reason it is counted under; any other is a bug, and raised. Not its
+# custodian's: an area has none (location's custody_has_volunteer).
+BringBackRefusal = Literal["parent_kind", "parent_retired"]
 BRING_BACK_REFUSALS: dict[str, BringBackRefusal] = {
     "location_area_parent": "parent_kind",
     "location_parent_current": "parent_retired",
-    "location_custody_volunteer": "custodian_retired",
 }
 # Refused, so measured at once (inventory-tng-wmh2).
 bring_backs_refused = meter.create_counter(
@@ -809,10 +807,10 @@ def count(
     )
     problems |= words
     # Read from `said`, not `words`: a sealed row of a package held nowhere
-    # is shown otherwise with no box to put words beside. Refused here
-    # whenever `said` is, with words beside a box or none, as kept_as_now
-    # has logged and measured it: the save would refuse it again, a second
-    # time (inventory-tng-xse9).
+    # is shown otherwise with no box to put words beside. Its field has
+    # words all the same (count_forms.changed_words reads every field
+    # typed_named does), so `said` comes with `problems` and the form is
+    # refused here, measured once, not again by the save (inventory-tng-xse9).
     if said:
         reasons.append("shown_otherwise")
     # Every alert is said above the form, each in its own words: why it was
@@ -839,7 +837,7 @@ def count(
         alerts.append(listed_alert)
         off_form = None if sent.listed.on_form else sent.listed
         reasons.append("listed_elsewhere")
-    if problems or said:
+    if problems:
         if boxes := box_refusals(sent):
             log.info("count refused for its boxes", location_id=place.id, reasons=boxes)
         count_refused(*reasons, *boxes)
@@ -1206,9 +1204,9 @@ def bring_back(
             return False
         return True
 
-    brought, broken = attempt(session, restore)
+    brought, broken = refusal(session, restore, *BRING_BACK_REFUSALS)
     if broken is not None:
-        bring_backs_refused.add(1, {"reason": BRING_BACK_REFUSALS.get(broken, "other")})
+        bring_backs_refused.add(1, {"reason": BRING_BACK_REFUSALS[broken]})
         log.info(
             "count area not brought back",
             location_id=place.id,
