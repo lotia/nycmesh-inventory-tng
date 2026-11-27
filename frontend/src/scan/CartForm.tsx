@@ -773,13 +773,19 @@ export function CartForm({
 
   /** Put the name check away, its space kept blank a moment if it was
    * shown, so what is below does not move up under the finger, and focus
-   * the name list without scrolling (Ali, 2026-11-27, inventory-tng-m6dc). */
-  function answerNameCheck() {
+   * the name list: without scrolling, from the check's own answers (Ali,
+   * 2026-11-27, inventory-tng-m6dc); scrolled into view if it is not, from
+   * Change, far below it, whose tap would otherwise show nothing. */
+  function answerNameCheck({ scroll = false } = {}) {
     if (nameCheck.current !== null) {
       nameCheckSpace.keep(nameCheck.current.getBoundingClientRect().height);
     }
     checkName.value = false;
-    focusInPlace(nameList.current);
+    if (scroll) {
+      nameList.current?.focus();
+    } else {
+      focusInPlace(nameList.current);
+    }
   }
   // Undo, while the cart is as removing left it.
   const undoable =
@@ -1059,7 +1065,10 @@ export function CartForm({
       {name !== undefined && (
         <p>
           {sayParts(RECORDING_AS, { name: <strong>{name}</strong> })}{" "}
-          <button type="button" onClick={answerNameCheck}>
+          <button
+            type="button"
+            onClick={() => answerNameCheck({ scroll: true })}
+          >
             {say(CHANGE)}
           </button>
         </p>

@@ -99,9 +99,12 @@ describe("whose name it is", () => {
 
   /** That answering with `answer`, by a pointer's tap, keeps the name
    * check's 120 px blank until taps are taken again, focuses the name list
-   * without scrolling, and an ignored tap there focuses it again (Ali,
-   * 2026-11-27, inventory-tng-m6dc). */
-  async function expectSpaceKept(answer: string) {
+   * once, with `focused` (without scrolling, unless said), and an ignored
+   * tap there focuses it again (Ali, 2026-11-27, inventory-tng-m6dc). */
+  async function expectSpaceKept(
+    answer: string,
+    focused: unknown[] = [{ preventScroll: true }],
+  ) {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const tall = vi
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
@@ -115,8 +118,7 @@ describe("whose name it is", () => {
     });
     expect(screen.queryByText(/Are you/)).toBeNull();
     expect(document.activeElement).toBe(nameList());
-    // Once, without scrolling.
-    expect(focus.mock.calls).toEqual([[{ preventScroll: true }]]);
+    expect(focus.mock.calls).toEqual([focused]);
     const space = keptSpace();
     expect(space.getAttribute("aria-hidden")).toBe("true");
     expect(space.style.height).toBe("120px");
@@ -142,18 +144,22 @@ describe("whose name it is", () => {
     expect(selected(say(YOUR_NAME))).toBe("");
   });
 
-  test("Change, with the name check shown, keeps its space blank a moment, and focuses the name list (inventory-tng-m6dc)", async () => {
-    await expectSpaceKept(say(CHANGE));
+  test("Change, with the name check shown, keeps its space blank a moment, and brings the name list into view (inventory-tng-m6dc)", async () => {
+    // Far below the list, Change scrolls to it, as it did before.
+    await expectSpaceKept(say(CHANGE), []);
     expect(selected(say(YOUR_NAME))).toBe("1");
   });
 
-  test("Change, with no name check shown, keeps no space", async () => {
+  test("Change, with no name check shown, keeps no space and brings the name list into view", async () => {
     open();
     await ready();
     pick(say(YOUR_NAME), "1");
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
     fireEvent.click(screen.getByRole("button", { name: say(CHANGE) }));
     expect(document.activeElement).toBe(nameList());
+    expect(focus.mock.calls).toEqual([[]]);
     expect(keptSpace()).toBeNull();
+    focus.mockRestore();
   });
 
   test("answered by a key, focus goes to the name list and stays where keys then move it (inventory-tng-m6dc)", async () => {
