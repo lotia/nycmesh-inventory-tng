@@ -769,9 +769,7 @@ export function CartForm({
         older={older}
         catalogue={catalogue}
         onPutBack={putInCart}
-        // Not scrolled to: the page moving would put something new under
-        // the finger (inventory-tng-lm1b).
-        focusAfter={() => cartHeading.current?.focus({ preventScroll: true })}
+        after={cartHeading}
       />
       {checkName.value && name !== undefined && (
         <div role="alert" class={CAUTION_BOX}>

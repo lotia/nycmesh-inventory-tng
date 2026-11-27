@@ -555,14 +555,17 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
   const form = page.locator("form").first();
-  const before = await form.evaluate((it) =>
-    JSON.stringify(Object.fromEntries(new FormData(it as HTMLFormElement))),
-  );
+  const values = () =>
+    form.evaluate((it) =>
+      JSON.stringify(Object.fromEntries(new FormData(it as HTMLFormElement))),
+    );
+  const before = await values();
+  const cartHeading = page.getByRole("heading", { name: "Cart" });
   await page.touchscreen.tap(x, y);
   await page.waitForTimeout(150);
   await page.touchscreen.tap(x, y);
   await expect(listing).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Cart" })).toBeFocused();
+  await expect(cartHeading).toBeFocused();
   // Once the space has gone, a form control is where the finger was: the
   // second tap would have landed on it.
   await expect
@@ -576,10 +579,6 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
       ),
     )
     .toBe(true);
-  expect(
-    await form.evaluate((it) =>
-      JSON.stringify(Object.fromEntries(new FormData(it as HTMLFormElement))),
-    ),
-  ).toBe(before);
-  await expect(page.getByRole("heading", { name: "Cart" })).toBeFocused();
+  expect(await values()).toBe(before);
+  await expect(cartHeading).toBeFocused();
 });

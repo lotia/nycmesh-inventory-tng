@@ -2,6 +2,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useSignal } from "@preact/signals";
+import type { RefObject } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { say } from "../shared/i18n";
 import { MAKE_CHANGES } from "../shared/outbox-notes";
@@ -24,7 +25,7 @@ import {
 } from "./older-builds";
 import { toCart, withRetired } from "./older-to-cart";
 import { indexOf } from "./search";
-import { SETTLE_MS, useKeptSpace } from "./settling";
+import { focusInPlace, SETTLE_MS, useKeptSpace } from "./settling";
 
 /** An older build's cart, filled for each kind (olderKind). */
 const CART_KIND_WORDS: Record<Kind, MessageDescriptor> = {
@@ -85,23 +86,22 @@ export const KEPT_ON_NOT_SENT = msg`Kept on this device {when}, not sent.`;
  * away makes every entry's buttons wait, and focus goes to the heading of
  * the entry that moved up, or of the list; the last entry taken away,
  * the list's space stays blank a moment (useKeptSpace), and focus goes to
- * what follows (`focusAfter`). One holding an item retired
- * since, and out of the catalogue, names it from the catalogue's retired
- * items, and goes in the cart only once that line is discarded.
+ * what follows (`after`). One holding an item retired since, and out of
+ * the catalogue, names it from the catalogue's retired items, and goes in
+ * the cart only once that line is discarded.
  */
 export function OlderList({
   older,
   catalogue,
   onPutBack,
-  focusAfter,
+  after,
 }: {
   older: OlderStore;
   catalogue: Catalogue;
   /** Put one back in the cart: why not, if it was not. */
   onPutBack: (each: Older) => NotPut | null;
-  /** Focus what follows the list, once nothing is listed, without
-   * scrolling to it. */
-  focusAfter: () => void;
+  /** What focus goes to once nothing is listed. */
+  after: RefObject<HTMLElement | null>;
 }) {
   // The one whose discarding is being confirmed, and what one tap said.
   const discarding = useSignal<string | null>(null);
@@ -153,16 +153,13 @@ export function OlderList({
     shown.findIndex(({ each }) => olderId(each) === on);
   /** Focus the heading of the entry at `at`, or the list's if none is,
    * or, none listed, what follows the list (Ali, 2026-11-27,
-   * inventory-tng-lm1b). Never scrolled to: the page moving would put
-   * something new under the finger (Ali, 2026-11-27). */
-  const focusPlace = (at: number) => {
-    const to = document.getElementById(`older-${at}`) ?? heading.current;
-    if (to === null) {
-      focusAfter();
-    } else {
-      to.focus({ preventScroll: true });
-    }
-  };
+   * inventory-tng-lm1b). */
+  const focusPlace = (at: number) =>
+    focusInPlace(
+      document.getElementById(`older-${at}`) ??
+        heading.current ??
+        after.current,
+    );
   // After a line's Discard, focus goes to its entry's heading, not to the
   // page; if a tap took the entry away, to the heading of the one that
   // moved up in its place, or of the list if none did (Ali, 2026-11-27,
@@ -181,7 +178,7 @@ export function OlderList({
     focusPlace(want.at ?? n);
   }, [shown]);
   if (shown.length === 0) {
-    return kept.space(focusAfter);
+    return kept.space(() => focusInPlace(after.current));
   }
   /** A tap on one of `on`'s buttons, ignored just after a line of it was
    * discarded, or just after a tap took any entry away: the second tap of

@@ -7,6 +7,11 @@ import { useEffect } from "preact/hooks";
  * something away, in milliseconds. */
 export const SETTLE_MS = 500;
 
+/** Focus `to`, if there is one, without scrolling it into view: the page
+ * moving would put something new under the finger (Ali, 2026-11-27). */
+export const focusInPlace = (to: HTMLElement | null) =>
+  to?.focus({ preventScroll: true });
+
 /**
  * The space a list took, kept blank for SETTLE_MS once a tap took its last
  * entry away, so what is below it does not move up under the finger (Ali,
