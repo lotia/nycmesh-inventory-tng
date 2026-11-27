@@ -226,8 +226,8 @@ test("the unit of the item picked follows its box", () => {
 test("Reorder at's unit and keypad follow the item's unit chosen", () => {
   document.body.innerHTML = `
     <select name="unit">
-      <option data-unit="m" data-inputmode="decimal" selected>m</option>
-      <option data-unit="each" data-inputmode="numeric">each</option>
+      <option data-unit="m" selected>m</option>
+      <option data-unit="each">each</option>
     </select>
     <input name="minimum" inputmode="decimal" aria-describedby="unit-minimum"><span id="unit-minimum" aria-hidden="true" data-unit-of="unit">m</span>`;
   followUnits(document);
@@ -245,7 +245,7 @@ test("How much takes the keypad of the item picked, its own for none", () => {
   document.body.innerHTML = `
     <select name="item_id">
       <option value="">Pick one</option>
-      <option value="1" data-unit="each" data-inputmode="numeric">Radio (each)</option>
+      <option value="1" data-unit="each">Radio (each)</option>
     </select>
     <input name="amount" inputmode="decimal" aria-describedby="unit-amount"><span id="unit-amount" data-unit-of="item_id"></span>`;
   followUnits(document);

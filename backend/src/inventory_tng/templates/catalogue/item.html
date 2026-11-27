@@ -69,7 +69,7 @@ with nothing sent. #}
     (hints.followUnits): with the unit free, it is read in the unit
     chosen. #}
     <select name="unit"{{ unit_refused }}>
-      {% for unit in units %}<option data-unit="{{ unit }}" data-inputmode="{{ unit | keyboard }}" {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
+      {% for unit in units %}<option data-unit="{{ unit }}" {% if values.get('unit', item.unit) == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}
     </select>
     {% endif %}
     {#- Answered No (Ali, 2026-11-25, inventory-tng-aknv): after what a

@@ -122,6 +122,7 @@ RECORDED_IN = "unit_asked"
 # refused as changed since if it is no longer so
 # (unit_changes.require_fixed_as_shown).
 UNIT_FREE = "unit_free"
+SHOWN_FREE = {"yes": True, "no": False}
 
 
 class _AskFirst(Exception):
@@ -813,7 +814,7 @@ def save_item(
             return _item_page(request, session, signed, found, alert=RULES[CHANGED])
     if fields is not None:
         recorded_in = form.get(RECORDED_IN) if answer == "yes" else None
-        shown_free = {"yes": True, "no": False}.get(form.get(UNIT_FREE, ""))
+        shown_free = SHOWN_FREE.get(form.get(UNIT_FREE, ""))
         same = forms.same_name(session, found, form, fields, typed)
         asked = None if same else []
         loose = 0

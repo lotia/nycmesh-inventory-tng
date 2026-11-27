@@ -1,3 +1,4 @@
+import { keyboard } from "../amount-rules";
 import { boxAmount, readBox } from "../shared/quantity";
 import { follow } from "./follow-fields";
 
@@ -57,8 +58,8 @@ function showDescribing(field: Element, words: HTMLElement, shown: boolean) {
  * typed in: "m" beside How much on the adjustment form, once a cable in m
  * is picked (inventory-tng-mdvz), and in the box's description, which
  * names the words (inventory-tng-4mcj). The words carry `data-unit-of`,
- * the select's name; each option, `data-unit`, and `data-inputmode`, the
- * keypad for its unit, which the box they describe takes, keeping its own
+ * the select's name; each option, `data-unit`. The box they describe
+ * takes the keypad for that unit (amount-rules keyboard), keeping its own
  * for an option with none, as "Pick one": Reorder at on the item page, read
  * in the unit chosen while it can change (inventory-tng-zhnd), and How
  * much for the item picked. Without this, the unit shows only in the
@@ -82,10 +83,10 @@ export function followUnits(document: Document): void {
       : null;
     const own = box?.inputMode ?? "";
     follow(document, [select], () => {
-      const picked = select.options[select.selectedIndex];
-      words.textContent = picked?.dataset.unit ?? "";
+      const unit = select.options[select.selectedIndex]?.dataset.unit ?? "";
+      words.textContent = unit;
       if (box !== null) {
-        box.inputMode = picked?.dataset.inputmode || own;
+        box.inputMode = unit ? keyboard(unit) : own;
       }
     });
   }

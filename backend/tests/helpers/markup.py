@@ -263,16 +263,6 @@ def units_offered(page: str | Element, name: str) -> dict[str, str | None]:
     }
 
 
-def keypads_offered(page: str | Element, name: str) -> dict[str, str | None]:
-    """The keypad each choice of the list named `name` gives the box its
-    unit follows (data-inputmode), by its value: None for one that gives
-    none."""
-    return {
-        option.attrs["value"]: option.attrs.get("data-inputmode")
-        for option in read(page).one("select", name=name).all("option")
-    }
-
-
 def sorted_columns(page: str | Element) -> list[tuple[str, str, str]]:
     """Each heading a list is sorted by (one a table): which way (its
     aria-sort), its link's words as spoken, and where that link goes."""

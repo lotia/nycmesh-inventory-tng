@@ -210,7 +210,7 @@ one by its size, an open package closed as none
     <label>{% trans %}Item{% endtrans %}
       <select name="extra_item_id"{{ described_by("extra_item_id", labelled=true) }}>
         <option value="">{% trans %}Nothing else{% endtrans %}</option>
-        {% for item in others %}<option value="{{ item.id }}" data-unit="{{ item.unit }}" data-inputmode="{{ item.unit | keyboard }}" {% if values.get('extra_item_id') == item.id | string %}selected{% endif %}>{{ item.name_shown }} ({{ item.unit }})</option>{% endfor %}
+        {% for item in others %}<option value="{{ item.id }}" data-unit="{{ item.unit }}" {% if values.get('extra_item_id') == item.id | string %}selected{% endif %}>{{ item.name_shown }} ({{ item.unit }})</option>{% endfor %}
       </select>
       {% with name = "extra_item_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>
@@ -231,7 +231,7 @@ one by its size, an open package closed as none
     <label>{% trans %}Package{% endtrans %}
       <select name="found_package_id"{{ described_by("found_package_id", labelled=true) }}>
         <option value="">{% trans %}None{% endtrans %}</option>
-        {% for package, name, unit in found_packages %}<option value="{{ package.id }}" data-unit="{{ unit }}" data-inputmode="{{ unit | keyboard }}" {% if values.get('found_package_id') == package.id | string %}selected{% endif %}{% if unit | printed_length %} data-hinted{% endif %}>{{ name }}, {{ package.name_shown }}</option>{% endfor %}
+        {% for package, name, unit in found_packages %}<option value="{{ package.id }}" data-unit="{{ unit }}" {% if values.get('found_package_id') == package.id | string %}selected{% endif %}{% if unit | printed_length %} data-hinted{% endif %}>{{ name }}, {{ package.name_shown }}</option>{% endfor %}
       </select>
       {% with name = "found_package_id" %}{% include "_field_problem.html" %}{% endwith %}
     </label>

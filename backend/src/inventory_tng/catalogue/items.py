@@ -439,28 +439,32 @@ def save(
     # label of it being made, which locks the item too (labels.make_for_item).
     relock(session, item, seen=seen)
     enforce("retired_read_only", when=item.retired_at is not None)
-    changing = fields.unit != item.unit
-    why = unit_changes.unit_fixed(session, item) if changing else None
-    if changing:
+    if fields.unit != item.unit:
+        why = unit_changes.unit_fixed(session, item)
         unit_changes.require_fixed_as_shown(item.id, why, shown_free)
-    if why:
-        minimum = unit_changes.convert(
-            session, item, fields.unit, fields.minimum, why=why, recorded_in=recorded_in
-        )
-        fields = replace(fields, minimum=minimum)
-    elif changing:
-        if counted_whole(fields.unit):
-            # Under the catalogue lock, which every package write takes.
-            fraction = fractional_package(session, item.id) is not None
-            enforce(PACKAGES_WHOLE, when=fraction)
-            holding_one = select(ItemPackage).where(
-                ItemPackage.item_id == item.id,
-                ItemPackage.retired_at.is_(None),
-                *_HOLDS_ONE,
+        if why:
+            minimum = unit_changes.convert(
+                session,
+                item,
+                fields.unit,
+                fields.minimum,
+                why=why,
+                recorded_in=recorded_in,
             )
-            for package in session.scalars(locked(holding_one)):
-                _short_cleared(session, package, "switch")
-        unit_changes.follow(session, item.id, fields.unit)
+            fields = replace(fields, minimum=minimum)
+        else:
+            if counted_whole(fields.unit):
+                # Under the catalogue lock, which every package write takes.
+                fraction = fractional_package(session, item.id) is not None
+                enforce(PACKAGES_WHOLE, when=fraction)
+                holding_one = select(ItemPackage).where(
+                    ItemPackage.item_id == item.id,
+                    ItemPackage.retired_at.is_(None),
+                    *_HOLDS_ONE,
+                )
+                for package in session.scalars(locked(holding_one)):
+                    _short_cleared(session, package, "switch")
+            unit_changes.follow(session, item.id, fields.unit)
     if fields.category_id != item.category_id:
         _in_current_category(session, fields.category_id)
     keys = Keys.of(session, fields.name)
