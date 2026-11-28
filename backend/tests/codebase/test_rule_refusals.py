@@ -13,7 +13,9 @@ Deterministic, read from the source:
   names nothing else, so the list cannot outlive its code. A rule passed
   on in a variable is read where it is named; the few places that pass one
   on are named in PASSED_ON.
-- An entry in either list no longer found fails too."""
+- A change made through attempt() or its kin with no ids for its
+  refusal's log line fails, but for those in NAMES_NO_ROW.
+- An entry in any of these lists no longer found fails too."""
 
 import ast
 import importlib
@@ -48,6 +50,26 @@ CAUGHT_ELSEWHERE = {
     ("stock/adjustment_reasons.py", "seeded"): SAME_TIME,
     ("stock/open_packages.py", "make"): SAME_TIME,
 }
+# The changes whose refusal is logged with no row's id, by module and
+# function, each with why: _attempted logs the ids a page gives it.
+NO_ROW_YET = "a row made, so none to name yet"
+NAMES_NO_ROW = {
+    ("volunteers/volunteers_routes.py", "add_volunteer"): NO_ROW_YET,
+    ("places/locations_routes.py", "add_location"): NO_ROW_YET,
+    ("catalogue/categories_routes.py", "add_category"): NO_ROW_YET,
+    ("site_settings/site_settings_routes.py", "add_reason"): NO_ROW_YET,
+    ("site_settings/site_settings_routes.py", "save_site_settings"): "the one "
+    "settings row",
+    ("catalogue/reading_rules_routes.py", "accept"): "rules for many units "
+    "at once, by token, not by row",
+    ("catalogue/unit_readings.py", "load"): "the operator's command, which "
+    "counts nothing, loading many rules",
+    ("catalogue/items_routes.py", "track_items"): "many items at once",
+    ("admins/accounts.py", "invite_by_operator"): NO_ROW_YET,
+    ("core/db_locking.py", "stale_since"): "Stale, which unchanged() logs "
+    "with its row's id, not _attempted",
+}
+ATTEMPTS = {"attempt", "refusal", "refusal_naming_index", "unique"}
 # Where a rule is passed on in a variable, named by whoever calls it: by
 # module and function.
 PASSED_ON = {
@@ -117,6 +139,53 @@ def test_rule_refusals_are_caught_only_by_attempt() -> None:
 
 def test_every_rule_refusal_caught_elsewhere_is_still_there() -> None:
     assert CAUGHT_ELSEWHERE.keys() - _caught_elsewhere() == set()
+
+
+def _unnamed(tree: ast.Module) -> set[str]:
+    """The functions of `tree` that make a change through attempt() or its
+    kin with no ids for its refusal's log line."""
+    inside = _functions(tree)
+    return {
+        inside.get(node, "<module>")
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name | ast.Attribute)
+        and (node.func.id if isinstance(node.func, ast.Name) else node.func.attr)
+        in ATTEMPTS
+        and not node.keywords
+    }
+
+
+def _unnamed_anywhere() -> set[tuple[str, str]]:
+    return {
+        (_where(path), function)
+        for path in modules()
+        if path != DB_ERRORS
+        for function in _unnamed(ast.parse(path.read_text(), str(path)))
+    }
+
+
+def test_every_change_names_its_rows_for_a_refusal() -> None:
+    """A rule refusal is logged with the ids a page passes attempt() and
+    its kin (CONTRIBUTING.md#logging): none passed fails, but for those in
+    NAMES_NO_ROW."""
+    assert _unnamed_anywhere() - NAMES_NO_ROW.keys() == set()
+
+
+def test_every_change_naming_no_row_is_still_there() -> None:
+    assert NAMES_NO_ROW.keys() - _unnamed_anywhere() == set()
+
+
+def test_finds_a_change_naming_no_row() -> None:
+    source = (
+        "def bare():\n"
+        "    attempt(session, change)\n"
+        "def named():\n"
+        "    db_errors.unique(session, change, item_id=1)\n"
+        "def passed_on():\n"
+        "    refusal(session, change, RULE, **ids)\n"
+    )
+    assert _unnamed(ast.parse(source)) == {"bare"}
 
 
 def _module(path: Path) -> ModuleType:

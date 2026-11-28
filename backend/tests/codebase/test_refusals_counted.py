@@ -6,9 +6,9 @@ module.
 
 Deterministic, read from the source: only a call of a log level's method
 (log.info("...")), or of a name given one (emit = log.info), with its
-event written in it, a string or an f-string, is read, and only its event, by whole words, so a docstring, a comment,
-a variable or a refusal's own words to a person (RULES, notices) never
-match. The few that are not a request refused are named in NOT_COUNTED,
+event written in it, a string or an f-string, is read, and only its
+event, by whole words, so a docstring, a comment, a variable or a
+refusal's own words to a person (RULES, notices) never match. The few that are not a request refused are named in NOT_COUNTED,
 each with why, and one no longer found there fails too, so the list
 cannot outlive its code."""
 

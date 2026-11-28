@@ -201,7 +201,7 @@ def change_reason(
     # (inventory-tng-j4ao).
     problem = name_problem(name) if renaming else None
     if problem is None:
-        _, broken = refusal(session, change, "unique")
+        _, broken = refusal(session, change, "unique", adjustment_reason_id=reason_id)
         problem = broken and forms.REASON_TAKEN
     if problem is not None:
         # A rename refused shows what was typed, beside its problem; a

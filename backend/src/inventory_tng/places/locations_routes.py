@@ -217,7 +217,7 @@ def save_location(
         def save() -> None:
             locations.save(session, found, name, under, time_zone=zone, seen=seen)
 
-        _, broken = attempt(session, save)
+        _, broken = attempt(session, save, location_id=location_id)
         if broken in ALERTS:
             alert = RULES[broken]
             return _location_page(request, session, signed, found, alert=alert)
@@ -242,7 +242,11 @@ def retire_location(
     found = changeable(session, location_id)
     if found is None:
         return not_found()
-    _, broken = attempt(session, lambda: locations.retire(session, found, now()))
+    _, broken = attempt(
+        session,
+        lambda: locations.retire(session, found, now()),
+        location_id=location_id,
+    )
     if broken:
         problems = {"name": rule_words(broken, TAKEN)}
         return _location_page(request, session, signed, found, problems)
@@ -257,7 +261,9 @@ def restore_location(
     found = changeable(session, location_id)
     if found is None:
         return not_found()
-    _, broken = attempt(session, lambda: locations.restore(session, found))
+    _, broken = attempt(
+        session, lambda: locations.restore(session, found), location_id=location_id
+    )
     if broken:
         problems = {"name": RULES[broken]}
         return _location_page(request, session, signed, found, problems)

@@ -380,7 +380,9 @@ def name_device(
             request, signed, session, device, problems=problems, values=values
         )
     _, broken = attempt(
-        session, lambda: devices.name_device(session, device, label or None, seen=seen)
+        session,
+        lambda: devices.name_device(session, device, label or None, seen=seen),
+        device_id=device.id,
     )
     if broken:
         return _device_page(request, signed, session, device, alert=RULES[broken])

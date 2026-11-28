@@ -149,7 +149,11 @@ def change_email(
     values = {"email": email}
     if problem := accounts.email_problem(email):
         return _refused(request, session, signed, {"email": problem}, values)
-    if not unique(session, lambda: accounts.change_email(session, admin, email, now())):
+    if not unique(
+        session,
+        lambda: accounts.change_email(session, admin, email, now()),
+        admin_id=admin.id,
+    ):
         return _refused(request, session, signed, {"email": EMAIL_TAKEN}, values)
     response = _done(signed, session, "email", section="email")
     # Told at the old address, in case it was not them: someone with their
@@ -198,7 +202,9 @@ def rename_authenticator(
             accounts.rename_authenticator(session, admin_id, authenticator_id, name)
         )
 
-    if not unique(session, rename):
+    if not unique(
+        session, rename, admin_id=admin_id, authenticator_id=authenticator_id
+    ):
         return _refused(request, session, signed, {field: NAME_TAKEN}, values)
     if not found[0]:
         return not_found()  # Someone else's, or gone: ids reveal nothing.

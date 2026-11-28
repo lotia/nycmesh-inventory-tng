@@ -449,8 +449,9 @@ def short_problem(short: Decimal | str | None, size: Decimal | None) -> Words | 
 
 
 def alias_problem(session: Session, item: Item, typed: Typed) -> Words:
-    """Words for an alias refused as an item's name or another alias, its units read as the form's answers say too, naming
-    that item, or what is wrong with the name itself."""
+    """Words for an alias refused as an item's name or another alias, its
+    units read as the form's answers say too, naming that item, or what is
+    wrong with the name itself."""
     found = items.alias_taken_by(session, typed.name, typed.rules)
     whose, other = found or ("name", None)
     log.debug("alias taken", item_id=item.id, other_item_id=other and other.id)

@@ -262,6 +262,7 @@ def save_volunteer(
         _, broken = attempt(
             session,
             lambda: volunteers.save(session, found, name, email or None, seen=seen),
+            volunteer_id=volunteer_id,
         )
         if broken in ALERTS:
             alert = RULES[broken]
@@ -285,7 +286,11 @@ def hold_stock(
     # A retired volunteer holds nothing.
     if found is None or found.retired_at is not None:
         return not_found()
-    _, broken = attempt(session, lambda: volunteers.hold_stock(session, found))
+    _, broken = attempt(
+        session,
+        lambda: volunteers.hold_stock(session, found),
+        volunteer_id=volunteer_id,
+    )
     if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
@@ -302,7 +307,9 @@ def stop_holding_stock(
     if found is None:
         return not_found()
     _, broken = attempt(
-        session, lambda: volunteers.stop_holding_stock(session, found, now())
+        session,
+        lambda: volunteers.stop_holding_stock(session, found, now()),
+        volunteer_id=volunteer_id,
     )
     if broken:
         # location_holds_stock: the one rule ending custody can break.
@@ -321,7 +328,11 @@ def retire_volunteer(
     found = session.get(Volunteer, volunteer_id)
     if found is None:
         return not_found()
-    _, broken = attempt(session, lambda: volunteers.retire(session, found, now()))
+    _, broken = attempt(
+        session,
+        lambda: volunteers.retire(session, found, now()),
+        volunteer_id=volunteer_id,
+    )
     if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()
@@ -375,7 +386,10 @@ def merge_volunteer(
             request, session, signed, found, Problem(PICK_INTO, "not_chosen")
         )
     _, broken = attempt(
-        session, lambda: volunteers.merge(session, found, into.id, now())
+        session,
+        lambda: volunteers.merge(session, found, into.id, now()),
+        volunteer_id=volunteer_id,
+        into_volunteer_id=into.id,
     )
     if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
@@ -390,7 +404,9 @@ def restore_volunteer(
     found = session.get(Volunteer, volunteer_id)
     if found is None:
         return not_found()
-    _, broken = attempt(session, lambda: volunteers.restore(session, found))
+    _, broken = attempt(
+        session, lambda: volunteers.restore(session, found), volunteer_id=volunteer_id
+    )
     if broken:
         return _refused(request, session, signed, found, rule_words(broken, TAKEN))
     session.commit()

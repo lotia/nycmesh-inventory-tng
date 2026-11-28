@@ -372,7 +372,7 @@ def _set(
         )
         open_packages.left_below_zero(session, row, counted.shows, now())
 
-    return attempt(session, both)[1] is None
+    return attempt(session, both, open_package_id=open_id)[1] is None
 
 
 def _back(view: View, sent: str) -> View:

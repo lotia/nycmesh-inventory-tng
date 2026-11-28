@@ -154,6 +154,7 @@ def _answer(
             lambda row=row: open_packages.close(
                 session, row.id, signed.admin.id, now(), how="confirmed"
             ),
+            open_package_id=row.id,
         )
         changed += bool(done)
     once_committed(
@@ -244,6 +245,7 @@ def close_directly(
         lambda: open_packages.close(
             session, open_id, signed.admin.id, now(), how="direct"
         ),
+        open_package_id=open_id,
     )
     session.commit()
     notice = "open_package_closed" if done else "used_up_unchanged"

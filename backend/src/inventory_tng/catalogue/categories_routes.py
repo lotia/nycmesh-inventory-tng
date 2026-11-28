@@ -175,6 +175,7 @@ def rename_category(
             lambda: categories.rename(session, found, name, seen=seen),
             "unique",
             *ALERTS,
+            category_id=found.id,
         )
         if broken in ALERTS:
             return _category_page(request, session, signed, found, alert=RULES[broken])
@@ -197,7 +198,10 @@ def retire_category(
         return not_found()
     # Under the catalogue lock: items added or brought back meanwhile too.
     _, broken = refusal(
-        session, lambda: categories.retire(session, found, now()), "category_has_items"
+        session,
+        lambda: categories.retire(session, found, now()),
+        "category_has_items",
+        category_id=category_id,
     )
     if broken:
         return _category_page(

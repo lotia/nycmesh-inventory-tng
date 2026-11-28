@@ -1201,7 +1201,7 @@ def recover(
         )
 
     # Two at once both pass the check above: the unique index stops one.
-    if not unique(session, make):
+    if not unique(session, make, admin_id=admin.id):
         _refuse("recovery", "used")
     once_committed(session, recoveries.add, 1, {"outcome": "made"})
     once_committed(session, log.warning, "recovery link made", admin_id=admin.id)
