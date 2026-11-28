@@ -7,7 +7,7 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { SAM } from "./scan-page";
-import { doubleTap, middleOverWhatMovesUp } from "./taps";
+import { clicksReaching, doubleTap, middleOverWhatMovesUp } from "./taps";
 
 /** The scan page, Sam's name picked, its cart last used long ago, so it
  * asks. */
@@ -42,6 +42,8 @@ for (const answer of ["That's me", "Not me"]) {
       form.evaluate((it) => new FormData(it as HTMLFormElement).get("kind"));
     const before = await kind();
     const name = page.getByLabel("Your name");
+    // A tap on Your name changes neither its value nor the focus.
+    const reached = await clicksReaching(form, controls);
     await doubleTap(page, at);
     await expect(page.getByText(`Are you ${SAM}?`)).toHaveCount(0);
     await expect(name).toBeFocused();
@@ -57,6 +59,7 @@ for (const answer of ["That's me", "Not me"]) {
       )
       .toBe(true);
     expect(await kind()).toBe(before);
+    expect(await reached()).toBe(0);
     await expect(name).toBeFocused();
   });
 }

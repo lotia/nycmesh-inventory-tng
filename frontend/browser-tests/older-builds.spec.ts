@@ -10,7 +10,13 @@ import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
 import { itemIdOf, ownCable, record } from "./own-rows";
 import { pick, SAM, SHELF } from "./scan-page";
-import { doubleTap, middleOf, middleOverWhatMovesUp, settled } from "./taps";
+import {
+  clicksReaching,
+  doubleTap,
+  middleOf,
+  middleOverWhatMovesUp,
+  settled,
+} from "./taps";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
 const PUT_BACK = "Added back to cart. Review before Record.";
@@ -535,7 +541,8 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
   await page.reload();
 
   const listing = listingOf(page);
-  const controls = "input, select, button, textarea, label";
+  // Not buttons: the Discard tapped first is one.
+  const controls = "input, select, textarea, label";
   // On the Discard, where a control of the form will move up to.
   const at = await middleOverWhatMovesUp(
     lineDiscard(listing, `${cable}: 3 m from an open package`),
@@ -549,6 +556,7 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
     );
   const before = await values();
   const cartHeading = page.getByRole("heading", { name: "Cart" });
+  const reached = await clicksReaching(form, controls);
   await doubleTap(page, at);
   await expect(listing).toHaveCount(0);
   await expect(cartHeading).toBeFocused();
@@ -564,5 +572,6 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
     )
     .toBe(true);
   expect(await values()).toBe(before);
+  expect(await reached()).toBe(0);
   await expect(cartHeading).toBeFocused();
 });

@@ -28,10 +28,15 @@ export async function middleOf(target: Locator): Promise<Point> {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
+/** How far, at least, the point is kept from the edges of the target and
+ * the control, so that a pixel's rounding cannot put it outside either. */
+const INSIDE_PX = 4;
+
 /** A point on `target`, scrolled onto the screen if it is not, that one of
  * the elements matching `controls` will be under once `gone` and its
  * space have gone and what follows it has moved up in its place: where a
- * double tap's second tap lands on them if nothing stops it. Found from
+ * double tap's second tap lands on them if nothing stops it. Only those
+ * after `gone` in the page's flow count, as only they move up. Found from
  * the page as drawn, so it holds whatever the fonts make its heights. */
 export async function middleOverWhatMovesUp(
   target: Locator,
@@ -44,18 +49,27 @@ export async function middleOverWhatMovesUp(
     throw new Error(`${target} is not shown`);
   }
   const over = await gone.evaluate(
-    (it, { box, controls }) => {
+    (it, { box, controls, inside }) => {
       const next = it.nextElementSibling;
       if (next === null) {
-        return null;
+        return "nothing after";
       }
       // How far what follows moves up: its distance from the top of `it`.
       const rise =
         next.getBoundingClientRect().top - it.getBoundingClientRect().top;
-      // The middle of the largest overlap, away from any edge.
+      // The middle of the largest overlap, if it is wide and tall enough
+      // to keep that middle off the edges.
       let best: { x: number; y: number; area: number } | null = null;
       for (const each of document.querySelectorAll(controls)) {
-        if (it.contains(each)) {
+        const follows =
+          it.compareDocumentPosition(each) & Node.DOCUMENT_POSITION_FOLLOWING;
+        const position = getComputedStyle(each).position;
+        if (
+          !follows ||
+          it.contains(each) ||
+          position === "fixed" ||
+          position === "sticky"
+        ) {
           continue;
         }
         const moved = each.getBoundingClientRect();
@@ -63,19 +77,45 @@ export async function middleOverWhatMovesUp(
         const bottom = Math.min(box.y + box.height, moved.bottom - rise);
         const left = Math.max(box.x, moved.left);
         const right = Math.min(box.x + box.width, moved.right);
-        const area = Math.max(0, bottom - top) * Math.max(0, right - left);
-        if (area > (best?.area ?? 0)) {
+        const area = (bottom - top) * (right - left);
+        if (
+          bottom - top >= 2 * inside &&
+          right - left >= 2 * inside &&
+          area > (best?.area ?? 0)
+        ) {
           best = { x: (left + right) / 2, y: (top + bottom) / 2, area };
         }
       }
       return best && { x: best.x, y: best.y };
     },
-    { box, controls },
+    { box, controls, inside: INSIDE_PX },
   );
+  if (over === "nothing after") {
+    throw new Error(`nothing follows ${gone} to move up`);
+  }
   if (over === null) {
     throw new Error(`nothing matching ${controls} moves up under ${target}`);
   }
   return over;
+}
+
+/** Counts, from now on, the clicks that reach an element matching
+ * `controls` inside `within`: a tap that should have been ignored, or
+ * kept off them, and got through, though it changed no value or focus. */
+export async function clicksReaching(
+  within: Locator,
+  controls: string,
+): Promise<() => Promise<number>> {
+  await within.evaluate((it, controls) => {
+    it.addEventListener("click", (event) => {
+      if ((event.target as Element).closest(controls) !== null) {
+        it.dataset.clicksReaching = String(
+          Number(it.dataset.clicksReaching ?? 0) + 1,
+        );
+      }
+    });
+  }, controls);
+  return () => within.evaluate((it) => Number(it.dataset.clicksReaching ?? 0));
 }
 
 /** Two taps of a finger at `at`, 150 ms apart, as a double tap lands: the
