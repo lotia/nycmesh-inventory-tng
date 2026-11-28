@@ -2,7 +2,7 @@
 
 **Status:** accepted · 2026-10-30 · amended 2026-11-19 (measured and
 logged once committed; camera sessions) and 2026-11-27 (every refusal
-logged and counted together)
+logged and counted together; a rule's refusal counted once)
 
 ## Context
 
@@ -105,3 +105,21 @@ and attributes, and now count through the helper.
 
 Operator commands log their refusals but count none: telemetry starts
 only in the server, so a counter in a command would always read nothing.
+
+### Rules refusing a change, counted once (2026-11-27)
+
+Decided by Ali on 2026-11-27 (inventory-tng-v8sq): a change a rule
+refuses is logged and counted once, in `core/db_errors.py`'s
+`_attempted()`, which every page's change passes through
+(`inventory.changes.refused`, by `rule`). The rule's name is the
+attribute, from `core/rule_names.py`'s fixed list, rather than a reason
+per page. Many such refusals had been said on the page and never logged.
+
+Pages that had counted their own rule refusals no longer do, so none is
+counted twice: adjustments, answers to lines recorded more than moved,
+package tracking, reading rules, the item page's forms, unit changes and
+recounts, and a count's Bring it back. A count form keeps its own counter
+for what its form refuses before the save. A form shown before its row
+changed is counted by `inventory.edits.stale` alone, by table.
+`tests/codebase/test_rule_refusals.py` fails on a rule refusal caught
+anywhere else, and on a rule missing from the list.

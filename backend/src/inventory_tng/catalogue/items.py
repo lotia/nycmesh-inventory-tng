@@ -441,7 +441,7 @@ def save(
     enforce("retired_read_only", when=item.retired_at is not None)
     if fields.unit != item.unit:
         why = unit_changes.unit_fixed(session, item)
-        unit_changes.require_fixed_as_shown(item.id, why, shown_free)
+        unit_changes.require_fixed_as_shown(why, shown_free)
         if why:
             minimum = unit_changes.convert(
                 session,

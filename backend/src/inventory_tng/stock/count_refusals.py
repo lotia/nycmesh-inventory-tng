@@ -1,6 +1,8 @@
-"""Why a count form was refused, nothing written, and the Refusals that
-logs and measures it, by reason (inventory-tng-w7xt). The routes that
-refuse are stock/count_routes.py's."""
+"""Why a count form was refused before it was saved, nothing written, and
+the Refusals that logs and measures it, by reason (inventory-tng-w7xt);
+and the rules that may refuse it as it is saved, which core/db_errors.py
+logs and counts (inventory-tng-v8sq). The routes that refuse are
+stock/count_routes.py's."""
 
 from typing import Literal, get_args
 
@@ -29,10 +31,8 @@ ONCE = "movement_item_once"
 # inventory-tng-53im, inventory-tng-kro9).
 SENT_AGAIN = "count_sent_otherwise"
 
-# Why a count form was refused: on the form, or, as it was saved, by one
-# of RULE_REFUSALS, a place retired since included, though answered as
-# not found. A form that is not as the page sends it is not found, and
-# not counted.
+# Why a count form was refused as it was read, before its save. A form
+# that is not as the page sends it is not found, and not counted.
 CountRefusal = Literal[
     "named_twice",
     "listed_elsewhere",
@@ -40,9 +40,6 @@ CountRefusal = Literal[
     "box_problem",
     "shown_otherwise",
     "nothing_typed",
-    "changed_since_shown",
-    "not_countable",
-    "sent_again",
 ]
 # Why a count form is refused for its boxes, as logged too: a package it
 # counts closed meanwhile, or a box's own problem, such as no number
@@ -51,19 +48,18 @@ CountRefusal = Literal[
 CLOSED: CountRefusal = "closed_meanwhile"
 BOX_PROBLEM: CountRefusal = "box_problem"
 
-# The rules that may refuse a count as it is saved, each by the reason it
-# is counted under: a fraction where whole units are counted, or an open
-# package found that its item does not follow, is a box's problem.
-RULE_REFUSALS: dict[str, CountRefusal] = {
-    WHOLE: BOX_PROBLEM,
-    COUNTABLE: "not_countable",
-    UNTRACKED: BOX_PROBLEM,
-    ONCE: "named_twice",
-    CLOSED_MEANWHILE: CLOSED,
-    CHANGED: "changed_since_shown",
-    SENT_AGAIN: "sent_again",
-    SHOWN_OTHERWISE: "shown_otherwise",
-}
+# The rules that may refuse a count as it is saved, a place retired since
+# included, though answered as not found.
+RULE_REFUSALS = (
+    WHOLE,
+    COUNTABLE,
+    UNTRACKED,
+    ONCE,
+    CLOSED_MEANWHILE,
+    CHANGED,
+    SENT_AGAIN,
+    SHOWN_OTHERWISE,
+)
 
 # Each reason a form is refused for is logged and counted once.
 count_refused = Refusals(

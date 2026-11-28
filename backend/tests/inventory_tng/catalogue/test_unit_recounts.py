@@ -8,7 +8,6 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy.orm import Session
-from structlog.testing import capture_logs
 
 from inventory_tng.catalogue import unit_recounts
 from inventory_tng.core.db_errors import RuleBroken
@@ -59,7 +58,5 @@ def test_an_item_retired_since_its_page_is_refused(session: Session) -> None:
     spools = Spools(session)
     seen = unit_recounts.planned(session, spools.cable).seen
     retire(session, spools.cable)
-    with capture_logs() as logs, pytest.raises(RuleBroken, match=RETIRED):
+    with pytest.raises(RuleBroken, match=RETIRED):
         recount(session, spools.cable, seen=seen)
-    refused = [each for each in logs if each["event"] == "unit recount refused"]
-    assert [each["reason"] for each in refused] == ["retired"]

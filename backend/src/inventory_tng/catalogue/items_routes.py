@@ -18,7 +18,6 @@ from typing import Annotated, NamedTuple
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
@@ -47,7 +46,6 @@ from inventory_tng.core.phrases import (
     lazy_gettext,
     ngettext,
 )
-from inventory_tng.core.refusals import Refusals
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -103,20 +101,6 @@ from inventory_tng.web.pages import NOTICES, add_notices, not_found, redirect
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
-
-# "Track each opened package" refused, for a package or items ticked on
-# the list: the item retired, or the page shown before a change since.
-tracking_refused = Refusals(
-    log,
-    metrics.get_meter(__name__).create_counter(
-        "inventory.package_tracking.refused",
-        unit="{change}",
-        description="Settings of whether opened packages are followed refused, "
-        "nothing changed, by where it was set and why",
-    ),
-    scope=("package", "bulk"),
-    reason=(RETIRED, CHANGED),
-)
 
 # Refused by _change_or_note, as a rule would be, to ask about close names.
 CLOSE = "close_names"
@@ -196,6 +180,7 @@ def _change_or_note[T](
             unit_changes.UNIT_UNCONFIRMED,
             *REFUSED_FIELDS,
             *ITEM_ALERTS,
+            **({} if item_id is None else {"item_id": item_id}),
         )
     except _AskFirst:
         log.debug("close names asked about", item_id=item_id, found=len(asked or ()))
@@ -212,12 +197,7 @@ def _change_or_note[T](
         problems["unit"] = fraction or WHOLE_UNITS
     elif broken in REFUSED_FIELDS:
         if broken == items.MINIMUM_WHOLE:  # The form's own check let it by.
-            forms.item_form_refused(
-                "database refused a fractional reorder at",
-                level="warning",
-                reason="minimum_whole",
-                item_id=item_id,
-            )
+            log.warning("fractional reorder at let by the form", item_id=item_id)
         problems[REFUSED_FIELDS[broken]] = RULES[broken]
     return done, broken
 
@@ -668,7 +648,7 @@ def _item_changed(
     """A change to an item's package or alias, made and committed, then the
     item page saying `notice` by `section`; refused, said above the page,
     while the item is retired."""
-    _, broken = refusal(session, change, RETIRED)
+    _, broken = refusal(session, change, RETIRED, item_id=item_id)
     if broken:
         found = session.get_one(Item, item_id)
         return _item_page(request, session, signed, found, alert=RULES[RETIRED])
@@ -768,7 +748,7 @@ def track_items(
         return not_found()
     if not item:
         return redirect(back, notice="tracking_none")
-    done, broken = refusal(
+    done, _ = refusal(
         session,
         lambda: open_packages.unfollowing(
             session,
@@ -781,7 +761,6 @@ def track_items(
         CHANGED,
     )
     if done is None:
-        tracking_refused("package tracking refused", scope="bulk", reason=broken)
         return redirect(back, notice="tracking_changed")
     changed, loose = done
     session.commit()
@@ -1048,7 +1027,10 @@ def restore_item(
         return not_found()
     # Its name and codes are its own still: unique, retired ones too.
     _, broken = refusal(
-        session, lambda: items.restore(session, found), "item_category_current"
+        session,
+        lambda: items.restore(session, found),
+        "item_category_current",
+        item_id=item_id,
     )
     # Beside the name: the category list shows only current categories.
     if broken:
@@ -1133,6 +1115,7 @@ def add_package(
             items.READ_ALIKE,
             items.PACKAGE_WHOLE,
             unit_changes.UNIT_CHANGED,
+            item_id=item_id,
         )
         if broken == RETIRED:
             return _item_page(request, session, signed, found, alert=RULES[RETIRED])
@@ -1266,6 +1249,7 @@ def save_package(
             SHORT_UNDER_SIZE,
             items.PACKAGE_WHOLE,
             *ALERTS,
+            item_package_id=package_id,
         )
         # Its size field is gone once fixed: said above the page, as for a
         # form that went stale.
@@ -1310,6 +1294,7 @@ def restore_package(
         lambda: items.restore_package(session, package),
         RETIRED,
         items.PACKAGE_WHOLE,
+        item_package_id=package_id,
     )
     found = session.get_one(Item, item_id)
     if broken is None:
@@ -1375,14 +1360,9 @@ def track_package(
         ),
         RETIRED,
         CHANGED,
+        item_package_id=package_id,
     )
     if done is None:
-        tracking_refused(
-            "package tracking refused",
-            scope="package",
-            reason=broken,
-            item_package_id=package_id,
-        )
         found = session.get_one(Item, item_id)
         return _item_page(request, session, signed, found, alert=RULES[str(broken)])
     session.commit()
@@ -1434,6 +1414,7 @@ def package_settings(
             SHORT_UNDER_SIZE,
             items.PACKAGE_WHOLE,
             unit_changes.UNIT_CHANGED,
+            item_package_id=package.id,
         )
         if broken == RETIRED:
             return _item_page(request, session, signed, found, alert=RULES[RETIRED])
@@ -1489,6 +1470,7 @@ def add_alias(
             "unique",
             items.ALIAS_IS_NAME,
             RETIRED,
+            item_id=item_id,
         )
         if broken == RETIRED:
             return _item_page(request, session, signed, found, alert=RULES[RETIRED])
@@ -1501,7 +1483,7 @@ def add_alias(
         problem = (
             forms.read_alike(session, typed)
             if broken == items.READ_ALIKE
-            else forms.alias_problem(session, found, typed, broken)
+            else forms.alias_problem(session, found, typed)
         )
     values = {**form, "alias_name": name}
     problems = {"alias_name": problem}

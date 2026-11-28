@@ -90,7 +90,6 @@ from inventory_tng.core.db_errors import Gone as RowGone
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, ngettext
-from inventory_tng.core.refusals import Refusals
 from inventory_tng.core.sent_forms import form_key
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
@@ -207,24 +206,10 @@ areas_brought_back = meter.create_counter(
     description="Retired areas emptied while they were counted, brought back "
     "from the count form",
 )
-# The rules places/locations.restore may refuse an area by, each by the
-# reason it is counted under; any other is a bug, and raised. Not its
-# custodian's: an area has none (location's custody_has_volunteer).
-BRING_BACK_REFUSALS = {
-    "location_area_parent": "parent_kind",
-    "location_parent_current": "parent_retired",
-}
-# Refused, so measured at once (inventory-tng-wmh2).
-bring_backs_refused = Refusals(
-    log,
-    meter.create_counter(
-        "inventory.count.bring_backs_refused",
-        unit="{area}",
-        description="Retired areas the count form's Bring it back refused, by "
-        "reason, nothing changed",
-    ),
-    reason=BRING_BACK_REFUSALS.values(),
-)
+# The rules places/locations.restore may refuse an area by; any other is a
+# bug, and raised. Not its custodian's: an area has none (location's
+# custody_has_volunteer).
+BRING_BACK_REFUSALS = ("location_area_parent", "location_parent_current")
 
 # A move from an area gone from a count form fixed on it: more or less
 # arrived than was moved, in any of the forms it arrived in
@@ -910,14 +895,8 @@ def count(
             shown_now = broken.now
             raise
 
-    result, broken = refusal(session, put_right, *RULE_REFUSALS)
+    result, broken = refusal(session, put_right, *RULE_REFUSALS, location_id=place.id)
     if broken is not None:
-        count_refused(
-            "count refused by a rule",
-            reason=RULE_REFUSALS[broken],
-            location_id=place.id,
-            rule=broken,
-        )
         if broken == SENT_AGAIN:
             # The saved count is listed on Counts, to see what went through.
             return redirect(COUNTS, notice="count_saved_already", section="count")
@@ -1217,15 +1196,10 @@ def bring_back(
             return False
         return True
 
-    brought, broken = refusal(session, restore, *BRING_BACK_REFUSALS)
+    brought, broken = refusal(
+        session, restore, *BRING_BACK_REFUSALS, location_id=place.id, area_id=area.id
+    )
     if broken is not None:
-        bring_backs_refused(
-            "count area not brought back",
-            reason=BRING_BACK_REFUSALS[broken],
-            location_id=place.id,
-            area_id=area.id,
-            rule=broken,
-        )
         # Nothing changed: the tree and the areas as read already.
         return again(
             at,

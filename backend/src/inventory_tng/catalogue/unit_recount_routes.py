@@ -173,6 +173,7 @@ def recount(
         CHANGED,
         RETIRED,
         unit_changes.UNIT_CHECKS_WAITING,
+        item_id=item_id,
     )
     if broken is not None:
         session.refresh(found)

@@ -15,7 +15,7 @@ The arithmetic of converting is unit_conversion's; the ledger's lines keep
 their unit and convert as they are read (stock/line_amounts.py)."""
 
 from decimal import Decimal
-from typing import Literal, get_args
+from typing import Literal
 
 import structlog
 from opentelemetry import metrics
@@ -27,7 +27,6 @@ from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import locked
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
-from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.base import QUANTITY_MAX, QUANTITY_STEP
 from inventory_tng.models.catalogue import UNITS, Item, ItemPackage, VendorOffer
 from inventory_tng.models.core import CatalogueHistory
@@ -68,8 +67,8 @@ UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
 
 # Refused: a change of the item's unit that finds it fixed or free
 # otherwise than its form showed (require_fixed_as_shown), by what fixed or
-# freed it since: the reason it is counted by, and the rule it is refused
-# by, whose words say that cause (Ali, 2026-11-27, inventory-tng-zhnd).
+# freed it since: the reason the item page logs, and the rule it is
+# refused by, whose words say that cause (Ali, 2026-11-27, inventory-tng-zhnd).
 # Free since: only its labels revoked can free it. Converted by another's
 # save, it is said as any save changed since; from the item page that save
 # also changed the item's version, so the stale check refuses it first.
@@ -80,22 +79,6 @@ SINCE_SHOWN: dict[UnitFixed | None, tuple[str, str]] = {
     None: ("revoked_since_shown", "item_unit_revoked_since_shown"),
 }
 SINCE_SHOWN_RULES = frozenset(rule for _, rule in SINCE_SHOWN.values())
-
-unit_changes_refused = Refusals(
-    log,
-    meter.create_counter(
-        "inventory.unit_changes.refused",
-        unit="{change}",
-        description="Changes to an item's unit refused, by why: what fixes it, "
-        "or, between lengths, what stops what is recorded converting",
-    ),
-    reason=(
-        *get_args(UnitFixed),
-        "checks_waiting",
-        "out_of_range",
-        *(reason for reason, _ in SINCE_SHOWN.values()),
-    ),
-)
 
 # Refused: a package's amount typed in the unit its form showed, which its
 # item or package has left since (require_unit_shown).
@@ -206,13 +189,13 @@ def convert(
     what it records converted (_converted), and `minimum`, its Reorder at
     as typed in its unit, comes back in `new`."""
     if not convertible(item.unit, new):
-        _refused(item.id, why, UNIT_FIXED_RULES[why])
+        enforce(UNIT_FIXED_RULES[why])
     # Refused before it is asked: a line recorded with more than was
     # moved, waiting, is shown in the line's unit. One raised while this
     # runs waits for it, holding the item, and is converted as it is
     # corrected (stock/over_recorded.py).
     if checks_waiting(session, item.id):
-        _refused(item.id, "checks_waiting", UNIT_CHECKS_WAITING)
+        enforce(UNIT_CHECKS_WAITING)
     if recorded_in != item.unit:
         log.info("unit change asked", item_id=item.id, reason=why)
         enforce(UNIT_UNCONFIRMED)
@@ -230,9 +213,7 @@ def checks_waiting(session: Session, item_id: int) -> bool:
     )
 
 
-def require_fixed_as_shown(
-    item_id: int, why: UnitFixed | None, shown_free: bool | None
-) -> None:
+def require_fixed_as_shown(why: UnitFixed | None, shown_free: bool | None) -> None:
     """RuleBroken, by SINCE_SHOWN's rule for `why`, unless a change of the
     item's unit finds it free (`why` None, unit_fixed) or fixed as its
     form showed it (`shown_free`). Free, the form says Reorder at is in
@@ -242,7 +223,8 @@ def require_fixed_as_shown(
     convert what is recorded otherwise (inventory-tng-zhnd). None for no
     form, as a command's."""
     if since := since_shown(why, shown_free):
-        _refused(item_id, *since)
+        _, rule = since
+        enforce(rule)
 
 
 def since_shown(
@@ -254,14 +236,6 @@ def since_shown(
     if shown_free is None or shown_free == (why is None):
         return None
     return SINCE_SHOWN[why]
-
-
-def _refused(item_id: int, reason: str, rule: str) -> None:
-    """A change of the item's unit refused by `rule`, logged and counted
-    by `reason`, from a fixed list: UnitFixed's, "checks_waiting",
-    "out_of_range" or SINCE_SHOWN's."""
-    unit_changes_refused("unit change refused", item_id=item_id, reason=reason)
-    enforce(rule)
 
 
 def _converted(
@@ -319,7 +293,7 @@ def _converted(
     if any(each is not None and each > QUANTITY_MAX for each in amounts) or not all(
         _kept_in(package, new) for package in packages
     ):
-        _refused(item.id, "out_of_range", UNIT_OUT_OF_RANGE)
+        enforce(UNIT_OUT_OF_RANGE)
     item.on_order = on_order
     item.unit_converted = True
     for offer in offered:

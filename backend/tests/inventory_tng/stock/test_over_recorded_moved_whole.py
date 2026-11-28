@@ -238,7 +238,7 @@ def test_a_count_is_taken_only_for_an_open_package_moved_whole(
     assert "over_recorded_unchanged" in response.headers["location"]
     assert checks(session)[0].settled_at is None
     assert adjustments(session) == []
-    refused = [line for line in logs if line["event"] == "over recorded not settled"]
+    refused = [line for line in logs if line["event"] == "change refused by a rule"]
     assert refused[0]["rule"] == "over_recorded_not_whole"
 
 

@@ -4,6 +4,7 @@ from collections.abc import Callable, Generator, Iterator, Mapping
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from functools import partial
 from typing import cast
 
 import pyotp
@@ -27,7 +28,6 @@ from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.admins.paths import ACCOUNT
 from inventory_tng.app import create_app
 from inventory_tng.catalogue import (
-    forms,
     items,
     reading_rules,
     unit_changes,
@@ -36,7 +36,7 @@ from inventory_tng.catalogue import (
 )
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS, unit_recount
 from inventory_tng.core import db_locking, db_sessions, mail
-from inventory_tng.core.db_errors import Gone, NoSession, RuleBroken
+from inventory_tng.core.db_errors import Gone, NoSession, RuleBroken, attempt
 from inventory_tng.core.masking import MASK, Masker
 from inventory_tng.core.settings import RateLimits, Settings
 from inventory_tng.core.telemetry import Telemetry, enabled
@@ -55,6 +55,7 @@ from inventory_tng.models.stock import (
 )
 from inventory_tng.scan import page_builds, page_telemetry_api
 from inventory_tng.stock import (
+    count_refusals,
     counts,
     counts_routes,
     ledger,
@@ -334,6 +335,10 @@ def added(
     }
 
 
+# Changes a rule refused, by its name (core/db_errors.py).
+RULES_REFUSED = "inventory.changes.refused"
+
+
 def since(
     reader: InMemoryMetricReader, name: str
 ) -> Callable[[], dict[tuple[object, ...], int]]:
@@ -602,7 +607,7 @@ def test_counts_the_areas_brought_back_from_a_count_form(
     assert counted(reader, name)[()] == before + 1
 
 
-def test_counts_the_areas_bring_it_back_refused_by_reason(
+def test_counts_the_areas_bring_it_back_refused_by_rule(
     rolled_back: Recorded, session: Session
 ) -> None:
     """Counted at once, as a refusal changes nothing: a bin in a retired
@@ -618,14 +623,13 @@ def test_counts_the_areas_bring_it_back_refused_by_reason(
     bin_ = add(session, Location(name=f"Bin {tag()}", kind="area", parent_id=shelf.id))
     retire(session, shelf, bin_)
     path, refused = emptied_while_counted(client, session, place, bin_)
-    name = "inventory.count.bring_backs_refused"
-    before = counted(reader, name)
+    rules = since(reader, RULES_REFUSED)
     brought_before = counted(reader, "inventory.count.areas_brought_back")
     back = client.post(
         f"{path}/bring-back", data=count_form(refused) | {"area_id": str(bin_.id)}
     )
     assert back.status_code == 409
-    assert added(reader, name, before) == {(("reason", "parent_retired"),): 1}
+    assert rules() == {(("rule", "location_parent_current"),): 1}
     assert counted(reader, "inventory.count.areas_brought_back") == brought_before
 
 
@@ -683,8 +687,8 @@ def test_counts_count_forms_refused_by_reason(
     rolled_back: Recorded, session: Session
 ) -> None:
     """Counted at once, as a refusal writes nothing to commit: by each
-    reason a form is refused for, once, from the form or as it was saved
-    (inventory-tng-w7xt)."""
+    reason a form is refused for, once (inventory-tng-w7xt); as it was
+    saved, by the rule refusing it (inventory-tng-v8sq)."""
     client, _, reader, _ = rolled_back
     _, key = new_admin(session)
     sign_in_with(client, key=key)
@@ -694,6 +698,7 @@ def test_counts_count_forms_refused_by_reason(
     form = count_form_at(client, place.store.id)
     name = "inventory.counts.refused"
     before = counted(reader, name)
+    rules = since(reader, RULES_REFUSED)
     sent = (
         (form | {radio: "lots"}, 400),
         (form | {radio: "3", f"counted_0{place.item.id}": "2", cable: "lots"}, 400),
@@ -707,8 +712,10 @@ def test_counts_count_forms_refused_by_reason(
     assert added(reader, name, before) == {
         (("reason", "box_problem"),): 2,
         (("reason", "named_twice"),): 1,
-        (("reason", "changed_since_shown"),): 1,
-        (("reason", "sent_again"),): 1,
+    }
+    assert rules() == {
+        (("rule", CHANGED),): 1,
+        (("rule", count_refusals.SENT_AGAIN),): 1,
     }
 
 
@@ -1353,16 +1360,16 @@ def test_counts_labels_made_printed_and_revoked(
     assert sum(counted(reader, "inventory.labels.revoked").values()) >= 1
 
 
-def test_counts_unit_changes_refused_by_why(
+def test_counts_changes_refused_by_a_rule_once_by_its_name(
     rolled_back: Recorded, session: Session
 ) -> None:
-    """Counted and logged at once, as a refusal writes nothing to commit:
-    by what fixes the unit, or, between lengths, a check waiting or an
-    amount too large in the new unit; or as fixed or free otherwise than
+    """Counted and logged at once, as a refusal writes nothing to commit,
+    in db_errors' attempt(), with the ids it is given: changes to an item's
+    unit refused by what fixes it, or, between lengths, a check waiting or
+    an amount too large in the new unit; or as fixed or free otherwise than
     its form showed."""
     _, _, reader, _ = rolled_back
-    name = "inventory.unit_changes.refused"
-    before = counted(reader, name)
+    rules = since(reader, RULES_REFUSED)
     moved = stocked(session).item
     labelled = Place(session).cable
     assert labels.make_for_item(session, labelled.id) is not None
@@ -1375,58 +1382,43 @@ def test_counts_unit_changes_refused_by_why(
     raise_check(session, moved_at)
     waiting, huge = other.cable, place.cable
     free = Place(session).cable
+    big = {"minimum": Decimal(400_000_000)}
     refusals = (
-        (moved, "m", "item_unit_fixed", {}),
-        (labelled, "each", "item_unit_labelled", {}),
-        (converted, "each", "item_unit_converted", {}),
-        (waiting, "ft", unit_changes.UNIT_CHECKS_WAITING, {}),
-        (huge, "ft", unit_changes.UNIT_OUT_OF_RANGE, {"minimum": Decimal(400_000_000)}),
+        (moved, item_fields(moved, unit="m"), None, "item_unit_fixed"),
+        (labelled, item_fields(labelled, unit="each"), None, "item_unit_labelled"),
+        (converted, item_fields(converted, unit="each"), None, "item_unit_converted"),
+        (waiting, item_fields(waiting, unit="ft"), None, "item_unit_checks_waiting"),
+        (huge, item_fields(huge, unit="ft", **big), None, "item_unit_out_of_range"),
+        # Forms drawn while their unit was free; each fixed now, by its cause.
+        (moved, item_fields(moved, unit="ft"), True, "item_unit_moved_since_shown"),
+        (
+            labelled,
+            item_fields(labelled, unit="ft"),
+            True,
+            "item_unit_labelled_since_shown",
+        ),
+        (converted, item_fields(converted, unit="ft"), True, CHANGED),
+        # Its form drawn while its unit was fixed; free now.
+        (free, item_fields(free, unit="ft"), False, "item_unit_revoked_since_shown"),
     )
     with capture_logs() as logs:
-        for item, unit, rule, more in refusals:
-            fields = item_fields(item, unit=unit, **more)
-            with breaks(session, rule):
-                items.save(session, item, fields, seen=None, recorded_in=item.unit)
-        # Forms drawn while their unit was free; each fixed now, by its cause.
-        for item, rule in (
-            (moved, "item_unit_moved_since_shown"),
-            (labelled, "item_unit_labelled_since_shown"),
-            (converted, "changed_since_shown"),
-        ):
-            with breaks(session, rule):
-                fields = item_fields(item, unit="ft")
-                items.save(session, item, fields, seen=None, shown_free=True)
-        # Its form drawn while its unit was fixed; free now.
-        with breaks(session, "item_unit_revoked_since_shown"):
-            items.save(
-                session, free, item_fields(free, unit="ft"), seen=None, shown_free=False
+        for item, fields, shown_free, rule in refusals:
+            save = partial(
+                items.save,
+                session,
+                item,
+                fields,
+                seen=None,
+                recorded_in=item.unit if shown_free is None else None,
+                shown_free=shown_free,
             )
-    assert added(reader, name, before) == {
-        (("reason", "moved"),): 1,
-        (("reason", "labelled"),): 1,
-        (("reason", "converted"),): 1,
-        (("reason", "checks_waiting"),): 1,
-        (("reason", "out_of_range"),): 1,
-        (("reason", "moved_since_shown"),): 1,
-        (("reason", "labelled_since_shown"),): 1,
-        (("reason", "converted_since_shown"),): 1,
-        (("reason", "revoked_since_shown"),): 1,
-    }
+            assert attempt(session, save, item_id=item.id) == (None, rule)
+    assert rules() == {(("rule", rule),): 1 for *_, rule in refusals}
     assert [
-        (line["item_id"], line["reason"], line["log_level"])
+        (line["item_id"], line["rule"], line["log_level"])
         for line in logs
-        if line["event"] == "unit change refused"
-    ] == [
-        (moved.id, "moved", "info"),
-        (labelled.id, "labelled", "info"),
-        (converted.id, "converted", "info"),
-        (waiting.id, "checks_waiting", "info"),
-        (huge.id, "out_of_range", "info"),
-        (moved.id, "moved_since_shown", "info"),
-        (labelled.id, "labelled_since_shown", "info"),
-        (converted.id, "converted_since_shown", "info"),
-        (free.id, "revoked_since_shown", "info"),
-    ]
+        if line["event"] == "change refused by a rule"
+    ] == [(item.id, rule, "info") for item, *_, rule in refusals]
 
 
 def test_counts_unit_changes_converted_by_unit(
@@ -1564,11 +1556,14 @@ def test_counts_saves_refused_as_changed_since_shown(
     radios.name = f"Wireless {tag()}"
     session.flush()
     before = counted(reader, "inventory.edits.stale").get((("table", "category"),), 0)
+    rules = since(reader, RULES_REFUSED)
     with capture_logs() as logs:
         refused = client.post(f"{CATEGORIES}/{radios.id}/name", data=form)
     assert refused.status_code == 409
     after = counted(reader, "inventory.edits.stale")[(("table", "category"),)]
     assert after == before + 1
+    # Counted once: not again as a rule refused (db_errors.Stale).
+    assert rules() == {}
     (line,) = [entry for entry in logs if entry["event"].startswith("edit refused")]
     assert (line["table"], line["row_id"]) == ("category", radios.id)
 
@@ -2225,20 +2220,15 @@ def test_counts_setups_and_emailed_resets_refused_by_reason(
     assert resets() == {(("reason", "no_such_address"),): 1}
 
 
-def test_counts_item_forms_and_unit_recounts_refused_by_reason(
+def test_counts_unit_recounts_refused_before_their_save(
     recorded: Recorded, session: Session
 ) -> None:
-    """A unit change to each refused for a package's fraction, and a
-    recount whose page showed records since changed."""
+    """A recount whose page showed records since changed."""
     reader = recorded[2]
     place = Place(session)
-    add(session, ItemPackage(item_id=place.cable.id, name="Reel", size=Decimal("2.5")))
-    item_forms = since(reader, "inventory.item_forms.refused")
     recounts = since(reader, "inventory.unit_recount.refused")
-    assert forms.package_fraction(session, place.cable.id) is not None
     plan = unit_recounts.planned(session, place.cable)
     assert unit_recounts.stale_as_read(place.cable.id, plan, f"not {plan.seen}")
-    assert item_forms() == {(("reason", "package_fraction"),): 1}
     assert recounts() == {(("reason", "changed"),): 1}
 
 
@@ -2259,12 +2249,12 @@ def test_counts_adjustments_and_answers_to_lines_recorded_more_refused(
     monkeypatch.setattr(counts_routes, "record_adjustment", not_countable)
     _, key = new_admin(session)
     sign_in_with(client, key=key)
-    adjustments = since(reader, "inventory.adjustments.refused")
+    rules = since(reader, RULES_REFUSED)
     answers = since(reader, "inventory.over_recorded.refused")
     assert client.post(ADJUSTMENTS, data=form).status_code == 400
     checked = {"seen": over_recorded.seen(check), "reason": ""}
     client.post(f"/admin/stock/recorded-more/{check.id}/checked", data=checked)
-    assert adjustments() == {(("reason", counts.COUNTABLE),): 1}
+    assert rules() == {(("rule", counts.COUNTABLE),): 1}
     assert answers() == {(("answer", "checked"), ("reason", "why_problem")): 1}
 
 
@@ -2288,13 +2278,13 @@ def test_counts_admin_and_single_use_forms_refused_by_reason(
     }
 
 
-def test_counts_package_tracking_refused_by_scope_and_reason(
+def test_counts_package_tracking_refused_by_rule(
     rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Items ticked whose open package moved meanwhile, then a package of
     an item retired."""
     client, _, reader, _ = rolled_back
-    refused = since(reader, "inventory.package_tracking.refused")
+    refused = since(reader, RULES_REFUSED)
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     spools = Spools(session)
@@ -2310,25 +2300,25 @@ def test_counts_package_tracking_refused_by_scope_and_reason(
     session.flush()
     package = f"{ITEMS}/{cable.id}/packages/{spools.spool.id}/tracking"
     assert client.post(package, data={"track": "off"}).status_code == 409
-    assert refused() == {
-        (("reason", CHANGED), ("scope", "bulk")): 1,
-        (("reason", RETIRED), ("scope", "package")): 1,
-    }
+    assert refused() == {(("rule", CHANGED),): 1, (("rule", RETIRED),): 1}
 
 
-def test_counts_reading_rules_refused_by_reason(
+def test_counts_reading_rules_refused_as_changed_since_shown_once(
     rolled_back: Recorded, session: Session
 ) -> None:
-    """A rule's reading sent from a page shown before a change since."""
+    """A rule's reading sent from a page shown before a change since: a
+    stale form, counted by table, not again as a rule refused."""
     client, _, reader, _ = rolled_back
-    refused = since(reader, "inventory.reading_rules.refused")
+    stale = since(reader, "inventory.edits.stale")
+    rules = since(reader, RULES_REFUSED)
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     (rule,) = reading_rules.decide(session, {f"Q{tag()}": units.Rule(None)}, None)
     later = str(int(shown(rule)) + 1)
     sent = {"reading": "none", "version": later}
     assert client.post(f"{READINGS}/{rule.id}", data=sent).status_code == 409
-    assert refused() == {(("reason", CHANGED),): 1}
+    assert stale() == {(("table", "reading_rule"),): 1}
+    assert rules() == {}
 
 
 def test_counts_lengths_set_on_length_checks_refused_by_reason(

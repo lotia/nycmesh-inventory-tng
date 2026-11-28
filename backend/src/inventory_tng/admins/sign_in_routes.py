@@ -13,7 +13,6 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy.exc import IntegrityError
 
 from inventory_tng.admins import accounts, authenticator_totp, guards, mail_messages
 from inventory_tng.admins.forms import (
@@ -51,6 +50,7 @@ from inventory_tng.admins.paths import (
     SIGN_OUT,
 )
 from inventory_tng.core import request_logging
+from inventory_tng.core.db_errors import unique
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
@@ -451,11 +451,14 @@ def new_authenticator(
     first = first and not accounts.has_recovery_codes(session, admin_id)
     if not problems:
         assert step is not None  # A wrong code is a problem.
-        try:
-            # A savepoint: PostgreSQL may compare names its own way.
-            with session.begin_nested():
-                accounts.add_authenticator(session, keys, admin_id, name, key, step)
-        except IntegrityError:
+        # In a savepoint (unique): PostgreSQL may compare names its own way.
+        if not unique(
+            session,
+            lambda: accounts.add_authenticator(
+                session, keys, admin_id, name, key, step
+            ),
+            admin_id=admin_id,
+        ):
             problems["authenticator_name"] = NAME_TAKEN
     if problems:
         session.rollback()

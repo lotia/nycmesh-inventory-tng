@@ -69,11 +69,11 @@ from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
-# An answer to a line recorded more than moved refused, nothing changed:
-# which answer, and why. A count or a reason the form gave that is not
-# one; settled or changed meanwhile (MEANWHILE); or another rule, said
-# above the page.
-OverRecordedRefusal = Literal["count_problem", "why_problem", "meanwhile", "rule"]
+# An answer to a line recorded more than moved refused by its form,
+# nothing changed: which answer, and why, a count or a reason the form gave
+# that is not one. One a rule refused, settled or changed meanwhile
+# (MEANWHILE) or otherwise, is logged and counted by core/db_errors.py.
+OverRecordedRefusal = Literal["count_problem", "why_problem"]
 answer_refused = Refusals(
     log,
     metrics.get_meter(__name__).create_counter(
@@ -82,7 +82,7 @@ answer_refused = Refusals(
         description="Answers to lines recorded with more than was moved "
         "refused, nothing changed, by the answer and why",
     ),
-    answer=("correct", "close", "checked", "count", "bring_back"),
+    answer=("checked", "count"),
     reason=get_args(OverRecordedRefusal),
 )
 
@@ -473,17 +473,11 @@ def bring_back(
         if brought:
             over_recorded.brought_back(session, check_id, location.id, signed.admin.id)
 
-    _, broken = attempt(session, restore)
+    _, broken = attempt(
+        session, restore, over_recorded_id=check_id, location_id=location.id
+    )
     session.commit()
     if broken is not None:
-        answer_refused(
-            "over recorded place not brought back",
-            answer="bring_back",
-            reason="meanwhile" if broken in MEANWHILE else "rule",
-            over_recorded_id=check_id,
-            location_id=location.id,
-            rule=broken,
-        )
         if broken == "over_recorded_unchanged":
             return redirect(view.link(), notice="over_recorded_unchanged")
         alert = not_changed(rule_words(broken))
@@ -594,16 +588,9 @@ def answer(
             refused_at = broken.location_id
             raise
 
-    how, broken = attempt(session, settle)
+    how, broken = attempt(session, settle, over_recorded_id=check_id)
     session.commit()
     if how is None:
-        answer_refused(
-            "over recorded not settled",
-            answer=do,
-            reason="meanwhile" if broken is None or broken in MEANWHILE else "rule",
-            over_recorded_id=check_id,
-            rule=broken,
-        )
         refused = None
         if broken is not None and broken not in MEANWHILE:
             refused = _refusal(session, check_id, do, broken, refused_at)

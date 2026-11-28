@@ -38,7 +38,7 @@ import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, NamedTuple, get_args
+from typing import NamedTuple
 
 import structlog
 from opentelemetry import metrics
@@ -77,20 +77,20 @@ recounted = meter.create_counter(
     description="Items whose unit, wrong from the start, a guided recount "
     "corrected, by the unit it was in and the one it is in now",
 )
-# Why a recount is refused: places the item reached since its page was
-# shown, the item retired, its records changed since, or checks waiting.
-RecountRefusal = Literal["places_added", "retired", "changed", "checks_waiting"]
-# Named apart from inventory.unit_recounts, which is a metric, not a
-# namespace (OpenTelemetry's naming conventions).
+# A recount refused before its save as its records changed since its page
+# (stale_as_read); one a rule refuses as it is saved, core/db_errors.py
+# logs and counts. Named apart from inventory.unit_recounts, which is a
+# metric, not a namespace (OpenTelemetry's naming conventions).
 refused = Refusals(
     log,
     meter.create_counter(
         "inventory.unit_recount.refused",
         unit="{recount}",
-        description="Guided recounts of an item's unit refused, nothing "
-        "written, by reason",
+        description="Guided recounts of an item's unit refused before they "
+        "were saved, nothing written, by reason: the records changed since "
+        "the page",
     ),
-    reason=get_args(RecountRefusal),
+    reason=("changed",),
 )
 
 
@@ -374,7 +374,9 @@ def recount(
     # A place it reached since was not held first: started over from its
     # page, which the stock moved since shows otherwise anyway (`seen`).
     if not _places_of(session, item.id) <= places:
-        _refused(item.id, "places_added", CHANGED)
+        # Detail of the refusal db_errors logs and counts, by its rule.
+        log.debug("recount found places added since", item_id=item.id)
+        enforce(CHANGED)
     plan = planned(session, item)
     return _recounted(session, item, unit, amounts, plan, seen, key, admin_id, at)
 
@@ -400,13 +402,6 @@ def _places_of(session: Session, item_id: int) -> set[int]:
         OpenPackage.item_id == item_id, OpenPackage.closed_at.is_(None)
     )
     return set(session.scalars(been.union(opened)))
-
-
-def _refused(item_id: int, reason: RecountRefusal, rule: str) -> None:
-    """A recount of the item refused by `rule`, logged and counted by
-    `reason`."""
-    refused("unit recount refused", item_id=item_id, reason=reason)
-    enforce(rule)
 
 
 def _recounted(
@@ -488,17 +483,17 @@ def _refuse_unless_as_seen(
     plan: Planned,
     seen: str,
 ) -> None:
-    """Refused (_refused) for a retired item, for anything changed since
+    """RuleBroken for a retired item, for anything changed since
     its page showed `seen`, or while a check of it waits."""
     if item.retired_at is not None:
-        _refused(item.id, "retired", RETIRED)
+        enforce(RETIRED)
     # A package asked again whose size was not sent: never left in the old
     # unit, nor a server error.
     unsized = {package.id for package in plan.resized} - amounts.sizes.keys()
     if plan.seen != seen or unsized or unit not in units_open(session, item):
-        _refused(item.id, "changed", CHANGED)
+        enforce(CHANGED)
     if plan.waiting:
-        _refused(item.id, "checks_waiting", unit_changes.UNIT_CHECKS_WAITING)
+        enforce(unit_changes.UNIT_CHECKS_WAITING)
 
 
 def _retire(session: Session, plan: Planned, at: datetime) -> None:

@@ -21,7 +21,6 @@ from typing import Annotated, Any
 import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
-from opentelemetry import metrics
 from sqlalchemy import ColumnElement, case, func
 from sqlalchemy.orm import Session
 
@@ -29,7 +28,6 @@ from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession, by_name
 from inventory_tng.core.phrases import Words, in_query, lazy_gettext
-from inventory_tng.core.refusals import Refusals
 from inventory_tng.core.sent_forms import form_key
 from inventory_tng.models.admins import Admin
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -52,16 +50,6 @@ from inventory_tng.web.pages import add_notices, redirect
 log = structlog.get_logger(__name__)
 # The rules that may refuse an adjustment as it is saved.
 ADJUSTMENT_RULES = (WHOLE, COUNTABLE, SHOWN_OTHERWISE)
-adjustment_refused = Refusals(
-    log,
-    metrics.get_meter(__name__).create_counter(
-        "inventory.adjustments.refused",
-        unit="{adjustment}",
-        description="Adjustments refused as they were saved, nothing written, "
-        "by the rule refusing them",
-    ),
-    reason=ADJUSTMENT_RULES,
-)
 
 router = APIRouter(include_in_schema=False)
 
@@ -240,11 +228,8 @@ def adjust(
             now = broken.now
             raise
 
-    _, broken = refusal(session, adjust_it, *ADJUSTMENT_RULES)
+    _, broken = refusal(session, adjust_it, *ADJUSTMENT_RULES, item_id=item.id)
     if broken is not None:
-        adjustment_refused(
-            "adjustment refused by a rule", reason=broken, item_id=item.id
-        )
         if now is not None:
             # Asked again in the unit it is counted in now, which the form
             # shown again shows.

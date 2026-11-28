@@ -1,9 +1,11 @@
-"""What attempt() says a refused change broke."""
+"""What attempt() says a refused change broke, and how it logs it."""
 
 from sqlalchemy.orm import Session
+from structlog.testing import capture_logs
 
 from inventory_tng.core.db_errors import (
     Broken,
+    Stale,
     attempt,
     refusal,
     refusal_naming_index,
@@ -37,3 +39,35 @@ def test_a_rule_refusal_names_no_index(session: Session, radios: Category) -> No
         None,
         Broken("ck_item_minimum"),
     )
+
+
+def test_a_refusal_is_logged_once_with_its_rule_index_and_ids(
+    session: Session, radios: Category
+) -> None:
+    add(session, Item(name="LiteBeam", category_id=radios.id, old_code="NYCM-2"))
+
+    def clash() -> Item:
+        return add(session, Item(name="Omni", category_id=radios.id, old_code="NYCM-2"))
+
+    with capture_logs() as logs:
+        attempt(session, clash, category_id=radios.id)
+    assert logs == [
+        {
+            "event": "change refused by a rule",
+            "rule": "unique",
+            "index": "uq_item_old_code",
+            "category_id": radios.id,
+            "log_level": "info",
+        }
+    ]
+
+
+def test_a_stale_form_is_left_to_its_own_log_line(session: Session) -> None:
+    """Logged and counted by db_locking.unchanged, by table."""
+
+    def stale() -> None:
+        raise Stale
+
+    with capture_logs() as logs:
+        assert attempt(session, stale) == (None, "changed_since_shown")
+    assert logs == []

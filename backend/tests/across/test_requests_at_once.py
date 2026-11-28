@@ -1541,8 +1541,10 @@ def test_a_recount_while_a_place_first_receives_the_item_is_refused(
         )
     assert refused == "changed_since_shown"
     assert [
-        line["reason"] for line in logs if line["event"] == "unit recount refused"
-    ] == ["places_added"]
+        line["item_id"]
+        for line in logs
+        if line["event"] == "recount found places added since"
+    ] == [place.cable.id]
 
 
 @pytest.mark.concurrency

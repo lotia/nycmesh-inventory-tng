@@ -707,10 +707,9 @@ def test_a_count_of_a_place_changed_before_its_moment_is_shown_again(
     assert (again["as_of"], again["seen"]) == (shown["as_of"], shown["seen"])
     assert counted_box(refused.text, place.item.id) == "4"
     assert {
-        "event": "count refused by a rule",
-        "reason": "changed_since_shown",
-        "location_id": place.store.id,
+        "event": "change refused by a rule",
         "rule": "changed_since_shown",
+        "location_id": place.store.id,
         "log_level": "info",
     } in logs
     done = admin_client.post(path, data=again | {f"counted_{place.item.id}": "4"})

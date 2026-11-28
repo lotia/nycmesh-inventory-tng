@@ -16,7 +16,7 @@ from sqlalchemy.orm import (
 )
 
 from inventory_tng.core.db_base import Base
-from inventory_tng.core.db_errors import Gone, RuleBroken, enforce, refusal
+from inventory_tng.core.db_errors import Gone, RuleBroken, Stale, enforce, refusal
 from inventory_tng.core.db_protection import (
     Action,
     Lock,
@@ -132,7 +132,7 @@ gone = Refusals(
 
 
 def unchanged(row: Base, seen: Seen) -> None:
-    """RuleBroken (changed_since_shown) unless the row, as locked, is at
+    """Stale (changed_since_shown) unless the row, as locked, is at
     the version a form showed (models.base.Versioned): another save since would
     otherwise be undone, unseen (inventory-tng-8i4.123)."""
     if seen is not None and getattr(row, "edit_version") != seen:  # noqa: B009
@@ -141,7 +141,7 @@ def unchanged(row: Base, seen: Seen) -> None:
             table=type(row).__tablename__,
             row_id=getattr(row, "id"),  # noqa: B009
         )
-        raise RuleBroken("changed_since_shown")
+        raise Stale
 
 
 # The catalogue lock (pg_advisory_xact_lock's key): every write to the

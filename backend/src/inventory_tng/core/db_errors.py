@@ -1,5 +1,6 @@
 """What a database error means: a rule broken, a row gone, or the database
-unable to answer just now, which is a 503."""
+unable to answer just now, which is a 503. A change a rule refused is
+logged and counted here, once, whichever page made it (_attempted)."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -12,6 +13,9 @@ from opentelemetry import metrics
 from pydantic import BaseModel
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
+
+from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.rule_names import RULE_NAMES, UNIQUE
 
 if TYPE_CHECKING:  # db_sessions imports this module.
     from inventory_tng.core.db_sessions import PoolName
@@ -47,6 +51,15 @@ class RuleBroken(Exception):
         self.rule = rule
 
 
+class Stale(RuleBroken):
+    """changed_since_shown, raised by db_locking.unchanged(), which logs it
+    and counts it by table (inventory.edits.stale): not counted again as a
+    rule refused (rule_refused)."""
+
+    def __init__(self) -> None:
+        super().__init__("changed_since_shown")
+
+
 class Gone(Exception):
     """The row a change is for is no longer as the page found it, such as
     retired or deleted meanwhile by another request: there is nothing here
@@ -71,31 +84,61 @@ class Broken:
     index: str | None = None
 
 
+rule_refused = Refusals(
+    log,
+    metrics.get_meter(__name__).create_counter(
+        "inventory.changes.refused",
+        unit="{change}",
+        description="Changes a rule refused, nothing written, by the rule: a "
+        "domain function's, a check constraint's, or unique for a unique "
+        "index. A form shown before its row changed is counted by "
+        "inventory.edits.stale instead",
+    ),
+    rule=RULE_NAMES,
+)
+
+
 def _attempted[T](
-    session: Session, change: Callable[[], T]
+    session: Session, change: Callable[[], T], ids: dict[str, int]
 ) -> tuple[T | None, Broken | None]:
-    """attempt(), saying the unique index broken too."""
+    """attempt(), saying the unique index broken too. A rule refusing the
+    change is logged, with `ids`, and counted (rule_refused) here, the one
+    place every page's change passes, so each is counted once, by the
+    rule's name (Ali, 2026-11-27, inventory-tng-v8sq)."""
     try:
         with session.begin_nested():
             done = change()
             session.flush()
     except BaseException as error:
-        if isinstance(error, RuleBroken):
-            return None, Broken(error.rule)
-        if isinstance(error, exc.IntegrityError):
-            sqlstate = getattr(error.orig, "sqlstate", None)
-            constraint = describe_error(error).get("constraint")
-            if sqlstate == UNIQUE_VIOLATION:
-                return None, Broken("unique", constraint)
-            if sqlstate == CHECK_VIOLATION and constraint:
-                return None, Broken(constraint)
-        # Such as Gone, or any other failure: raised.
-        raise
+        broken = _broken(error)
+        if broken is None:
+            # Such as Gone, or any other failure: raised.
+            raise
+        if not isinstance(error, Stale):
+            fields: dict[str, Any] = {"rule": broken.rule, **ids}
+            if broken.index:
+                fields["index"] = broken.index
+            rule_refused("change refused by a rule", **fields)
+        return None, broken
     return done, None
 
 
+def _broken(error: BaseException) -> Broken | None:
+    """The rule `error` says a change broke, if it says one."""
+    if isinstance(error, RuleBroken):
+        return Broken(error.rule)
+    if isinstance(error, exc.IntegrityError):
+        sqlstate = getattr(error.orig, "sqlstate", None)
+        constraint = describe_error(error).get("constraint")
+        if sqlstate == UNIQUE_VIOLATION:
+            return Broken(UNIQUE, constraint)
+        if sqlstate == CHECK_VIOLATION and constraint:
+            return Broken(constraint)
+    return None
+
+
 def attempt[T](
-    session: Session, change: Callable[[], T]
+    session: Session, change: Callable[[], T], **ids: int
 ) -> tuple[T | None, str | None]:
     """Run `change` in a savepoint, with nothing of it kept if it breaks a
     rule: what it returned, and None; or None, and "unique" if it broke a
@@ -104,35 +147,36 @@ def attempt[T](
     the check constraint it broke, or the rule a domain function refused it
     by (RuleBroken), so a page can say why in its own words. Any other
     failure is raised. Locks taken in `change` go with the savepoint,
-    however it failed (db_locking._savepoint_locks_released)."""
-    done, broken = _attempted(session, change)
+    however it failed (db_locking._savepoint_locks_released). A refusal
+    is logged with `ids`, those of the rows the change is for."""
+    done, broken = _attempted(session, change, ids)
     return done, broken.rule if broken else None
 
 
 def refusal_naming_index[T](
-    session: Session, change: Callable[[], T], *expected: str
+    session: Session, change: Callable[[], T], *expected: str, **ids: int
 ) -> tuple[T | None, Broken | None]:
     """refusal(), saying which unique index a "unique" refusal broke, for a
     page whose words differ by index."""
-    done, broken = _attempted(session, change)
+    done, broken = _attempted(session, change, ids)
     if broken is not None and broken.rule not in expected:
         raise ValueError(f"refused by {broken.rule}, not {', '.join(expected)}")
     return done, broken
 
 
 def refusal[T](
-    session: Session, change: Callable[[], T], *expected: str
+    session: Session, change: Callable[[], T], *expected: str, **ids: int
 ) -> tuple[T | None, str | None]:
     """attempt(), for a change only the `expected` rules may refuse. Any
     other rule broken is a bug, and raised."""
-    done, broken = refusal_naming_index(session, change, *expected)
+    done, broken = refusal_naming_index(session, change, *expected, **ids)
     return done, broken.rule if broken else None
 
 
-def unique(session: Session, change: Callable[[], object]) -> bool:
+def unique(session: Session, change: Callable[[], object], **ids: int) -> bool:
     """attempt(), for a change only a unique index can refuse: False if it
     did."""
-    return refusal(session, change, "unique")[1] is None
+    return refusal(session, change, UNIQUE, **ids)[1] is None
 
 
 UNIQUE_VIOLATION = "23505"
