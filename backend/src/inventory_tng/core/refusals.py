@@ -68,8 +68,9 @@ def _attributes(
     shape: Callable[..., None], listed: Mapping[str, Collection[str]]
 ) -> dict[str, Collection[str]]:
     """Each attribute `shape` declares, by name, with its fixed list: its
-    Literal's, or the one in `listed`. A declaration that says neither is
-    a bug, raised as the module is imported."""
+    Literal's, or the one in `listed`. A declaration that says neither, or
+    lists UNLISTED, which would count a bug as that value, is a bug,
+    raised as the module is imported."""
     attributes: dict[str, Collection[str]] = {}
     for name, parameter in inspect.signature(shape).parameters.items():
         if parameter.kind is not inspect.Parameter.KEYWORD_ONLY:
@@ -77,6 +78,8 @@ def _attributes(
         values = listed.get(name, _literal_values(parameter.annotation))
         if values is None:
             raise TypeError(f"{shape}: {name} is no Literal, nor listed")
+        if UNLISTED in values:
+            raise TypeError(f"{shape}: {name} lists {UNLISTED}")
         attributes[name] = values
     if unknown := listed.keys() - attributes.keys():
         raise TypeError(f"{shape}: no attribute {', '.join(sorted(unknown))}")

@@ -2,11 +2,10 @@
 (RuleName): the fixed list a rule refusal is counted by
 (db_errors.rule_refused, AGENTS.md rule 7). A domain function's
 (db_errors.RuleBroken), a check constraint's, or "unique" for any unique
-index. web/forms.py's RULES puts
-most into words; a page words the rest itself. Names only, so any module
-may import it. `ty check` refuses a rule raised by a name not here
-(enforce(), RuleBroken take a RuleName), and
-tests/codebase/test_rule_refusals.py one here that nothing raises."""
+index. web/forms.py's RULES puts most into words; a page words the rest
+itself. Names only, so any module may import it. `ty check` refuses a
+rule raised by a name not here (enforce(), RuleBroken take a RuleName),
+and tests/codebase/test_rule_refusals.py one here that nothing raises."""
 
 from typing import Literal
 

@@ -122,3 +122,18 @@ def test_an_attribute_of_no_fixed_list_is_refused_at_import() -> None:
             refusals(log, cast(Counter, counter))(shape)
     with pytest.raises(TypeError, match="no attribute page"):
         refusals(log, cast(Counter, counter), reason=("a",), page=("b",))(free)
+
+
+def test_a_list_naming_unlisted_is_refused_at_import() -> None:
+    """A value "unlisted" would count alike with a bug's."""
+
+    def listing(
+        event: str, *, reason: Literal["unlisted"], **fields: Unpack[Fields]
+    ) -> None: ...
+
+    def by_page(event: str, *, page: str, **fields: Unpack[Fields]) -> None: ...
+
+    with pytest.raises(TypeError, match="reason lists unlisted"):
+        refusals(log, cast(Counter, counter))(listing)
+    with pytest.raises(TypeError, match="page lists unlisted"):
+        refusals(log, cast(Counter, counter), page=(UNLISTED,))(by_page)
