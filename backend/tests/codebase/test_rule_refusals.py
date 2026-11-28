@@ -1,6 +1,6 @@
 """A change a rule refuses is logged and counted once, in
 core/db_errors.py's _attempted(), by the rule's name from
-core/rule_names.py's RULE_NAMES (Ali, 2026-11-27, inventory-tng-v8sq).
+core/rule_names.py's RuleName (Ali, 2026-11-27, inventory-tng-v8sq).
 
 Deterministic, read from the source:
 
@@ -9,10 +9,11 @@ Deterministic, read from the source:
   CAUGHT_ELSEWHERE, each with why.
 - Every rule the code raises by name (enforce(), RuleBroken(), a
   RuleBroken subclass's own, require_current(), the ledger's line rules)
-  is in RULE_NAMES, as is every key of web/forms.py's RULES, and RULE_NAMES
-  names nothing else, so the list cannot outlive its code. A rule passed
-  on in a variable is read where it is named; the few places that pass one
-  on are named in PASSED_ON.
+  is a RuleName, and RuleName names nothing else, so the list cannot
+  outlive its code. A rule passed on in a variable is read where it is
+  named; the few places that pass one on are named in PASSED_ON. That
+  each is a RuleName, and so is every key of web/forms.py's RULES, `ty
+  check` holds too (inventory-tng-vj5h).
 - A change made through attempt() or its kin with no ids for its
   refusal's log line fails, but for those in NAMES_NO_ROW.
 - An entry in any of these lists no longer found fails too."""
@@ -22,8 +23,9 @@ import importlib
 from collections.abc import Callable
 from functools import cache
 from types import ModuleType
+from typing import get_args
 
-from inventory_tng.core.rule_names import RULE_NAMES, UNIQUE
+from inventory_tng.core.rule_names import UNIQUE, RuleName
 from inventory_tng.web.forms import RULES
 
 from helpers.source import parsed
@@ -70,6 +72,7 @@ NAMES_NO_ROW = {
     ("core/db_locking.py", "stale_since"): "Stale, which unchanged() logs "
     "with its row's id, not _attempted",
 }
+RULE_NAMES = frozenset(get_args(RuleName))
 ATTEMPTS = {"attempt", "refusal", "refusal_naming_index", "unique"}
 # Where a rule is passed on in a variable, named by whoever calls it: by
 # module and function.
@@ -257,6 +260,18 @@ def _rule_of(node: ast.Call, where: str, broken: set[ast.AST]) -> ast.expr | Non
     return None
 
 
+def _returned_lists(tree: ast.Module) -> set[str]:
+    """The rules' names the ledger's rule functions return in a list, as
+    in return ["opening_from_sealed"]."""
+    return {
+        part.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Return) and isinstance(node.value, ast.List)
+        for part in node.value.elts
+        if isinstance(part, ast.Constant) and isinstance(part.value, str)
+    }
+
+
 def _in_rule_errors(tree: ast.Module) -> set[ast.AST]:
     """The nodes of `tree`'s subclasses of RuleBroken."""
     return {
@@ -277,6 +292,8 @@ def _raised() -> tuple[set[str], set[tuple[str, str]]]:
         module = _module(where)
         inside = _functions(tree)
         broken = _in_rule_errors(tree)
+        if where == LEDGER:
+            names |= _returned_lists(tree)
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
@@ -298,7 +315,6 @@ def test_every_rule_raised_is_in_rule_names() -> None:
 
 def test_rule_names_has_every_rule_worded_and_nothing_else() -> None:
     names, passed = _raised()
-    assert set(RULES) - RULE_NAMES == set()
     assert RULE_NAMES - names - set(RULES) - {UNIQUE} == set()
     assert PASSED_ON - passed == set()
 

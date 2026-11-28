@@ -12,7 +12,7 @@ forms, compared by catalogue/unit_changes.py, are measured here too.
 
 from collections.abc import Collection, Mapping
 from decimal import Decimal
-from typing import Literal, NamedTuple, get_args
+from typing import Literal, NamedTuple, Unpack
 
 import structlog
 from opentelemetry import metrics
@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.stock.queries import units_of
 
@@ -35,7 +35,8 @@ Save = Literal[
     "batch", "count", "adjustment", "confirm_count", "add_package", "package_settings"
 ]
 
-refused = Refusals(
+
+@refusals(
     log,
     meter.create_counter(
         "inventory.saves.shown_otherwise",
@@ -44,9 +45,11 @@ refused = Refusals(
         "that changed since, one for each item or package, so the save was "
         "refused and asked again, by what changed and the save",
     ),
-    changed=get_args(Changed),
-    save=get_args(Save),
 )
+def refused(
+    event: str, *, changed: Changed, save: Save, **fields: Unpack[Fields]
+) -> None: ...
+
 
 SHOWN_OTHERWISE = "shown_otherwise"
 

@@ -26,6 +26,7 @@ from inventory_tng.catalogue.unit_recounts import Planned
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.phrases import Words, gettext
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.core.sent_forms import form_key
 from inventory_tng.models.catalogue import Item
 from inventory_tng.stock.paths import COUNTS
@@ -99,7 +100,7 @@ def _refused_page(
     item: Item,
     unit: str,
     plan: Planned,
-    rule: str,
+    rule: RuleName,
 ) -> HTMLResponse:
     """The recount's page as `plan` reads the records now, refused by
     `rule`, with nothing typed kept (inventory-tng-0w7o). Changed since

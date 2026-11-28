@@ -11,13 +11,13 @@ forms.py may import it (docs/decisions/0023)."""
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal, Self, get_args
+from typing import Any, Literal, Self, Unpack
 
 import structlog
 from opentelemetry import metrics
 
 from inventory_tng.core.phrases import Words
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 
 log = structlog.get_logger(__name__)
 
@@ -75,7 +75,7 @@ def whole_problem(typed: str, words: Words) -> Problem:
     return Problem(words, "not_valid" if typed.strip() else "required")
 
 
-shown = Refusals(
+@refusals(
     log,
     metrics.get_meter(__name__).create_counter(
         "inventory.forms.problems",
@@ -85,8 +85,8 @@ shown = Refusals(
         "of problem",
     ),
     form=FORMS,
-    kind=get_args(Kind),
 )
+def shown(event: str, *, form: str, kind: Kind, **fields: Unpack[Fields]) -> None: ...
 
 
 def count_shown(template: str, context: Mapping[str, Any]) -> None:

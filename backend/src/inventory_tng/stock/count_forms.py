@@ -11,6 +11,7 @@ from typing import NamedTuple
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import Separator, Words, lazy_gettext
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import OpenPackage
@@ -42,7 +43,7 @@ COUNTED = "counted_"
 EXTRA, EXTRA_ITEM = "extra_quantity", "extra_item_id"
 # An open package closed while it was counted: a ledger rule a race can
 # break past the page's checks, said above the form as rules are.
-CLOSED_MEANWHILE = "movement_open_package_closed"
+CLOSED_MEANWHILE: RuleName = "movement_open_package_closed"
 ON_THE_FORM_TWICE = lazy_gettext("This item is on the form more than once.")
 # Something else here naming an item the place picked for it lists: said on
 # that item's line there (Ali, 2026-11-21, inventory-tng-fh0e).

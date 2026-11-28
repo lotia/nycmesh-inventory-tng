@@ -35,7 +35,7 @@ import dataclasses
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, Literal, Unpack, cast
 from urllib.parse import quote
 
 import structlog
@@ -69,7 +69,7 @@ from inventory_tng.core.db_sessions import (
 )
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.core.sent_forms import is_spent
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models.admins import Admin, AdminSession
@@ -79,7 +79,9 @@ from inventory_tng.web.navigation import Badge, sections
 from inventory_tng.web.pages import page, redirect, remember_signed_in, templates
 
 log = structlog.get_logger(__name__)
-form_refused = Refusals(
+
+
+@refusals(
     log,
     metrics.get_meter(__name__).create_counter(
         "inventory.admin.forms.refused",
@@ -87,8 +89,14 @@ form_refused = Refusals(
         description="Administrators' forms refused before their route, nothing "
         "done, by reason: a secret field it would carry, or signed out meanwhile",
     ),
-    reason=("secret_field", "signed_out"),
 )
+def form_refused(
+    event: str,
+    *,
+    reason: Literal["secret_field", "signed_out"],
+    **fields: Unpack[Fields],
+) -> None: ...
+
 
 COOKIE = "inventory_admin"
 

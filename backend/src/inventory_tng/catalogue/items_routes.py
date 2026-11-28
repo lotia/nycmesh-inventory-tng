@@ -46,6 +46,7 @@ from inventory_tng.core.phrases import (
     lazy_gettext,
     ngettext,
 )
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -106,7 +107,7 @@ router = APIRouter(include_in_schema=False)
 CLOSE = "close_names"
 # The rules a change to an item may break, besides "unique", and the field
 # each is shown by.
-REFUSED_FIELDS = {
+REFUSED_FIELDS: dict[RuleName, str] = {
     "item_category_current": "category_id",
     items.MINIMUM_WHOLE: "minimum",
     **dict.fromkeys(unit_changes.UNIT_FIXED_RULES.values(), "unit"),
@@ -1047,7 +1048,7 @@ def _package(session: Session, item_id: int, package_id: int) -> ItemPackage | N
 
 
 # A size at or below its too-short length (models.catalogue.ItemPackage).
-SHORT_UNDER_SIZE = "ck_item_package_short_below_under_size"
+SHORT_UNDER_SIZE: RuleName = "ck_item_package_short_below_under_size"
 # The unit a package form showed its amount in, the item's to add one or
 # the package's for its too-short length, compared as it is saved
 # (unit_changes.require_unit_shown); the package's for its size, to say a
@@ -1363,8 +1364,9 @@ def track_package(
         item_package_id=package_id,
     )
     if done is None:
+        assert broken is not None  # refusal() returns one or the other.
         found = session.get_one(Item, item_id)
-        return _item_page(request, session, signed, found, alert=RULES[str(broken)])
+        return _item_page(request, session, signed, found, alert=RULES[broken])
     session.commit()
     return redirect(
         f"{ITEMS}/{item_id}",

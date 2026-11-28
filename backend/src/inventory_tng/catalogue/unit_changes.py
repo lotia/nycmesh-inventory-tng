@@ -27,6 +27,7 @@ from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import locked
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.base import QUANTITY_MAX, QUANTITY_STEP
 from inventory_tng.models.catalogue import UNITS, Item, ItemPackage, VendorOffer
 from inventory_tng.models.core import CatalogueHistory
@@ -47,7 +48,7 @@ unit_changes_converted = meter.create_counter(
 
 # Why an item's unit is fixed, and the rule each refuses a change by.
 UnitFixed = Literal["moved", "converted", "labelled"]
-UNIT_FIXED_RULES: dict[UnitFixed, str] = {
+UNIT_FIXED_RULES: dict[UnitFixed, RuleName] = {
     "moved": "item_unit_fixed",
     "converted": "item_unit_converted",
     "labelled": "item_unit_labelled",
@@ -55,11 +56,11 @@ UNIT_FIXED_RULES: dict[UnitFixed, str] = {
 # Asked: a change between lengths, the item's unit fixed, that converts
 # what is recorded, not yet confirmed as recorded in its unit (Ali,
 # 2026-11-24, inventory-tng-y50b).
-UNIT_UNCONFIRMED = "item_unit_unconfirmed"
+UNIT_UNCONFIRMED: RuleName = "item_unit_unconfirmed"
 # Refused: that change while a line of the item recorded with more than
 # was moved waits, its amounts shown in the line's unit
 # (stock/over_recorded.py).
-UNIT_CHECKS_WAITING = "item_unit_checks_waiting"
+UNIT_CHECKS_WAITING: RuleName = "item_unit_checks_waiting"
 # Refused: that change, an amount it converts too large to keep in the new
 # unit, or a package's size or too-short length too small or no longer
 # below its size there (QUANTITY_MAX, QUANTITY_STEP).
@@ -72,7 +73,7 @@ UNIT_OUT_OF_RANGE = "item_unit_out_of_range"
 # Free since: only its labels revoked can free it. Converted by another's
 # save, it is said as any save changed since; from the item page that save
 # also changed the item's version, so the stale check refuses it first.
-SINCE_SHOWN: dict[UnitFixed | None, tuple[str, str]] = {
+SINCE_SHOWN: dict[UnitFixed | None, tuple[str, RuleName]] = {
     "moved": ("moved_since_shown", "item_unit_moved_since_shown"),
     "labelled": ("labelled_since_shown", "item_unit_labelled_since_shown"),
     "converted": ("converted_since_shown", "changed_since_shown"),
@@ -229,7 +230,7 @@ def require_fixed_as_shown(why: UnitFixed | None, shown_free: bool | None) -> No
 
 def since_shown(
     why: UnitFixed | None, shown_free: bool | None
-) -> tuple[str, str] | None:
+) -> tuple[str, RuleName] | None:
     """SINCE_SHOWN's reason and rule if an item fixed by `why` (None,
     free) is fixed or free otherwise than its form showed it
     (`shown_free`; None, no form); else None."""

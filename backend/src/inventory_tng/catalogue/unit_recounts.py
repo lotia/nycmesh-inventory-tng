@@ -38,7 +38,7 @@ import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import NamedTuple
+from typing import Literal, NamedTuple, Unpack
 
 import structlog
 from opentelemetry import metrics
@@ -51,7 +51,7 @@ from inventory_tng.catalogue.queries import Offer, current_offers
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import lock_catalogue, locked, relock
 from inventory_tng.core.db_once_committed import once_committed
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import (
     Item,
@@ -77,11 +77,13 @@ recounted = meter.create_counter(
     description="Items whose unit, wrong from the start, a guided recount "
     "corrected, by the unit it was in and the one it is in now",
 )
+
+
 # A recount refused before its save as its records changed since its page
 # (stale_as_read); one a rule refuses as it is saved, core/db_errors.py
 # logs and counts. Named apart from inventory.unit_recounts, which is a
 # metric, not a namespace (OpenTelemetry's naming conventions).
-refused = Refusals(
+@refusals(
     log,
     meter.create_counter(
         "inventory.unit_recount.refused",
@@ -90,8 +92,10 @@ refused = Refusals(
         "were saved, nothing written, by reason: the records changed since "
         "the page",
     ),
-    reason=("changed",),
 )
+def refused(
+    event: str, *, reason: Literal["changed"], **fields: Unpack[Fields]
+) -> None: ...
 
 
 def units_open(session: Session, item: Item) -> tuple[str, ...]:

@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import exc, select
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction
 from inventory_tng.stock import open_packages
@@ -77,7 +78,7 @@ def broken(
     entry: Entry,
     kind: str = "move",
     places: tuple[int | None, int | None] = (STORE, VAN),
-) -> list[str]:
+) -> list[RuleName]:
     return form_breaks(kind, entry, places, PACKAGES, OPENS)
 
 

@@ -38,13 +38,14 @@ from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS, unit_reco
 from inventory_tng.core import db_locking, db_sessions, mail
 from inventory_tng.core.db_errors import Gone, NoSession, RuleBroken, attempt
 from inventory_tng.core.masking import MASK, Masker
+from inventory_tng.core.refusals import UNLISTED
 from inventory_tng.core.settings import RateLimits, Settings
 from inventory_tng.core.telemetry import Telemetry, enabled
 from inventory_tng.devices import devices
 from inventory_tng.devices.guards import RegisteredDevice
 from inventory_tng.devices.paths import CODES
 from inventory_tng.labels import labels
-from inventory_tng.models.catalogue import Category, ItemPackage
+from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.models.devices import Device
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import (
@@ -66,6 +67,7 @@ from inventory_tng.stock import (
 from inventory_tng.stock.count_forms import NO_SUCH_PACKAGE
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web import security_headers
+from inventory_tng.web.form_problems import Problem, count_shown
 from inventory_tng.web.forms import CHANGED, RETIRED
 
 from helpers.apps import on_session
@@ -2248,6 +2250,37 @@ def test_counts_form_problems_shown_by_form_and_kind(
         ("catalogue/categories", "required", ["name"]),
         ("catalogue/items", "not_chosen", ["category_id", "unit"]),
     ]
+
+
+def test_counts_a_rule_and_a_form_not_on_their_lists_as_unlisted(
+    recorded: Recorded, session: Session
+) -> None:
+    """A check constraint no form checks first, named only by the
+    database, and a form problem of a page with no template: each still
+    counted, by "unlisted", and logged as an error naming the attribute
+    (Ali, 2026-11-27, inventory-tng-vj5h)."""
+    reader = recorded[2]
+    rules = since(reader, RULES_REFUSED)
+    problems = since(reader, FORM_PROBLEMS)
+    radios = add(session, Category(name=f"Radios {tag()}"))
+
+    def below_none() -> Item:
+        return add(
+            session, Item(name=f"Omni {tag()}", category_id=radios.id, minimum=-1)
+        )
+
+    with capture_logs() as logs:
+        assert attempt(session, below_none)[1] == "ck_item_minimum"
+        count_shown(
+            "no/such/page.html", {"problems": {"name": Problem("No.", "required")}}
+        )
+    assert rules() == {(("rule", UNLISTED),): 1}
+    assert problems() == {(("form", UNLISTED), ("kind", "required")): 1}
+    assert [
+        (line["refusal"], line["attribute"])
+        for line in logs
+        if line["event"] == "refusal counted as unlisted"
+    ] == [("change refused by a rule", "rule"), ("form refused for its boxes", "form")]
 
 
 def test_counts_administrator_actions_refused_by_action_and_why(

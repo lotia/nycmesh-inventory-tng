@@ -31,6 +31,7 @@ from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import ReadingRule, reading_rules_held
 from inventory_tng.web.admin_pages import TextForm, admin_page
@@ -198,7 +199,7 @@ def _refused(
     session: Session,
     signed: SignedIn,
     rule: ReadingRule,
-    broken: str,
+    broken: RuleName,
     change: units.Rule | None,
 ) -> HTMLResponse:
     """The rule's page again, saying why a change to it was refused: names

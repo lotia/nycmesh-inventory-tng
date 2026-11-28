@@ -67,6 +67,7 @@ from inventory_tng.core.db_locking import (
 )
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
     SMALLEST_PACKAGE_FIRST,
@@ -165,7 +166,7 @@ class Fields:
 
 
 # Refused: an item's name that is an alias, its own or another item's.
-NAME_IS_ALIAS = "item_name_is_alias"
+NAME_IS_ALIAS: RuleName = "item_name_is_alias"
 # Refused: an alias that is an item's name, its own or another's.
 ALIAS_IS_NAME = "item_alias_is_name"
 
@@ -334,8 +335,8 @@ def _not_an_alias(session: Session, keys: Keys, but: ItemAlias | None = None) ->
 # is too short to use below, a fraction (Ali, 2026-11-23,
 # inventory-tng-fa5i); and a package's size or too-short length with a
 # fraction, its item counted each.
-PACKAGES_WHOLE = "item_packages_whole"
-PACKAGE_WHOLE = "package_whole_units"
+PACKAGES_WHOLE: RuleName = "item_packages_whole"
+PACKAGE_WHOLE: RuleName = "package_whole_units"
 # The database's check (models.catalogue.Item) on a fractional Reorder at
 # for an item counted each, which the form refuses first (Ali, 2026-11-23,
 # inventory-tng-gfes).
@@ -620,7 +621,7 @@ def save_package(
 # Why a package's size is fixed: some has moved or been opened in it, for
 # good, or only a label not revoked says it.
 SizeFixed = Literal["used", "labelled"]
-SIZE_FIXED_RULES: dict[SizeFixed, str] = {
+SIZE_FIXED_RULES: dict[SizeFixed, RuleName] = {
     "used": "package_size_fixed",
     "labelled": "package_size_labelled",
 }
@@ -747,7 +748,7 @@ def track_items(session: Session, item_ids: Collection[int], track: bool) -> lis
 
 
 # Refused: a reading rule changed that would make names read alike.
-READ_ALIKE = "names_read_alike"
+READ_ALIKE: RuleName = "names_read_alike"
 
 
 @dataclass(frozen=True)

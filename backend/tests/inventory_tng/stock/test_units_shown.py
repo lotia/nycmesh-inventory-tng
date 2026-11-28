@@ -16,6 +16,7 @@ from structlog.testing import capture_logs
 from inventory_tng.catalogue import items
 from inventory_tng.core.db_locking import UNGUARDED_INFO
 from inventory_tng.core.phrases import Words
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.stock import count_refusals, count_routes, counts_routes
@@ -831,8 +832,8 @@ def test_an_adjustment_refused_otherwise_says_a_switch_since(
     refusal = counts_routes.refusal
 
     def switched_after(
-        held: Session, change: Callable[[], object], *expected: str, **ids: int
-    ) -> tuple[object, str | None]:
+        held: Session, change: Callable[[], object], *expected: RuleName, **ids: int
+    ) -> tuple[object, RuleName | None]:
         refused = refusal(held, change, *expected, **ids)
         # Another administrator's edit, as the test's own rows are written.
         to_feet(setting_up(session), place.cable)

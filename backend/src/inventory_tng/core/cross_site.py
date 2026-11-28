@@ -7,6 +7,7 @@ forged one cannot be made that way. Go's net/http CrossOriginProtection
 works the same way.
 """
 
+from typing import Unpack
 from urllib.parse import urlsplit
 
 import structlog
@@ -16,10 +17,12 @@ from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from inventory_tng.core.phrases import lazy_gettext
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 
 log = structlog.get_logger(__name__)
-refused = Refusals(
+
+
+@refusals(
     log,
     metrics.get_meter(__name__).create_counter(
         "inventory.cross_site.refused",
@@ -28,6 +31,9 @@ refused = Refusals(
         "site's page sent them",
     ),
 )
+def refused(event: str, **fields: Unpack[Fields]) -> None: ...
+
+
 REFUSED = lazy_gettext("Refused: this came from another site's page.")
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})

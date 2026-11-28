@@ -11,7 +11,7 @@ and registering. A page's numbers are not worth a connection, and a flood
 of them must not hold one up from those.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Unpack
 
 import structlog
 from fastapi import APIRouter, FastAPI, Request, Response
@@ -22,7 +22,7 @@ from opentelemetry import metrics
 from pydantic import BaseModel, ConfigDict, Field
 
 from inventory_tng.core.rate_limits import RateLimitedReply
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.web import forms
 from inventory_tng.web.browser import over_limit
 
@@ -216,7 +216,7 @@ class Report(Strict):
     events: Annotated[list[Event], Field(min_length=1, max_length=MOST_EVENTS)]
 
 
-reports_refused = Refusals(
+@refusals(
     log,
     meter.create_counter(
         "inventory.page.reports.refused",
@@ -224,8 +224,12 @@ reports_refused = Refusals(
         description="Reports the scan and register pages sent about themselves "
         "refused, none recorded, by reason",
     ),
-    reason=("rate_limited",),
 )
+def reports_refused(
+    event: str, *, reason: Literal["rate_limited"], **fields: Unpack[Fields]
+) -> None: ...
+
+
 page_errors = meter.create_counter(
     "inventory.page.errors",
     unit="{error}",

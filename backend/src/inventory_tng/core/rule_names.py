@@ -1,12 +1,14 @@
 """Every rule a change can break, by the name db_errors.attempt() gives it
 (RuleName): the fixed list a rule refusal is counted by
-(db_errors.rule_refused, AGENTS.md rule 7). A domain function's (db_errors.RuleBroken), a check
-constraint's, or "unique" for any unique index. web/forms.py's RULES puts
+(db_errors.rule_refused, AGENTS.md rule 7). A domain function's
+(db_errors.RuleBroken), a check constraint's, or "unique" for any unique
+index. web/forms.py's RULES puts
 most into words; a page words the rest itself. Names only, so any module
-may import it; tests/codebase/test_rule_refusals.py fails on a rule the
-code raises that is not here, or one here that nothing raises."""
+may import it. `ty check` refuses a rule raised by a name not here
+(enforce(), RuleBroken take a RuleName), and
+tests/codebase/test_rule_refusals.py one here that nothing raises."""
 
-from typing import Literal, get_args
+from typing import Literal
 
 RuleName = Literal[
     "unique",
@@ -61,6 +63,10 @@ RuleName = Literal[
     "movement_unit",
     "movement_whole_packages",
     "movement_whole_units",
+    "open_package_full",
+    "open_package_opened_once",
+    "opening_follows_setting",
+    "opening_from_sealed",
     "receipt_retired_item",
     "receipt_retired_package",
     # Counts, open packages and their checks.
@@ -76,6 +82,4 @@ RuleName = Literal[
     "changed_since_shown",
     "retired_read_only",
 ]
-# The same, as a set, which the counter reads its attribute from.
-RULE_NAMES = frozenset(get_args(RuleName))
 UNIQUE: RuleName = "unique"

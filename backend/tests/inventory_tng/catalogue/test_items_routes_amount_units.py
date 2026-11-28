@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.items_routes import UNIT_FREE
 from inventory_tng.catalogue.paths import ITEMS
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Category, Item, ItemPackage
 from inventory_tng.web.forms import CHANGED, RULES
@@ -66,7 +67,7 @@ def _refused_since(
     item: Item,
     drawn: str,
     minimum: str,
-    rule: str,
+    rule: RuleName,
 ) -> None:
     """A change of `item`'s unit to ft, Reorder at `minimum`, sent from a
     form `drawn` free or not: refused with `rule`'s words alone, which say

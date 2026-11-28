@@ -6,6 +6,7 @@ the form's fields."""
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.places import Location
 from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.forms import chosen, name_problem
@@ -23,7 +24,7 @@ PICK_WHAT = lazy_gettext("Pick what it is.")
 PICK_WHERE = lazy_gettext("Pick where it is.")
 # The rules places/locations.py refuses a place by, besides its name's,
 # and the field each is shown by; any other is shown by the name.
-REFUSED_FIELDS = {
+REFUSED_FIELDS: dict[RuleName, str] = {
     "location_area_parent": "parent_id",
     "location_parent_current": "parent_id",
     "location_no_cycle": "parent_id",

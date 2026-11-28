@@ -8,7 +8,7 @@ import re
 import unicodedata
 from decimal import Decimal
 from enum import StrEnum
-from typing import Literal, get_args
+from typing import Literal, Unpack
 
 import structlog
 from opentelemetry import metrics
@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue.amount_rules import whole_enough
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext, number
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.base import (
     INTEGER_MAX,
     QUANTITY_MAX,
@@ -37,7 +38,7 @@ PICK_A_ZONE = lazy_gettext("Pick a zone from the list.")
 # The rules domain functions check, by the name db_errors.attempt gives one
 # that a change broke (db_errors.RuleBroken's), in words. A page passes its own
 # words for "unique", which depend on what it is naming.
-RULES = {
+RULES: dict[RuleName, Words] = {
     "location_area_parent": lazy_gettext("An area is part of a store or another area."),
     "location_no_cycle": lazy_gettext("That would make it part of itself."),
     "location_parent_current": lazy_gettext(
@@ -129,10 +130,10 @@ BREAKS_A_RULE = lazy_gettext("That breaks one of the inventory's rules.")
 # A save refused as its row changed since its form was shown
 # (db_locking.unchanged): the page shows it again as it is now, with RULES'
 # words as an alert.
-CHANGED = "changed_since_shown"
+CHANGED: RuleName = "changed_since_shown"
 # A change to a retired row, which is read only until brought back
 # (docs/decisions/0019): said the same way.
-RETIRED = "retired_read_only"
+RETIRED: RuleName = "retired_read_only"
 # The refusals said as an alert above the page, not beside a field.
 ALERTS = frozenset({CHANGED, RETIRED})
 
@@ -308,9 +309,14 @@ other_separators = meter.create_counter(
     "does not use, refused, by which: a point, a comma, or either followed by "
     "three digits after a whole part above 0, as thousands are grouped",
 )
+
+
 # The server's own boxes' refusals; the scan page's come counted
 # (scan/page_telemetry_api).
-number_refused = Refusals(log, other_separators, separator=get_args(OtherSeparator))
+@refusals(log, other_separators)
+def number_refused(
+    event: str, *, separator: OtherSeparator, **fields: Unpack[Fields]
+) -> None: ...
 
 
 def other_separator(refused: Unreadable, separator: Separator) -> OtherSeparator | None:

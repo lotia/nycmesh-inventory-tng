@@ -19,6 +19,7 @@ from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import Seen, lock_catalogue, relock, require_current
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.places import STORE_KINDS, Location
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.stock.balance import holds_stock
@@ -34,7 +35,7 @@ class Parent:
     current: bool
 
 
-def placing(parent: Parent | None, *, current: bool) -> str | None:
+def placing(parent: Parent | None, *, current: bool) -> RuleName | None:
     """A location put under `parent`, as it is added, moved or brought
     back: an area's parent is a store or another area, and a current
     area's parent is current."""
@@ -49,7 +50,7 @@ def placing(parent: Parent | None, *, current: bool) -> str | None:
 
 def no_cycle(
     parents: Mapping[int, int | None], location_id: int, parent_id: int
-) -> str | None:
+) -> RuleName | None:
     """Moving `location_id` under `parent_id`, given each location's parent:
     walking up from the new parent never reaches the location itself."""
     seen: set[int] = set()

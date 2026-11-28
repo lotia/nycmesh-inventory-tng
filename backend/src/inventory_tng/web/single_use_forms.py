@@ -11,7 +11,7 @@ would show only the second answer, and the first's secret never.
 """
 
 import uuid
-from typing import TYPE_CHECKING, Annotated, Any, Literal, cast, get_args
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Unpack, cast
 
 import structlog
 from babel.support import LazyProxy
@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException
 
 from inventory_tng.core.phrases import lazy_gettext
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.core.sent_forms import form_key, spend
 from inventory_tng.web.pages import page, templates
 
@@ -44,7 +44,9 @@ SingleUseKey = Annotated[str, Form(alias=FIELD)]
 Made = Literal[
     "registration_code", "registration_codes", "recovery_codes", "link", "change"
 ]
-refused = Refusals(
+
+
+@refusals(
     log,
     metrics.get_meter(__name__).create_counter(
         "inventory.single_use_forms.refused",
@@ -52,9 +54,16 @@ refused = Refusals(
         description="Forms that make something shown once refused, nothing "
         "made: sent again, or with no key, by reason and what they make",
     ),
-    reason=("sent_again", "key_missing"),
-    made=get_args(Made),
 )
+def refused(
+    event: str,
+    *,
+    reason: Literal["sent_again", "key_missing"],
+    made: Made,
+    **fields: Unpack[Fields],
+) -> None: ...
+
+
 # What the page says of each but "change", which sent_again.html words.
 SENT_AGAIN: dict[Made, LazyProxy] = {
     "registration_code": lazy_gettext(

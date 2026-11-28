@@ -28,6 +28,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Iterable
+from typing import Literal, Unpack
 
 import structlog
 from fastapi import APIRouter, Request, Response
@@ -39,7 +40,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.rate_limits import RateLimitedReply
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.web.browser import over_limit
 from inventory_tng.web.pages import NONCE, csp_nonce
 
@@ -139,15 +140,22 @@ violations = meter.create_counter(
     unit="{violation}",
     description="Content-Security-Policy violations browsers reported, by directive",
 )
-reports_refused = Refusals(
+
+
+@refusals(
     log,
     meter.create_counter(
         "inventory.csp.reports.refused",
         unit="{report}",
         description="Content-Security-Policy reports refused, none counted, by reason",
     ),
-    reason=("rate_limited", "not_a_report_type", "too_large", "not_a_report"),
 )
+def reports_refused(
+    event: str,
+    *,
+    reason: Literal["rate_limited", "not_a_report_type", "too_large", "not_a_report"],
+    **fields: Unpack[Fields],
+) -> None: ...
 
 
 def content_security_policy(

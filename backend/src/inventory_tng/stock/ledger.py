@@ -41,6 +41,7 @@ from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.local_time import zone_at
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
@@ -76,12 +77,12 @@ class Entry(NamedTuple):
     unit: str | None = None
 
 
-def line_breaks(kind: str, item: Item, amount: Decimal) -> list[str]:
+def line_breaks(kind: str, item: Item, amount: Decimal) -> list[RuleName]:
     """The ledger's rules a line of a transaction of this kind breaks,
     moving `amount` of `item`: whole units for an item counted in each, and
     a retired item never received (docs/decisions/0003). Empty if it
     breaks none."""
-    broken = []
+    broken: list[RuleName] = []
     if not whole_enough(item.unit, amount):
         broken.append("movement_whole_units")
     if item.retired_at is not None and kind == "receipt":
@@ -91,7 +92,7 @@ def line_breaks(kind: str, item: Item, amount: Decimal) -> list[str]:
 
 def lines_break(
     kind: str, items: Mapping[int, Item], lines: Lines
-) -> list[list[str] | None]:
+) -> list[list[RuleName] | None]:
     """For each line the rules of its item it breaks (line_breaks), or None
     if its item is not in `items`."""
     return [
@@ -185,7 +186,7 @@ def form_breaks(
     places: tuple[int | None, int | None],
     packages: Mapping[int, PackageFacts],
     opens: Mapping[int, OpenFacts],
-) -> list[str]:
+) -> list[RuleName]:
     """The rules of docs/decisions/0020 a line breaks, in a transaction of
     `kind` between `places` (from, to; None outside). Empty if none.
 
@@ -204,7 +205,7 @@ def form_breaks(
       packages, else into loose units.
     - Loosening, at one place, takes all that is left on an open package
       into loose units there (_loosening_breaks)."""
-    broken: list[str] = []
+    broken: list[RuleName] = []
     sides = list(zip(places, (entry.leaves, entry.arrives), strict=True))
     if any(place is None and form != LOOSE for place, form in sides):
         broken.append("movement_form_outside")
@@ -250,7 +251,7 @@ def form_breaks(
 
 def _opening_breaks(
     entry: Entry, packages: Mapping[int, PackageFacts], opens: Mapping[int, OpenFacts]
-) -> list[str]:
+) -> list[RuleName]:
     """form_breaks' rules of opening: a sealed package becomes an open one,
     made for it, unopened before, and full; or loose units, as its item
     says (opening_follows_setting)."""
@@ -272,7 +273,7 @@ def _opening_breaks(
     return []
 
 
-def _loosening_breaks(entry: Entry, opens: Mapping[int, OpenFacts]) -> list[str]:
+def _loosening_breaks(entry: Entry, opens: Mapping[int, OpenFacts]) -> list[RuleName]:
     """form_breaks' rules of loosening (open_packages.close_unfollowed):
     all that is left on an open package leaves it as loose units; or, left
     below zero, as much arrives on it from them, so it shows nothing and

@@ -22,6 +22,7 @@ from inventory_tng.core.db_locking import (
 )
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.places import Location
 from inventory_tng.models.volunteers import Volunteer
 from inventory_tng.places import locations
@@ -33,7 +34,7 @@ def _logged(session: Session, event: str, volunteer: Volunteer, **ids: int) -> N
     once_committed(session, log.info, event, volunteer_id=volunteer.id, **ids)
 
 
-def leaving(*, others_merged_in: bool, holds_custody: bool) -> str | None:
+def leaving(*, others_merged_in: bool, holds_custody: bool) -> RuleName | None:
     """A volunteer retired, or merged: those merged into them are pointed
     elsewhere first, and their custody location is retired first."""
     if others_merged_in:

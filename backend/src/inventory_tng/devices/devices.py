@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from importlib import resources
 from ipaddress import IPv4Address, IPv6Address, ip_address
-from typing import Literal, NoReturn, get_args
+from typing import Literal, NoReturn, Unpack
 
 import structlog
 from limits import RateLimitItemPerMinute
@@ -37,7 +37,7 @@ from inventory_tng.core.db_locking import Seen, get_locked, locked, unchanged
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.rate_limits import limiter, refund
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.models.devices import Device, RegistrationCode
 
 log = structlog.get_logger(__name__)
@@ -70,15 +70,21 @@ registered = meter.create_counter(
     unit="{device}",
     description="Devices registered with a code, by use: its first, or again",
 )
-rejected = Refusals(
+
+
+@refusals(
     log,
     meter.create_counter(
         "inventory.registrations.rejected",
         unit="{registration}",
         description="Registration attempts refused, by reason",
     ),
-    reason=(*get_args(BadCode), "rate_limited"),
 )
+def rejected(
+    event: str, *, reason: BadCode | Literal["rate_limited"], **fields: Unpack[Fields]
+) -> None: ...
+
+
 made = meter.create_counter(
     "inventory.registration_codes.made",
     unit="{code}",
@@ -86,15 +92,21 @@ made = meter.create_counter(
 )
 # Why another like a code is not made: no such code, or nothing left on it.
 AnotherRefusal = Literal["no_such_code", "nothing_left"]
-another_refused = Refusals(
+
+
+@refusals(
     log,
     meter.create_counter(
         "inventory.registration_codes.refused",
         unit="{code}",
         description="Another like a registration code refused, none made, by reason",
     ),
-    reason=get_args(AnotherRefusal),
 )
+def another_refused(
+    event: str, *, reason: AnotherRefusal, **fields: Unpack[Fields]
+) -> None: ...
+
+
 revoked = meter.create_counter(
     "inventory.devices.revoked",
     unit="{device}",

@@ -4,7 +4,7 @@ logged and counted here, once, whichever page made it (_attempted)."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Unpack, cast
 
 import structlog
 from fastapi import FastAPI, Request
@@ -14,8 +14,8 @@ from pydantic import BaseModel
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
 
-from inventory_tng.core.refusals import Refusals
-from inventory_tng.core.rule_names import RULE_NAMES, UNIQUE
+from inventory_tng.core.refusals import Fields, refusals
+from inventory_tng.core.rule_names import UNIQUE, RuleName
 
 if TYPE_CHECKING:  # db_sessions imports this module.
     from inventory_tng.core.db_sessions import PoolName
@@ -43,11 +43,11 @@ class NoSession(PoolTimeout):
 
 class RuleBroken(Exception):
     """A change the app's rules refuse (the catalogue's, the ledger's, the
-    site settings'), by the rule's name, one of core/rule_names.py's
-    RULE_NAMES, which web.forms.RULES puts into words. Raised before
+    site settings'), by the rule's name, a core/rule_names.py RuleName,
+    which web.forms.RULES puts into words. Raised before
     anything is written."""
 
-    def __init__(self, rule: str) -> None:
+    def __init__(self, rule: RuleName) -> None:
         super().__init__(rule)
         self.rule = rule
 
@@ -67,7 +67,7 @@ class Gone(Exception):
     to change, and a page answers not found (pages.ErrorPages)."""
 
 
-def enforce(broken: str | None, *, when: bool = True) -> None:
+def enforce(broken: RuleName | None, *, when: bool = True) -> None:
     """Raise RuleBroken for `broken`, a rule's name, if `when`: as a rule
     function returns it, or named for a rule of one condition, as in
     enforce("category_has_items", when=has_items)."""
@@ -81,11 +81,11 @@ class Broken:
     """The rule a change broke, by the name attempt() gives it, and the
     unique index, if it broke one and the database said which."""
 
-    rule: str
+    rule: RuleName
     index: str | None = None
 
 
-rule_refused = Refusals(
+@refusals(
     log,
     metrics.get_meter(__name__).create_counter(
         "inventory.changes.refused",
@@ -95,8 +95,8 @@ rule_refused = Refusals(
         "index. A form shown before its row changed is counted by "
         "inventory.edits.stale instead",
     ),
-    rule=RULE_NAMES,
 )
+def rule_refused(event: str, *, rule: RuleName, **fields: Unpack[Fields]) -> None: ...
 
 
 def _attempted[T](
@@ -116,10 +116,8 @@ def _attempted[T](
             # Such as Gone, or any other failure: raised.
             raise
         if not isinstance(error, Stale):
-            fields: dict[str, Any] = {"rule": broken.rule, **ids}
-            if broken.index:
-                fields["index"] = broken.index
-            rule_refused("change refused by a rule", **fields)
+            named: Fields = {"index": broken.index} if broken.index else {}
+            rule_refused("change refused by a rule", rule=broken.rule, **named, **ids)
         return None, broken
     return done, None
 
@@ -134,13 +132,16 @@ def _broken(error: BaseException) -> Broken | None:
         if sqlstate == UNIQUE_VIOLATION:
             return Broken(UNIQUE, constraint)
         if sqlstate == CHECK_VIOLATION and constraint:
-            return Broken(constraint)
+            # Named by the database, so only known as the app runs: one not
+            # in RuleName is counted as unlisted (rule_refused), and has no
+            # words in web.forms.RULES.
+            return Broken(cast(RuleName, constraint))
     return None
 
 
 def attempt[T](
     session: Session, change: Callable[[], T], **ids: int
-) -> tuple[T | None, str | None]:
+) -> tuple[T | None, RuleName | None]:
     """Run `change` in a savepoint, with nothing of it kept if it breaks a
     rule: what it returned, and None; or None, and "unique" if it broke a
     unique index (as each table's index compares, such as an item's name
@@ -155,7 +156,7 @@ def attempt[T](
 
 
 def refusal_naming_index[T](
-    session: Session, change: Callable[[], T], *expected: str, **ids: int
+    session: Session, change: Callable[[], T], *expected: RuleName, **ids: int
 ) -> tuple[T | None, Broken | None]:
     """refusal(), saying which unique index a "unique" refusal broke, for a
     page whose words differ by index."""
@@ -166,8 +167,8 @@ def refusal_naming_index[T](
 
 
 def refusal[T](
-    session: Session, change: Callable[[], T], *expected: str, **ids: int
-) -> tuple[T | None, str | None]:
+    session: Session, change: Callable[[], T], *expected: RuleName, **ids: int
+) -> tuple[T | None, RuleName | None]:
     """attempt(), for a change only the `expected` rules may refuse. Any
     other rule broken is a bug, and raised."""
     done, broken = refusal_naming_index(session, change, *expected, **ids)

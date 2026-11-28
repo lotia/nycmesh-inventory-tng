@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_locking import UNGUARDED_INFO
 from inventory_tng.core.phrases import PATH_BETWEEN
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
 from inventory_tng.stock import count_routes, queries
@@ -316,8 +317,8 @@ def test_a_count_refused_as_an_area_is_gone_says_a_switch_since(
     refusal = count_routes.refusal
 
     def switched_after(
-        held: Session, change: Callable[[], object], *expected: str, **ids: int
-    ) -> tuple[object, str | None]:
+        held: Session, change: Callable[[], object], *expected: RuleName, **ids: int
+    ) -> tuple[object, RuleName | None]:
         refused = refusal(held, change, *expected, **ids)
         # Another administrator's edit, as the test's own rows are written.
         setting_up(session)

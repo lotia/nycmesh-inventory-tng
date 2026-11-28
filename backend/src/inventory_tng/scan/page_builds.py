@@ -18,7 +18,7 @@ of the API, never the page, so it is checked as any other: a field it
 lacks is a 422 that names it.
 """
 
-from typing import Annotated, Literal, cast
+from typing import Annotated, Literal, Unpack, cast
 
 import structlog
 from fastapi import FastAPI, Header, Request, Response
@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 from pydantic import BaseModel, Field
 
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.web.frontend_bundle import BUILD_ID
 
 log = structlog.get_logger(__name__)
@@ -37,7 +37,8 @@ HEADER = "X-Inventory-Build"
 # every build's. Set only in a change that makes a batch accept less.
 OLDEST_BUILD: str | None = None
 
-too_old = Refusals(
+
+@refusals(
     log,
     meter.create_counter(
         "inventory.transactions.too_old",
@@ -46,6 +47,7 @@ too_old = Refusals(
         "than the server takes: kept on the phone, to put back in the cart",
     ),
 )
+def too_old(event: str, **fields: Unpack[Fields]) -> None: ...
 
 
 # What a client told its build is too old does, in the reply's own words.

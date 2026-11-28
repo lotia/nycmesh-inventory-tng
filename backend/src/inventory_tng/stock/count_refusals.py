@@ -4,12 +4,13 @@ and the rules that may refuse it as it is saved, which core/db_errors.py
 logs and counts (inventory-tng-v8sq). The routes that refuse are
 stock/count_routes.py's."""
 
-from typing import Literal, get_args
+from typing import Literal, Unpack
 
 import structlog
 from opentelemetry import metrics
 
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.stock.count_forms import (
     CLOSED_MEANWHILE,
 )
@@ -23,11 +24,11 @@ meter = metrics.get_meter(__name__)
 # An open package found that its item does not follow once opened, and a
 # form counted twice: said as rules are.
 UNTRACKED = "open_package_untracked"
-ONCE = "movement_item_once"
+ONCE: RuleName = "movement_item_once"
 # A form saved, sent again saying otherwise (stock/store_counts.py):
 # nothing is written, and Counts says so (Ali, 2026-11-22,
 # inventory-tng-53im, inventory-tng-kro9).
-SENT_AGAIN = "count_sent_otherwise"
+SENT_AGAIN: RuleName = "count_sent_otherwise"
 
 # Why a count form was refused as it was read, before its save. A form
 # that is not as the page sends it is not found, and not counted.
@@ -55,8 +56,9 @@ RULE_REFUSALS = (
     SHOWN_OTHERWISE,
 )
 
+
 # Each reason a form is refused for is logged and counted once.
-count_refused = Refusals(
+@refusals(
     log,
     meter.create_counter(
         "inventory.counts.refused",
@@ -64,5 +66,7 @@ count_refused = Refusals(
         description="Count forms refused, nothing written, by reason: one "
         "refused for several is counted under each",
     ),
-    reason=get_args(CountRefusal),
 )
+def count_refused(
+    event: str, *, reason: CountRefusal, **fields: Unpack[Fields]
+) -> None: ...

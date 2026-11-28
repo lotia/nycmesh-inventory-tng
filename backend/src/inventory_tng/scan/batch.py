@@ -13,7 +13,7 @@ import uuid
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Literal, NamedTuple, cast
+from typing import Literal, NamedTuple, Unpack, cast
 
 import structlog
 from opentelemetry import metrics
@@ -30,7 +30,8 @@ from inventory_tng.catalogue.unit_conversion import (
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.models.volunteers import Volunteer
@@ -63,7 +64,8 @@ replayed = meter.create_counter(
 # A batch refused only for these is of a page behind the catalogue.
 SHOWN_BEHIND = frozenset({"unit_changed", "package_resized"})
 
-refused = Refusals(
+
+@refusals(
     log,
     meter.create_counter(
         "inventory.transactions.refused",
@@ -74,8 +76,15 @@ refused = Refusals(
         "for a unit or package size changed since the page showed it, or for "
         "reusing a key, by reason",
     ),
-    reason=("invalid", "shown_otherwise", "key_reused"),
 )
+def refused(
+    event: str,
+    *,
+    reason: Literal["invalid", "shown_otherwise", "key_reused"],
+    **fields: Unpack[Fields],
+) -> None: ...
+
+
 recorded = meter.create_counter(
     "inventory.transactions.recorded",
     unit="{transaction}",
@@ -461,7 +470,7 @@ def _line_form_breaks(
     opens: Mapping[int, OpenFacts],
     *,
     keyed: bool,
-) -> list[str]:
+) -> list[RuleName]:
     """form_breaks' rules a batch's line breaks, before an opening's open
     packages are made: one opened into one under the page's key, if its
     item tracks them, is one whole package (open_package_full). One without
@@ -476,10 +485,12 @@ def _line_form_breaks(
     return broken
 
 
+# Read again in the unit a line was counted in, if its item's changed since.
+WHOLE_UNITS: RuleName = "movement_whole_units"
 # Each of the rules a batch's line can break, as its problem: which field,
 # and what. A batch's forms are sealed or loose alike on both sides
 # (entry_of), or an opening's, so no other form rule can be broken by one.
-LINE_PROBLEMS: dict[str, tuple[str, batch_schemas.ProblemKind]] = {
+LINE_PROBLEMS: dict[RuleName, tuple[str, batch_schemas.ProblemKind]] = {
     "movement_whole_units": ("quantity", "not_whole"),
     "receipt_retired_item": ("item_id", "retired"),
     "movement_package_of_item": ("package_id", "not_found"),
@@ -561,9 +572,9 @@ def _problems(
         if sent.unit != item.unit:
             problems.append((("lines", number, "unit"), "unit_changed"))
             now.units[item.id] = item.unit
-            broken = [rule for rule in broken if rule != "movement_whole_units"]
+            broken = [rule for rule in broken if rule != WHOLE_UNITS]
             if not whole_enough(sent.unit, sent.quantity):
-                broken.append("movement_whole_units")
+                broken.append(WHOLE_UNITS)
         # Resized since the page read its catalogue: refused, and its rules
         # read in the size it was counted in.
         facts = packages

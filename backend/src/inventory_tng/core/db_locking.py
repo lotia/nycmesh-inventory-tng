@@ -2,7 +2,7 @@
 write holds the lock its table's protection names."""
 
 from collections.abc import Collection
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Unpack
 
 import structlog
 from opentelemetry import metrics
@@ -26,7 +26,8 @@ from inventory_tng.core.db_protection import (
 )
 from inventory_tng.core.db_savepoints import innermost, savepoint_undone, within
 from inventory_tng.core.db_sessions import exists_where
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
+from inventory_tng.core.rule_names import RuleName
 
 if TYPE_CHECKING:
     # The type with_for_update takes for `of`, which locked passes on.
@@ -109,7 +110,9 @@ def settings_row[M: Base](session: Session, model: type[M], *, seen: Seen) -> M:
 type Seen = int | None
 
 meter = metrics.get_meter(__name__)
-stale = Refusals(
+
+
+@refusals(
     log,
     meter.create_counter(
         "inventory.edits.stale",
@@ -119,7 +122,8 @@ stale = Refusals(
     ),
     table=Base.metadata.tables,
 )
-gone = Refusals(
+def stale(event: str, *, table: str, **fields: Unpack[Fields]) -> None: ...
+@refusals(
     log,
     meter.create_counter(
         "inventory.edits.gone",
@@ -129,6 +133,7 @@ gone = Refusals(
     ),
     table=Base.metadata.tables,
 )
+def gone(event: str, *, table: str, **fields: Unpack[Fields]) -> None: ...
 
 
 def unchanged(row: Base, seen: Seen) -> None:
@@ -316,7 +321,7 @@ def _next_version(
 
 
 def require_current(
-    session: Session, model: type[Base], row_id: int, rule: str
+    session: Session, model: type[Base], row_id: int, rule: RuleName
 ) -> None:
     """RuleBroken for `rule` unless the row is there and not retired, read
     afresh: an object the session holds may be from before a lock."""

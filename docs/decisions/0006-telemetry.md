@@ -138,3 +138,19 @@ again. The count form's box problems and an answer to a line recorded
 more than moved refused by its form are counted here alone now.
 `tests/codebase/test_form_problems_counted.py` fails on a forms module
 that leaves a phrase of its own bare.
+
+### No count lost, and every reason type-checked (2026-11-27)
+
+Decided by Ali on 2026-11-27 (inventory-tng-vj5h): a refusal whose
+attribute is not on its list, or left out, is still counted, with that
+attribute `unlisted`, and logged as an error naming the refusal and the
+attribute, never the value. It was logged but not counted before, so a
+dashboard undercounted.
+
+Each kind of refusal is declared by its call's signature (`@refusals` in
+`core/refusals.py`), every attribute a `Literal`, so `ty check` refuses a
+reason not on its list before any test runs. Rule names (`RuleName`) and
+form problems' kinds are `Literal`s too, and `web/forms.py`'s `RULES` is
+keyed by `RuleName`. Only values the app learns as it runs are left to
+`unlisted`: a check constraint the database names, a page's template, and
+a table.

@@ -12,7 +12,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, NamedTuple
+from typing import Annotated, Literal, NamedTuple, Unpack
 
 import structlog
 from babel.support import LazyProxy
@@ -28,7 +28,7 @@ from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Separator, Words, lazy, lazy_gettext
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import OpenPackage
@@ -66,7 +66,9 @@ from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
-set_refused = Refusals(
+
+
+@refusals(
     log,
     metrics.get_meter(__name__).create_counter(
         "inventory.open_packages.length_checks.refused",
@@ -74,8 +76,14 @@ set_refused = Refusals(
         description="Lengths set on Length checks refused, nothing set, by "
         "reason: not a length, or the form not saying what it showed",
     ),
-    reason=("not_a_length", "not_as_shown"),
 )
+def set_refused(
+    event: str,
+    *,
+    reason: Literal["not_a_length", "not_as_shown"],
+    **fields: Unpack[Fields],
+) -> None: ...
+
 
 router = APIRouter(include_in_schema=False)
 

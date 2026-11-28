@@ -15,7 +15,7 @@ import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Literal, NoReturn, get_args
+from typing import Literal, NoReturn, Unpack
 
 import structlog
 from argon2 import PasswordHasher
@@ -40,7 +40,7 @@ from inventory_tng.core.db_sessions import exists_where, set_actor
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.core.rate_limits import limiter
-from inventory_tng.core.refusals import Refusals
+from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
 from inventory_tng.devices.devices import digest
@@ -111,9 +111,23 @@ confirmations = meter.create_counter(
     unit="{attempt}",
     description="Codes typed to confirm a sensitive action, by outcome",
 )
-sign_in_refused = Refusals(log, sign_ins, outcome=("refused",), reason=get_args(Reason))
-# By Confirmation's outcomes but "confirmed".
-confirmation_refused = Refusals(log, confirmations, outcome=("refused", "rate_limited"))
+
+
+@refusals(log, sign_ins)
+def sign_in_refused(
+    event: str, *, outcome: Literal["refused"], reason: Reason, **fields: Unpack[Fields]
+) -> None: ...
+
+
+@refusals(log, confirmations)
+def confirmation_refused(
+    event: str,
+    *,
+    # Confirmation's outcomes but "confirmed".
+    outcome: Literal["refused", "rate_limited"],
+    **fields: Unpack[Fields],
+) -> None: ...
+
 
 _hasher = PasswordHasher()
 # Checked against when there is no account, so an unknown username takes as
@@ -705,15 +719,17 @@ def _check_operator_token(
         _refuse(purpose, "bad_token")
 
 
-setup_refused = Refusals(
+@refusals(
     log,
     meter.create_counter(
         "inventory.admin.setups.refused",
         unit="{attempt}",
         description="Uses of the operator's setup token refused, by reason",
     ),
-    reason=get_args(TokenRefusal),
 )
+def setup_refused(
+    event: str, *, reason: TokenRefusal, **fields: Unpack[Fields]
+) -> None: ...
 
 
 def _refuse(purpose: Literal["setup", "recovery"], reason: TokenRefusal) -> NoReturn:
@@ -1047,7 +1063,7 @@ def may_ask_for_reset(session: Session, address: str, limits: RateLimits) -> boo
     return limiter(session).hit(_per_address(limits), "forgot", address)
 
 
-emailed_reset_refused = Refusals(
+@refusals(
     log,
     meter.create_counter(
         "inventory.admin.emailed_resets.refused",
@@ -1055,8 +1071,13 @@ emailed_reset_refused = Refusals(
         description="Password resets asked for by mail not made, none sent, by "
         "reason; the person asking is told the same either way",
     ),
-    reason=("no_such_address", "no_password", "rate_limited"),
 )
+def emailed_reset_refused(
+    event: str,
+    *,
+    reason: Literal["no_such_address", "no_password", "rate_limited"],
+    **fields: Unpack[Fields],
+) -> None: ...
 
 
 def emailed_reset(
@@ -1163,7 +1184,12 @@ recoveries = meter.create_counter(
     unit="{attempt}",
     description="Uses of the operator's recovery token, by outcome",
 )
-recovery_refused = Refusals(log, recoveries, outcome=get_args(TokenRefusal))
+
+
+@refusals(log, recoveries)
+def recovery_refused(
+    event: str, *, outcome: TokenRefusal, **fields: Unpack[Fields]
+) -> None: ...
 
 
 def recover(
@@ -1241,7 +1267,9 @@ AdminAction = Literal["invite", "reset", "retire", "restore"]
 # Why, for the log: the page says only not found, but an operator should
 # tell a session cut off meanwhile (signed_out, a warning) from a stale id.
 Why = Literal["themselves", "no_such_admin", "signed_out"]
-action_refused = Refusals(
+
+
+@refusals(
     log,
     meter.create_counter(
         "inventory.admin.actions.refused",
@@ -1249,9 +1277,10 @@ action_refused = Refusals(
         description="Invitations, resets, retires and bring-backs of an "
         "administrator refused, nothing changed, by the action and why",
     ),
-    action=get_args(AdminAction),
-    why=get_args(Why),
 )
+def action_refused(
+    event: str, *, action: AdminAction, why: Why, **fields: Unpack[Fields]
+) -> None: ...
 
 
 def _refuse_action(

@@ -1,5 +1,7 @@
 """What attempt() says a refused change broke, and how it logs it."""
 
+from typing import cast
+
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
@@ -10,9 +12,14 @@ from inventory_tng.core.db_errors import (
     refusal,
     refusal_naming_index,
 )
+from inventory_tng.core.rule_names import RuleName
 from inventory_tng.models.catalogue import Category, Item
 
 from helpers.rows import add
+
+# A check constraint only the database names, no RuleName: a form checks
+# Reorder at first (core/db_errors._broken).
+MINIMUM = cast(RuleName, "ck_item_minimum")
 
 
 def test_a_unique_refusal_names_its_index(session: Session, radios: Category) -> None:
@@ -35,9 +42,9 @@ def test_a_rule_refusal_names_no_index(session: Session, radios: Category) -> No
     def below_none() -> Item:
         return add(session, Item(name="Omni", category_id=radios.id, minimum=-1))
 
-    assert refusal_naming_index(session, below_none, "unique", "ck_item_minimum") == (
+    assert refusal_naming_index(session, below_none, "unique", MINIMUM) == (
         None,
-        Broken("ck_item_minimum"),
+        Broken(MINIMUM),
     )
 
 
