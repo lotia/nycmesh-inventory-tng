@@ -510,7 +510,7 @@ describe("what an older build left", () => {
     );
   });
 
-  test("just after a line's Discard, taps on its entry's buttons are ignored, so a double tap discards one line", async () => {
+  test("just after a line's Discard, the page's taps are ignored, so a double tap discards one line", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     leaveSave(
       {},
@@ -541,8 +541,16 @@ describe("what an older build left", () => {
     fireEvent.click(movedUp, { detail: 0 });
     within(listing()).getByText("Cat6 cable: 5 m from an open package");
     expect(document.activeElement).toBe(movedUp);
-    tap(lastDiscard());
-    tap(within(listing()).getByRole("button", { name: say(ADD_TO_CART) }));
+    // What is below the entry moved up too: the cart's taps wait as well
+    // (inventory-tng-r3jx).
+    const kind = screen.getAllByRole("radio")[1] as HTMLInputElement;
+    fireEvent.click(kind, { detail: 1 });
+    expect(kind.checked).toBe(false);
+    fireEvent.click(lastDiscard(), { detail: 1 });
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: say(ADD_TO_CART) }),
+      { detail: 1 },
+    );
     expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
     expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
     await vi.advanceTimersByTimeAsync(SETTLE_MS);
@@ -550,8 +558,11 @@ describe("what an older build left", () => {
     within(listing()).getByText(say(CONFIRM_DISCARD));
     // Asked, a line discarded meanwhile holds the answer back too.
     tap(discardOf("Cat6 cable: 5 m from an open package"));
-    tap(lastDiscard());
-    tap(within(listing()).getByRole("button", { name: say(KEEP_IT) }));
+    fireEvent.click(lastDiscard(), { detail: 1 });
+    fireEvent.click(
+      within(listing()).getByRole("button", { name: say(KEEP_IT) }),
+      { detail: 1 },
+    );
     within(listing()).getByText(say(CONFIRM_DISCARD));
     await vi.advanceTimersByTimeAsync(SETTLE_MS);
     tap(within(listing()).getByRole("button", { name: say(KEEP_IT) }));
@@ -734,7 +745,7 @@ describe("what an older build left", () => {
     fireEvent.click(movedUp, { detail: 0 });
     within(listing()).getByText(FIVE);
     expect(document.activeElement).toBe(movedUp);
-    tap(lastDiscard());
+    fireEvent.click(lastDiscard(), { detail: 1 });
     expect(within(listing()).queryByText(say(CONFIRM_DISCARD))).toBeNull();
     await vi.advanceTimersByTimeAsync(SETTLE_MS);
     fireEvent.click(movedUp, { detail: 1 });

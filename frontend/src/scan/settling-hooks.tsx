@@ -4,7 +4,7 @@
 import { useSignal } from "@preact/signals";
 import type { RefObject } from "preact";
 import { useEffect, useRef } from "preact/hooks";
-import { focusInPlace, SETTLE_MS } from "../shared/settling";
+import { focusInPlace, ignoreTaps, SETTLE_MS } from "../shared/settling";
 
 /**
  * The space something took, kept blank for SETTLE_MS once a tap took it
@@ -65,18 +65,17 @@ export function useKeptSpaceOf<T extends HTMLElement>(
 }
 
 /**
- * Taps on a list's entries, ignored a moment once a tap took an entry
- * away, as the second tap of a double tap would land on what moved up in
- * its place; or once a tap changed `on` but left it listed (`stayed`), on
- * `on`'s taps alone (Ali, inventory-tng-0su, inventory-tng-ensw,
- * inventory-tng-34ns). Focus then goes, without scrolling, to the heading
+ * A list whose entries' taps may take an entry away, or change one but
+ * leave it listed (`stayed`): either moves what is below up under the
+ * finger, so taps on the page are ignored a moment (ignoreTaps; Ali,
+ * inventory-tng-0su, inventory-tng-ensw, inventory-tng-34ns,
+ * inventory-tng-r3jx). Focus then goes, without scrolling, to the heading
  * of the entry that moved up, found by its id, so one listed or gone
- * meanwhile in another tab does not send focus to another; or of
- * the list (`heading`); or, none listed, to `after`, and the list's
- * space stays blank a moment (useKeptSpace, `space`); after `stayed`, to
- * `on`'s. A pointer's ignored tap focused the button as it landed, where
- * Enter would later tap it, so focus goes back there (inventory-tng-bz73);
- * a key's press (detail 0) leaves focus where the volunteer moved it.
+ * meanwhile in another tab does not send focus to another; or of the list
+ * (`heading`); or, none listed, to `after`, and the list's space stays
+ * blank a moment (useKeptSpace, `space`); after `stayed`, to `on`'s. An
+ * ignored pointer tap puts focus back there, where Enter would otherwise
+ * later tap what it landed on (inventory-tng-bz73).
  *
  * `listed` gives the entries' ids in the order they are drawn, as they
  * are kept: called as the list is drawn, and again once a tap has run.
@@ -93,15 +92,9 @@ export function useSettledList({
   after: RefObject<HTMLElement | null>;
 }) {
   const drawn = listed();
-  // When an entry last went by a tap, and the one that moved up in its
-  // place, if any: by id, not place, as one saved or dismissed meanwhile
-  // in another tab moves the places.
-  const entryGone = useRef<{ when: number; next: string | null }>({
-    when: -Infinity,
-    next: null,
-  });
-  // When a tap last changed each but left it listed.
-  const stayedAt = useRef(new Map<string, number>());
+  // As last drawn, for a tap ignored after this render.
+  const lastDrawn = useRef(drawn);
+  lastDrawn.current = drawn;
   // The entry whose heading to focus once the list is drawn again, and
   // the one gone by the tap, which a render from before it went still
   // draws.
@@ -111,16 +104,22 @@ export function useSettledList({
   const heading = useRef<HTMLHeadingElement>(null);
   const list = useRef<HTMLElement>(null);
   const kept = useKeptSpace();
-  /** Focus the heading of `on`, as drawn, or the list's if it is not
-   * listed, or, none listed, what follows the list (Ali, 2026-11-27,
+  /** The heading of `on`, as drawn, or the list's if it is not listed,
+   * or, none listed, what follows the list (Ali, 2026-11-27,
    * inventory-tng-lm1b). */
-  const focusOn = (on: string | null) => {
-    const at = on === null ? -1 : drawn.indexOf(on);
-    focusInPlace(
+  const headingOf = (on: string | null) => {
+    const at = on === null ? -1 : lastDrawn.current.indexOf(on);
+    return (
       (at < 0 ? null : document.getElementById(`${headingIds}-${at}`)) ??
-        heading.current ??
-        after.current,
+      heading.current ??
+      after.current
     );
+  };
+  /** Taps wait, and focus goes to `to`'s heading once `gone` is drawn
+   * no more. */
+  const settle = (to: string | null, gone: string | null) => {
+    refocus.current = { to, gone };
+    ignoreTaps(document, () => headingOf(to));
   };
   // After every render: the one after a tap draws what it changed.
   useEffect(() => {
@@ -132,7 +131,7 @@ export function useSettledList({
       return;
     }
     refocus.current = null;
-    focusOn(want.to);
+    focusInPlace(headingOf(want.to));
   });
   return {
     /** For the list's section, measured as a tap lands. */
@@ -142,42 +141,24 @@ export function useSettledList({
     /** What is drawn in the list's place once nothing is listed. */
     space: () => kept.space(() => focusInPlace(after.current)),
     /** A tap changed `on` but left it listed. */
-    stayed: (on: string) => {
-      stayedAt.current.set(on, performance.now());
-      refocus.current = { to: on, gone: null };
+    stayed: (on: string) => settle(on, null),
+    /** `tap`, on one of `on`'s buttons, settling the list if it took `on`
+     * away. */
+    tapOn: (on: string, tap: () => void) => () => {
+      // Measured before the tap redraws the list, drawn as it was tapped.
+      const tall = (list.current as HTMLElement).getBoundingClientRect().height;
+      tap();
+      const left = listed();
+      if (!left.includes(on)) {
+        // The first below it still listed, which moved up in its place.
+        const next =
+          drawn.slice(drawn.indexOf(on) + 1).find((id) => left.includes(id)) ??
+          null;
+        settle(next, on);
+        if (left.length === 0) {
+          kept.keep(tall);
+        }
+      }
     },
-    /** `tap`, on one of `on`'s buttons, unless taps are waiting. */
-    unlessSettling:
-      (on: string, tap: () => void) =>
-      (event: MouseEvent): void => {
-        const now = performance.now();
-        const entryWaits = now - entryGone.current.when < SETTLE_MS;
-        if (
-          entryWaits ||
-          now - (stayedAt.current.get(on) ?? -Infinity) < SETTLE_MS
-        ) {
-          if (event.detail > 0) {
-            focusOn(entryWaits ? entryGone.current.next : on);
-          }
-          return;
-        }
-        // Measured before the tap redraws the list, drawn as it was tapped.
-        const tall = (list.current as HTMLElement).getBoundingClientRect()
-          .height;
-        tap();
-        const left = listed();
-        if (!left.includes(on)) {
-          // The first below it still listed, which moved up in its place.
-          const next =
-            drawn
-              .slice(drawn.indexOf(on) + 1)
-              .find((id) => left.includes(id)) ?? null;
-          entryGone.current = { when: performance.now(), next };
-          refocus.current = { to: next, gone: on };
-          if (left.length === 0) {
-            kept.keep(tall);
-          }
-        }
-      },
   };
 }

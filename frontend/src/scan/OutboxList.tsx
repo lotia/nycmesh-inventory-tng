@@ -104,9 +104,9 @@ export type AddRest = (entry: Entry, rest: Body) => NotPut | null;
  * list does, while the page refreshes the stock (Ali, inventory-tng-g0e,
  * d; inventory-tng-0gg). One refused (422) whose problems name lines
  * offers Add to cart, for the rest (add-the-rest.ts). A tap that takes an
- * entry away makes every entry's buttons wait a moment, as the older list
- * does (useSettledList): focus goes to the heading of the entry that moved
- * up, or of the list; the last taken away, the list's space stays blank a
+ * entry away makes the page's taps wait a moment, as the older list does
+ * (useSettledList): focus goes to the heading of the entry that moved up,
+ * or of the list; the last taken away, the list's space stays blank a
  * moment, and focus goes to what follows (`after`) (Ali, 2026-11-27,
  * inventory-tng-34ns).
  */
@@ -163,7 +163,7 @@ export function OutboxList({
   if (entries.length === 0) {
     return settled.space();
   }
-  const { unlessSettling } = settled;
+  const { tapOn } = settled;
   // Too old, nothing this tab sends is taken, so none waiting is sent
   // until the page is loaded again (Outbox.send).
   const held = outbox.builds.newer.value === "too_old";
@@ -234,11 +234,11 @@ export function OutboxList({
                   added={elsewhere?.added === true}
                   cartKey={cartKey}
                   describedBy={words}
-                  onAdd={(difference, event) =>
-                    unlessSettling(id, () => {
+                  onAdd={(difference) =>
+                    tapOn(id, () => {
                       const why = onAddDifference(entry, difference);
                       notAdded.value = why === null ? null : { on: id, why };
-                    })(event)
+                    })()
                   }
                 />
               )}
@@ -250,7 +250,7 @@ export function OutboxList({
                   added={reason?.code === "refused" && reason.added === true}
                   inCart={cartKey === rest.key}
                   describedBy={words}
-                  onPut={unlessSettling(id, () => {
+                  onPut={tapOn(id, () => {
                     const why = onAddRest(entry, rest);
                     notAdded.value = why === null ? null : { on: id, why };
                   })}
@@ -271,7 +271,7 @@ export function OutboxList({
                 <button
                   type="button"
                   aria-describedby={words}
-                  onClick={unlessSettling(id, () => outbox.dismiss(entry))}
+                  onClick={tapOn(id, () => outbox.dismiss(entry))}
                 >
                   {say(DISMISS)}
                 </button>
@@ -311,7 +311,7 @@ function RecordedElsewhere({
   cartKey: string | undefined;
   /** The id of its entry's words, which describe its button. */
   describedBy: string;
-  onAdd: (difference: Body, event: MouseEvent) => void;
+  onAdd: (difference: Body) => void;
 }) {
   const { was, changes, difference } = useMemo(
     () => ({
@@ -349,7 +349,7 @@ function RecordedElsewhere({
           added={added === true}
           inCart={cartKey === difference.key}
           describedBy={describedBy}
-          onPut={(event) => onAdd(difference, event)}
+          onPut={() => onAdd(difference)}
         />
       )}
     </>

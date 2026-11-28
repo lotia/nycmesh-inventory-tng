@@ -81,10 +81,10 @@ export const KEPT_ON_NOT_SENT = msg`Kept on this device {when}, not sent.`;
  * each in words, to add to the cart (older-to-cart.ts) or discard
  * (older-builds.ts). Discarding asks first, here on the page. A line that
  * cannot go back says why under it, and can be discarded on its own,
- * without asking: focus then goes to its entry's heading, and taps on the
- * entry's buttons wait a moment (SETTLE_MS). A tap that takes its entry
- * away makes every entry's buttons wait, and focus goes to the heading of
- * the entry that moved up, or of the list; the last entry taken away,
+ * without asking: focus then goes to its entry's heading, and the page's
+ * taps wait a moment, as what is below moved up. A tap that takes its
+ * entry away makes them wait too, and focus goes to the heading of the
+ * entry that moved up, or of the list; the last entry taken away,
  * the list's space stays blank a moment (useSettledList), and focus goes to
  * what follows (`after`). One holding an item retired since, and out of
  * the catalogue, names it from the catalogue's retired items, and goes in
@@ -149,7 +149,7 @@ export function OlderList({
   if (shown.length === 0) {
     return settled.space();
   }
-  const { unlessSettling } = settled;
+  const { tapOn } = settled;
   /** What to tell the volunteer, under `on`, of its Discard, or a line's,
    * not done: the browser did not keep it, or it changed meanwhile, as
    * listing it again shows; of one gone, nothing. */
@@ -217,7 +217,7 @@ export function OlderList({
                           <button
                             type="button"
                             aria-describedby={named}
-                            onClick={unlessSettling(on, () => {
+                            onClick={tapOn(on, () => {
                               said.value = null;
                               const done = older.dropPart(
                                 each,
@@ -252,7 +252,7 @@ export function OlderList({
               {discarding.value === on ? (
                 <ConfirmDiscard
                   describedBy={title}
-                  onDiscard={unlessSettling(on, () => {
+                  onDiscard={tapOn(on, () => {
                     discarding.value = null;
                     const done = older.discard(each);
                     if (done === "done") {
@@ -261,7 +261,7 @@ export function OlderList({
                       said.value = discardSaid(on, done);
                     }
                   })}
-                  onKeep={unlessSettling(on, () => {
+                  onKeep={tapOn(on, () => {
                     // The question's alert goes, and the entries below
                     // move up (inventory-tng-r3jx).
                     discarding.value = null;
@@ -275,7 +275,7 @@ export function OlderList({
                       type="button"
                       aria-describedby={title}
                       disabled={retired}
-                      onClick={unlessSettling(on, () => {
+                      onClick={tapOn(on, () => {
                         const why = onPutBack(each);
                         said.value = why === null ? null : { on, why };
                       })}
@@ -286,7 +286,7 @@ export function OlderList({
                   <button
                     type="button"
                     aria-describedby={title}
-                    onClick={unlessSettling(on, () => {
+                    onClick={tapOn(on, () => {
                       said.value = null;
                       discarding.value = on;
                     })}
