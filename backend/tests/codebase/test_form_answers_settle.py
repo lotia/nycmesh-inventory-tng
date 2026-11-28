@@ -9,7 +9,7 @@ admin_base.html, which carries the mark."""
 
 import re
 
-from helpers.source import SOURCE, TEMPLATES
+from helpers.source import SOURCE, TEMPLATES, modules
 
 # A response made by hand, page or redirect.
 MADE = re.compile(r"\b(?:TemplateResponse|HTMLResponse|RedirectResponse)\(")
@@ -25,7 +25,7 @@ NOT_ADMIN = {"admin_base.html", "frontend_page.html"}
 def test_pages_and_redirects_are_made_only_by_page_and_redirect() -> None:
     made = [
         path.relative_to(SOURCE).as_posix()
-        for path in sorted(SOURCE.rglob("*.py"))
+        for path in modules()
         if MADE.search(path.read_text())
     ]
     assert [path for path in made if path not in MAKERS] == []

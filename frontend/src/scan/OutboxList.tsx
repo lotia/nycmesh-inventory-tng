@@ -382,7 +382,7 @@ function PutInCart({
   inCart: boolean;
   /** The id of its entry's words, which describe the button. */
   describedBy: string;
-  onPut: (event: MouseEvent) => void;
+  onPut: () => void;
 }) {
   // Once shown, the in-cart words keep their room when recorded, so Dismiss
   // below does not move; one already recorded as it is first drawn needs

@@ -67,8 +67,8 @@ export function ConfirmDiscard({
   onKeep,
   describedBy,
 }: {
-  onDiscard: (event: MouseEvent) => void;
-  onKeep: (event: MouseEvent) => void;
+  onDiscard: () => void;
+  onKeep: () => void;
   describedBy?: string;
 }) {
   const keep = useRef<HTMLButtonElement>(null);

@@ -77,16 +77,15 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   something with controls below it, they move up; when it brings up a
   question, a dialog, a confirmation page, or any administrator page
   answering a form, that page's controls appear. Either way the second
-  lands on one never meant. So
-  such a tap keeps that space blank, or has the page ignore taps, for
-  `SETTLE_MS` (`frontend/src/shared/settling.ts`).
+  lands on one never meant. So such a tap keeps that space blank, or has
+  the page ignore taps, for `SETTLE_MS` (`frontend/src/shared/settling.ts`).
 - **Focus moves without scrolling**, to the heading of what moved up,
   the list's heading, or the control the removed content was about,
   such as the Your name list after "That's me"; to a question's safe
   choice, such as Go back or Keep it; never to a text box, whose
-  keyboard would open. A tap
-  that asks to go somewhere far from it scrolls there, as Change goes
-  to Your name, and taps then wait too, as everything moved.
+  keyboard would open. A tap that asks to go somewhere far from it
+  scrolls there, as Change goes to Your name, and taps then wait too, as
+  everything moved.
 - **An ignored tap** puts focus back on that target; an ignored key's
   press leaves focus where the volunteer moved it.
 - **How:** any page ignores all of its taps with `ignoreTaps`. The scan
@@ -98,13 +97,15 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   reached by a redirect, as the browser tells. So does a page with a
   notice (`_notice.html`), which marks its words `data-settle`, and a
   confirmation page (`_confirm.html`'s macro), which marks its way
-  back. Focus stays where a page's starts until an ignored tap focuses
-  what the page marks, else its heading. A link followed to any other
-  page takes taps at once; one that redirects, as to sign in, waits.
-  Only taps, and such a page, start a wait: typing, picking from a list
-  and a label read leave taps taken.
+  back. Such a page leaves focus where the browser puts it; an ignored
+  tap focuses what the page marks, else its heading. A link followed to
+  any other page takes taps at once; one that redirects, as to sign in,
+  waits. Only taps, and such a page, start a wait: typing, picking from
+  a list and a label read leave taps taken.
   `backend/tests/codebase/test_focus_and_settling.py` refuses focus
-  moved, or a tap told from a key's press, anywhere else.
+  moved, or a tap told from a key's press, anywhere else;
+  `test_form_answers_settle.py` and `test_danger_buttons.py` beside it
+  refuse a page or a confirmation made outside what marks it.
 - We rejected deciding each place apart, as each fix found another (Ali,
   2026-11-27).
 
