@@ -80,14 +80,17 @@ def shown_in(form: Mapping[str, str]) -> Shown:
 
 def _then(said: str, problem: Words | None) -> str:
     """`said`, of what changed since a form was shown, then `problem`,
-    anything else wrong with what was typed, so both are fixed at once."""
+    anything else wrong with what was typed, so both are fixed at once:
+    still the form's own Problem, of its kind, so the page counts it
+    (web/form_problems.py)."""
     if problem is None:
         return said
     # Translators: %(changed)s says what changed since the form was shown,
     # such as the item now counted in another unit or the package now
     # holding another size; %(problem)s what else is wrong with what was
     # typed.
-    return gettext("%(changed)s %(problem)s", changed=said, problem=problem)
+    both = gettext("%(changed)s %(problem)s", changed=said, problem=problem)
+    return Problem(both, problem.kind) if isinstance(problem, Problem) else both
 
 
 def now_counted_in(unit: str, problem: Words | None = None) -> str:

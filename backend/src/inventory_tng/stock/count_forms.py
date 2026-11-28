@@ -596,7 +596,7 @@ def _unit_free_problem(
         prefix = f"{ARRIVED}{area}_"
     if name.startswith(SEALED):
         unread = typed.strip() and whole(typed, 0, INTEGER_MAX) is None
-        return WHOLE_PACKAGES if unread else None
+        return Problem(WHOLE_PACKAGES, "not_whole") if unread else None
     if name.startswith(OPENED):
         state = fields.get(f"{prefix}{STATE}{name.removeprefix(OPENED)}", "here")
         if state != "here":

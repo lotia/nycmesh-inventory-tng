@@ -290,6 +290,29 @@ def test_every_box_wrong_in_any_unit_says_so_after_its_new_unit(
     assert words[f"opened_{made.id}"] == now_counted_in("ft")
 
 
+def test_a_box_wrong_in_any_unit_is_still_its_form_s_problem(
+    session: Session,
+) -> None:
+    """Said after the new unit, what else is wrong with a box is still
+    the form's own Problem, of its kind, so the page counts it as it
+    shows it (web/form_problems.py, inventory-tng-v8sq)."""
+    spools = Spools(session)
+    cable, spool, store = spools.cable.id, spools.spool.id, spools.store.id
+    form = {
+        f"loose_{cable}": "-1",
+        f"sealed_{cable}_{spool}": "1.5",
+        "found_package_id": str(spool),
+        "found_left": "",
+    }
+    ft = Now({cable: "ft"}, {})
+    words = changed_words(session, form, store, [store], ft, separator=".")
+    assert {box: getattr(said, "kind", None) for box, said in words.items()} == {
+        f"loose_{cable}": "too_small",
+        f"sealed_{cable}_{spool}": "not_whole",
+        "found_left": "required",
+    }
+
+
 def test_a_box_wrong_only_in_its_new_unit_says_only_the_unit(
     session: Session,
 ) -> None:
