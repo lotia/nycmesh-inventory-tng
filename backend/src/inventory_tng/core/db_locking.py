@@ -123,6 +123,8 @@ meter = metrics.get_meter(__name__)
     table=Base.metadata.tables,
 )
 def stale(event: str, *, table: str, **fields: Unpack[Fields]) -> None: ...
+
+
 @refusals(
     log,
     meter.create_counter(

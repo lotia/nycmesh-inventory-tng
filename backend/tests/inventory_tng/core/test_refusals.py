@@ -21,11 +21,12 @@ class Added:
 
 
 counter = Added()
+counted = cast(Counter, counter)
 Reason = Literal["rate_limited", "too_large"]
 type Other = Literal["other"]
 
 
-@refusals(log, cast(Counter, counter), page=("scan", "register"))
+@refusals(log, counted, page=("scan", "register"))
 def refused(
     event: str, *, reason: Reason, page: str, **fields: Unpack[Fields]
 ) -> None: ...
@@ -97,12 +98,12 @@ def test_a_kind_reads_its_values_from_its_literals() -> None:
     """A Literal, an alias of one, or a union of them; a kind of no
     attributes counts by none."""
 
-    @refusals(log, cast(Counter, counter))
+    @refusals(log, counted)
     def by_union(
         event: str, *, reason: Reason | Other, **fields: Unpack[Fields]
     ) -> None: ...
 
-    @refusals(log, cast(Counter, counter))
+    @refusals(log, counted)
     def by_none(event: str, **fields: Unpack[Fields]) -> None: ...
 
     by_union("refused", reason="other")
@@ -119,9 +120,9 @@ def test_an_attribute_of_no_fixed_list_is_refused_at_import() -> None:
 
     for shape in (free, partly):
         with pytest.raises(TypeError, match="reason is no Literal"):
-            refusals(log, cast(Counter, counter))(shape)
+            refusals(log, counted)(shape)
     with pytest.raises(TypeError, match="no attribute page"):
-        refusals(log, cast(Counter, counter), reason=("a",), page=("b",))(free)
+        refusals(log, counted, reason=("a",), page=("b",))(free)
 
 
 def test_a_list_naming_unlisted_is_refused_at_import() -> None:
@@ -134,6 +135,6 @@ def test_a_list_naming_unlisted_is_refused_at_import() -> None:
     def by_page(event: str, *, page: str, **fields: Unpack[Fields]) -> None: ...
 
     with pytest.raises(TypeError, match="reason lists unlisted"):
-        refusals(log, cast(Counter, counter))(listing)
+        refusals(log, counted)(listing)
     with pytest.raises(TypeError, match="page lists unlisted"):
-        refusals(log, cast(Counter, counter), page=(UNLISTED,))(by_page)
+        refusals(log, counted, page=(UNLISTED,))(by_page)
