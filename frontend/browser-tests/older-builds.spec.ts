@@ -12,6 +12,7 @@ import { itemIdOf, ownCable, record } from "./own-rows";
 import { pick, SAM, SHELF } from "./scan-page";
 import {
   clicksReaching,
+  controlUnder,
   doubleTap,
   middleOf,
   middleOverWhatMovesUp,
@@ -562,15 +563,7 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
   await expect(cartHeading).toBeFocused();
   // Once the space has gone, a form control is where the finger was: the
   // second tap would have landed on it.
-  await expect
-    .poll(() =>
-      page.evaluate(
-        ({ x, y, controls }) =>
-          document.elementFromPoint(x, y)?.closest(controls) != null,
-        { ...at, controls },
-      ),
-    )
-    .toBe(true);
+  await expect.poll(() => controlUnder(page, at, controls)).toBe(true);
   expect(await values()).toBe(before);
   expect(await reached()).toBe(0);
   await expect(cartHeading).toBeFocused();

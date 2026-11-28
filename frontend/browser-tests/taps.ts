@@ -17,14 +17,21 @@ export async function settled(page: Page): Promise<void> {
   await page.waitForTimeout(SETTLE_MS);
 }
 
-/** The middle of `target`, scrolled onto the screen if it is not, where
- * a finger can reach it. */
-export async function middleOf(target: Locator): Promise<Point> {
+/** The box of `target`, scrolled onto the screen if it is not, where a
+ * finger can reach it. */
+async function shownBox(target: Locator) {
   await target.scrollIntoViewIfNeeded();
   const box = await target.boundingBox();
   if (box === null) {
     throw new Error(`${target} is not shown`);
   }
+  return box;
+}
+
+/** The middle of `target`, scrolled onto the screen if it is not, where
+ * a finger can reach it. */
+export async function middleOf(target: Locator): Promise<Point> {
+  const box = await shownBox(target);
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
@@ -34,69 +41,70 @@ const INSIDE_PX = 4;
 
 /** A point on `target`, scrolled onto the screen if it is not, that one of
  * the elements matching `controls` will be under once `gone` and its
- * space have gone and what follows it has moved up in its place: where a
- * double tap's second tap lands on them if nothing stops it. Only those
- * after `gone` in the page's flow count, as only they move up. Found from
- * the page as drawn, so it holds whatever the fonts make its heights. */
+ * space have gone and what follows has moved up in its place: where a
+ * double tap's second tap lands on them if nothing stops it. Found by
+ * laying the page out without `gone` for a moment, before it is drawn
+ * again, so it holds whatever the fonts make its heights. Only controls
+ * that move count. */
 export async function middleOverWhatMovesUp(
   target: Locator,
   gone: Locator,
   controls: string,
 ): Promise<Point> {
-  await target.scrollIntoViewIfNeeded();
-  const box = await target.boundingBox();
-  if (box === null) {
-    throw new Error(`${target} is not shown`);
-  }
+  const box = await shownBox(target);
   const over = await gone.evaluate(
     (it, { box, controls, inside }) => {
-      const next = it.nextElementSibling;
-      if (next === null) {
-        return "nothing after";
-      }
-      // How far what follows moves up: its distance from the top of `it`.
-      const rise =
-        next.getBoundingClientRect().top - it.getBoundingClientRect().top;
+      const each = [...document.querySelectorAll(controls)];
+      const before = each.map((control) => control.getBoundingClientRect());
+      const { scrollX, scrollY } = window;
+      const display = it.style.display;
+      it.style.display = "none";
+      const after = each.map((control) => control.getBoundingClientRect());
+      it.style.display = display;
+      window.scrollTo(scrollX, scrollY);
       // The middle of the largest overlap, if it is wide and tall enough
       // to keep that middle off the edges.
-      let best: { x: number; y: number; area: number } | null = null;
-      for (const each of document.querySelectorAll(controls)) {
-        const follows =
-          it.compareDocumentPosition(each) & Node.DOCUMENT_POSITION_FOLLOWING;
-        const position = getComputedStyle(each).position;
-        if (
-          !follows ||
-          it.contains(each) ||
-          position === "fixed" ||
-          position === "sticky"
-        ) {
+      let best: Point | null = null;
+      let bestArea = 0;
+      for (const [i, moved] of after.entries()) {
+        if (moved.top === before[i]?.top) {
           continue;
         }
-        const moved = each.getBoundingClientRect();
-        const top = Math.max(box.y, moved.top - rise);
-        const bottom = Math.min(box.y + box.height, moved.bottom - rise);
+        const top = Math.max(box.y, moved.top);
+        const bottom = Math.min(box.y + box.height, moved.bottom);
         const left = Math.max(box.x, moved.left);
         const right = Math.min(box.x + box.width, moved.right);
         const area = (bottom - top) * (right - left);
         if (
           bottom - top >= 2 * inside &&
           right - left >= 2 * inside &&
-          area > (best?.area ?? 0)
+          area > bestArea
         ) {
-          best = { x: (left + right) / 2, y: (top + bottom) / 2, area };
+          best = { x: (left + right) / 2, y: (top + bottom) / 2 };
+          bestArea = area;
         }
       }
-      return best && { x: best.x, y: best.y };
+      return best;
     },
     { box, controls, inside: INSIDE_PX },
   );
-  if (over === "nothing after") {
-    throw new Error(`nothing follows ${gone} to move up`);
-  }
   if (over === null) {
     throw new Error(`nothing matching ${controls} moves up under ${target}`);
   }
   return over;
+}
+
+/** Whether an element matching `controls` is under `at` now. */
+export async function controlUnder(
+  page: Page,
+  at: Point,
+  controls: string,
+): Promise<boolean> {
+  return page.evaluate(
+    ({ x, y, controls }) =>
+      document.elementFromPoint(x, y)?.closest(controls) != null,
+    { ...at, controls },
+  );
 }
 
 /** Counts, from now on, the clicks that reach an element matching
@@ -107,13 +115,17 @@ export async function clicksReaching(
   controls: string,
 ): Promise<() => Promise<number>> {
   await within.evaluate((it, controls) => {
-    it.addEventListener("click", (event) => {
-      if ((event.target as Element).closest(controls) !== null) {
-        it.dataset.clicksReaching = String(
-          Number(it.dataset.clicksReaching ?? 0) + 1,
-        );
-      }
-    });
+    it.addEventListener(
+      "click",
+      (event) => {
+        if ((event.target as Element).closest(controls) !== null) {
+          it.dataset.clicksReaching = String(
+            Number(it.dataset.clicksReaching ?? 0) + 1,
+          );
+        }
+      },
+      { capture: true },
+    );
   }, controls);
   return () => within.evaluate((it) => Number(it.dataset.clicksReaching ?? 0));
 }

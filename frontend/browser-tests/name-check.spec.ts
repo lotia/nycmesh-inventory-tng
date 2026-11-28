@@ -7,7 +7,12 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { SAM } from "./scan-page";
-import { clicksReaching, doubleTap, middleOverWhatMovesUp } from "./taps";
+import {
+  clicksReaching,
+  controlUnder,
+  doubleTap,
+  middleOverWhatMovesUp,
+} from "./taps";
 
 /** The scan page, Sam's name picked, its cart last used long ago, so it
  * asks. */
@@ -49,15 +54,7 @@ for (const answer of ["That's me", "Not me"]) {
     await expect(name).toBeFocused();
     // Once the space has gone, the form is where the finger was, the kinds'
     // radios or Your name: the second tap would have landed on it.
-    await expect
-      .poll(() =>
-        page.evaluate(
-          ({ x, y, controls }) =>
-            document.elementFromPoint(x, y)?.closest(controls) != null,
-          { ...at, controls },
-        ),
-      )
-      .toBe(true);
+    await expect.poll(() => controlUnder(page, at, controls)).toBe(true);
     expect(await kind()).toBe(before);
     expect(await reached()).toBe(0);
     await expect(name).toBeFocused();
