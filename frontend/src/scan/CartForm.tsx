@@ -138,6 +138,11 @@ export const RECORD = msg`Record`;
 export const DISCARD_CART = msg`Discard cart`;
 export const PICK_A_PLACE = msg`Pick a place`;
 
+/** Whether a change to the cart came from a tap on the page (change). */
+type How = { tapped: boolean };
+const TAPPED: How = { tapped: true };
+const NOT_TAPPED: How = { tapped: false };
+
 export function CartForm({
   catalogue,
   pending,
@@ -301,7 +306,7 @@ export function CartForm({
    * a moment, an ignored one focusing what had focus (inventory-tng-r3jx).
    * Not `tapped`, as when picked in a list's picker or read from a label,
    * or typed in a box, no finger is on the page to land again. */
-  function change(next: Cart, tapped = true) {
+  function change(next: Cart, { tapped }: How = TAPPED) {
     const said = saidAbove();
     // Focus is on an HTML or SVG element, either of which takes focus().
     const focused = document.activeElement as HTMLElement | null;
@@ -370,11 +375,11 @@ export function CartForm({
     }
   });
 
-  /** Change the cart's `fields`, `tapped` or not (change). */
-  function set(fields: Partial<Cart>, tapped = true) {
+  /** Change the cart's `fields`, tapped or not (change). */
+  function set(fields: Partial<Cart>, how: How = TAPPED) {
     change(
       placed(cart.value, { ...cart.value, ...fields }, catalogue, sealed),
-      tapped,
+      how,
     );
   }
 
@@ -396,7 +401,7 @@ export function CartForm({
           aboutLine(cart.value, itemId),
         );
       }
-      change(withLine(cart.value, itemId), false);
+      change(withLine(cart.value, itemId), NOT_TAPPED);
       return done(say(WHICH_PACKAGE, { item: item?.name }));
     }
     if (pack === undefined && looseUnread(cart.value, itemId)) {
@@ -409,7 +414,7 @@ export function CartForm({
       packageId === undefined
         ? next
         : withLineChanged(next, itemId, (line) => ({ ...line, typed: true })),
-      false,
+      NOT_TAPPED,
     );
     return done(
       pack === undefined
@@ -454,7 +459,7 @@ export function CartForm({
         const place = places.get(read.locationId);
         const [only, other] = placeSides(cart.value);
         if (only !== undefined && other === undefined) {
-          placeOn(only, read.locationId, false);
+          placeOn(only, read.locationId, NOT_TAPPED);
           const here =
             cart.value.kind === "open" ? PLACE_HERE : PLACE_FROM_HERE;
           return done(say(only === "from" ? here : PLACE_TO_HERE, { place }));
@@ -469,12 +474,9 @@ export function CartForm({
     });
   }
 
-  /** Fill `side` with the place, `tapped` or read from its label. */
-  function placeOn(side: Side, locationId: number, tapped = true) {
-    set(
-      side === "from" ? { fromId: locationId } : { toId: locationId },
-      tapped,
-    );
+  /** Fill `side` with the place, tapped or read from its label. */
+  function placeOn(side: Side, locationId: number, how: How = TAPPED) {
+    set(side === "from" ? { fromId: locationId } : { toId: locationId }, how);
     placeRead.value = null;
   }
 
@@ -896,7 +898,10 @@ export function CartForm({
             ref={nameList}
             value={String(cart.value.volunteerId ?? "")}
             onChange={(event) =>
-              set({ volunteerId: idOrNull(event.currentTarget.value) }, false)
+              set(
+                { volunteerId: idOrNull(event.currentTarget.value) },
+                NOT_TAPPED,
+              )
             }
           >
             <option value="">{say(NO_NAME_PICKED)}</option>
@@ -934,7 +939,7 @@ export function CartForm({
           list={fromList}
           catalogue={catalogue}
           value={cart.value.fromId}
-          onPick={(fromId) => set({ fromId }, false)}
+          onPick={(fromId) => set({ fromId }, NOT_TAPPED)}
         />
       )}
       {sides.to && (
@@ -943,7 +948,7 @@ export function CartForm({
           list={toList}
           catalogue={catalogue}
           value={cart.value.toId}
-          onPick={(toId) => set({ toId }, false)}
+          onPick={(toId) => set({ toId }, NOT_TAPPED)}
         />
       )}
       {cart.value.kind === "install" && (
