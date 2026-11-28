@@ -28,6 +28,56 @@ export async function middleOf(target: Locator): Promise<Point> {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
+/** A point on `target`, scrolled onto the screen if it is not, that one of
+ * the elements matching `controls` will be under once `gone` and its
+ * space have gone and what follows it has moved up in its place: where a
+ * double tap's second tap lands on them if nothing stops it. Found from
+ * the page as drawn, so it holds whatever the fonts make its heights. */
+export async function middleOverWhatMovesUp(
+  target: Locator,
+  gone: Locator,
+  controls: string,
+): Promise<Point> {
+  await target.scrollIntoViewIfNeeded();
+  const box = await target.boundingBox();
+  if (box === null) {
+    throw new Error(`${target} is not shown`);
+  }
+  const over = await gone.evaluate(
+    (it, { box, controls }) => {
+      const next = it.nextElementSibling;
+      if (next === null) {
+        return null;
+      }
+      // How far what follows moves up: its distance from the top of `it`.
+      const rise =
+        next.getBoundingClientRect().top - it.getBoundingClientRect().top;
+      // The middle of the largest overlap, away from any edge.
+      let best: { x: number; y: number; area: number } | null = null;
+      for (const each of document.querySelectorAll(controls)) {
+        if (it.contains(each)) {
+          continue;
+        }
+        const moved = each.getBoundingClientRect();
+        const top = Math.max(box.y, moved.top - rise);
+        const bottom = Math.min(box.y + box.height, moved.bottom - rise);
+        const left = Math.max(box.x, moved.left);
+        const right = Math.min(box.x + box.width, moved.right);
+        const area = Math.max(0, bottom - top) * Math.max(0, right - left);
+        if (area > (best?.area ?? 0)) {
+          best = { x: (left + right) / 2, y: (top + bottom) / 2, area };
+        }
+      }
+      return best && { x: best.x, y: best.y };
+    },
+    { box, controls },
+  );
+  if (over === null) {
+    throw new Error(`nothing matching ${controls} moves up under ${target}`);
+  }
+  return over;
+}
+
 /** Two taps of a finger at `at`, 150 ms apart, as a double tap lands: the
  * page redrawn, or the next one come, after the first. */
 export async function doubleTap(page: Page, at: Point): Promise<void> {

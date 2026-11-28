@@ -10,7 +10,7 @@ import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
 import { itemIdOf, ownCable, record } from "./own-rows";
 import { pick, SAM, SHELF } from "./scan-page";
-import { doubleTap, middleOf, settled } from "./taps";
+import { doubleTap, middleOf, middleOverWhatMovesUp, settled } from "./taps";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
 const PUT_BACK = "Added back to cart. Review before Record.";
@@ -535,8 +535,12 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
   await page.reload();
 
   const listing = listingOf(page);
-  const at = await middleOf(
+  const controls = "input, select, button, textarea, label";
+  // On the Discard, where a control of the form will move up to.
+  const at = await middleOverWhatMovesUp(
     lineDiscard(listing, `${cable}: 3 m from an open package`),
+    listing,
+    controls,
   );
   const form = page.locator("form").first();
   const values = () =>
@@ -553,11 +557,9 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
   await expect
     .poll(() =>
       page.evaluate(
-        ({ x, y }) =>
-          document
-            .elementFromPoint(x, y)
-            ?.closest("input, select, button, textarea, label") != null,
-        at,
+        ({ x, y, controls }) =>
+          document.elementFromPoint(x, y)?.closest(controls) != null,
+        { ...at, controls },
       ),
     )
     .toBe(true);

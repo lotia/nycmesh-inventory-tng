@@ -7,7 +7,7 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { SAM } from "./scan-page";
-import { doubleTap, middleOf } from "./taps";
+import { doubleTap, middleOverWhatMovesUp } from "./taps";
 
 /** The scan page, Sam's name picked, its cart last used long ago, so it
  * asks. */
@@ -30,7 +30,13 @@ for (const answer of ["That's me", "Not me"]) {
     page,
   }) => {
     await asked(page);
-    const at = await middleOf(page.getByRole("button", { name: answer }));
+    const controls = "fieldset, input, select, label";
+    // On the answer, where the form will move up to.
+    const at = await middleOverWhatMovesUp(
+      page.getByRole("button", { name: answer }),
+      page.getByRole("alert").filter({ hasText: `Are you ${SAM}?` }),
+      controls,
+    );
     const form = page.locator("form").first();
     const kind = () =>
       form.evaluate((it) => new FormData(it as HTMLFormElement).get("kind"));
@@ -44,11 +50,9 @@ for (const answer of ["That's me", "Not me"]) {
     await expect
       .poll(() =>
         page.evaluate(
-          ({ x, y }) =>
-            document
-              .elementFromPoint(x, y)
-              ?.closest("fieldset, input, select, label") != null,
-          at,
+          ({ x, y, controls }) =>
+            document.elementFromPoint(x, y)?.closest(controls) != null,
+          { ...at, controls },
         ),
       )
       .toBe(true);
