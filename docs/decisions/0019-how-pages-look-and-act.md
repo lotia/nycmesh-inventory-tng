@@ -84,11 +84,11 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   to Your name, and taps then wait too, as everything moved.
 - **An ignored tap** puts focus back on that target; an ignored key's
   press leaves focus where the volunteer moved it.
-- **How:** the scan page keeps the space of a part that goes, or
-  settles a list's own taps, with the hooks in
-  `frontend/src/scan/settling-hooks.tsx`; every other such tap, on any
-  page, ignores all of the page's taps with `ignoreTaps`. Only taps start
-  a wait: typing, picking from a list and a label read leave taps taken.
+- **How:** any page ignores all of its taps with `ignoreTaps`. The scan
+  page's hooks in `frontend/src/scan/settling-hooks.tsx` keep the space
+  of a part that goes, and find a list's entry that moved up, by its id,
+  for focus. Only taps start a wait: typing, picking from a list and a
+  label read leave taps taken.
   `backend/tests/codebase/test_focus_and_settling.py` refuses focus
   moved, or a tap told from a key's press, anywhere else.
 - We rejected deciding each place apart, as each fix found another (Ali,

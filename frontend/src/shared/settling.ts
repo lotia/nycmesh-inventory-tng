@@ -75,6 +75,17 @@ export function ignoreTaps(
   waits.set(document, { until: performance.now() + SETTLE_MS, refocus });
 }
 
+/** Focus `to()` without scrolling, and ignore taps for SETTLE_MS, an
+ * ignored pointer tap focusing it again (ignoreTaps): for a tap that took
+ * something away whose focus target is drawn already. */
+export function focusAndIgnoreTaps(
+  document: Document,
+  to: () => HTMLElement | null | undefined,
+) {
+  focusInPlace(to());
+  ignoreTaps(document, to);
+}
+
 /** Take taps on the page again at once: for tests, so one test's wait is
  * not left to the next. */
 export function stopIgnoringTaps(document: Document) {

@@ -12,7 +12,7 @@ import { countedWhole, isLength, isShortEnd, keyboard } from "../amount-rules";
 import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
 import { boxAmount } from "../shared/quantity";
-import { focusInPlace, ignoreTaps } from "../shared/settling";
+import { focusAndIgnoreTaps } from "../shared/settling";
 import type { Item } from "./cart";
 import {
   cutOf,
@@ -282,8 +282,7 @@ export function OpenPackageCard({
                 // below moves up under the finger: taps wait a moment,
                 // and focus goes to the card (docs/decisions/0019, Double
                 // taps).
-                focusInPlace(card.current);
-                ignoreTaps(document, () => card.current);
+                focusAndIgnoreTaps(document, () => card.current);
               }
             }}
           />

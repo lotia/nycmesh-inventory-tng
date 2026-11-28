@@ -10,7 +10,7 @@ import {
   sharedOutbox,
 } from "../shared/outbox";
 import { NOT_REGISTERED } from "../shared/registration";
-import { focusInPlace, ignoreTaps } from "../shared/settling";
+import { focusAndIgnoreTaps } from "../shared/settling";
 import { telemetry } from "../shared/telemetry";
 import { CartForm } from "./CartForm";
 import { STORAGE_KEY as CART_KEY, type Catalogue, loadCart } from "./cart";
@@ -261,8 +261,7 @@ export function ScanPage({
               // The alert gives way to Loading, and the list below moves
               // up (Ali, 2026-11-27, inventory-tng-r3jx).
               load();
-              focusInPlace(pageHeading.current);
-              ignoreTaps(document, () => pageHeading.current);
+              focusAndIgnoreTaps(document, () => pageHeading.current);
             }}
           >
             {say(TRY_AGAIN)}

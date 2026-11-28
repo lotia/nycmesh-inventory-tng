@@ -7,7 +7,7 @@ import { type ReadonlySignal, useSignal } from "@preact/signals";
 import type { ComponentChildren, RefObject } from "preact";
 import { Field } from "../shared/Field";
 import { say } from "../shared/i18n";
-import { focusInPlace, ignoreTaps } from "../shared/settling";
+import { focusAndIgnoreTaps } from "../shared/settling";
 import { type Cart, type Catalogue, RETIRED } from "./cart";
 import { readLabel, type Scanned } from "./label-codes";
 import { UpgradeToSave } from "./NewerBuild";
@@ -126,8 +126,7 @@ export function Finder({
                   show(() => onAdd(item.id));
                   // The matches go, and what is below moves up under the
                   // finger (Ali, 2026-11-27, inventory-tng-r3jx).
-                  focusInPlace(after.current);
-                  ignoreTaps(document, () => after.current);
+                  focusAndIgnoreTaps(document, () => after.current);
                 }}
               >
                 {item.name}

@@ -8,7 +8,7 @@ import { Field } from "../shared/Field";
 import { say } from "../shared/i18n";
 import { type Outbox, sharedOutbox } from "../shared/outbox";
 import { type Outcome, REFUSALS, register } from "../shared/registration";
-import { focusInPlace, ignoreTaps } from "../shared/settling";
+import { focusAndIgnoreTaps } from "../shared/settling";
 
 const CODE = "code";
 
@@ -76,8 +76,7 @@ export function RegisterPage({
   // inventory-tng-r3jx).
   useEffect(() => {
     if (done) {
-      focusInPlace(registered.current);
-      ignoreTaps(document, () => registered.current);
+      focusAndIgnoreTaps(document, () => registered.current);
     }
   }, [done]);
 

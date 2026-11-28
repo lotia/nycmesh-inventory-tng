@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { focusInPlace, ignoreTaps, SETTLE_MS } from "./settling";
+import {
+  focusAndIgnoreTaps,
+  focusInPlace,
+  ignoreTaps,
+  SETTLE_MS,
+} from "./settling";
 
 describe("ignoreTaps (Ali, 2026-11-27, inventory-tng-r3jx)", () => {
   let tapped: string[];
@@ -75,6 +80,20 @@ describe("ignoreTaps (Ali, 2026-11-27, inventory-tng-r3jx)", () => {
     first.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
     expect(tapped).toEqual([]);
     expect(document.activeElement).toBe(second);
+  });
+
+  test("focusAndIgnoreTaps focuses the target at once, and an ignored tap there again", () => {
+    const target = button("target");
+    const other = button("other");
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    focusAndIgnoreTaps(document, () => target);
+    expect(document.activeElement).toBe(target);
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+    other.focus();
+    other.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    expect(document.activeElement).toBe(target);
+    expect(tapped).toEqual([]);
+    focus.mockRestore();
   });
 });
 
