@@ -42,6 +42,7 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.core.rate_limits import limiter
 from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.core.settings import RateLimits
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.devices import devices
 from inventory_tng.devices.devices import digest
 from inventory_tng.models.admins import (
@@ -101,25 +102,28 @@ def _per_account(limits: RateLimits) -> RateLimitItem:
 Reason = Literal["unknown_user", "bad_password", "bad_code", "rate_limited"]
 Factor = Literal["totp", "recovery", "password"]
 
-sign_ins = meter.create_counter(
+# Each counts what is refused too, so is given to refusals() as well.
+_sign_ins = meter.create_counter(
     "inventory.admin.sign_ins",
     unit="{attempt}",
     description="Administrators' sign-in attempts, by outcome",
 )
-confirmations = meter.create_counter(
+signed_in = WriteMetric(log, _sign_ins)
+_confirmations = meter.create_counter(
     "inventory.admin.confirmations",
     unit="{attempt}",
     description="Codes typed to confirm a sensitive action, by outcome",
 )
+confirmed = WriteMetric(log, _confirmations)
 
 
-@refusals(log, sign_ins)
+@refusals(log, _sign_ins)
 def sign_in_refused(
     event: str, *, outcome: Literal["refused"], reason: Reason, **fields: Unpack[Fields]
 ) -> None: ...
 
 
-@refusals(log, confirmations)
+@refusals(log, _confirmations)
 def confirmation_refused(
     event: str,
     *,
@@ -352,16 +356,18 @@ def _recovery_digest(typed: str) -> bytes:
     return digest(re.sub(r"[^A-Z0-9]", "", typed.upper()))
 
 
-recovery_code_events = meter.create_counter(
+# Counts reminders too, which write nothing, so are added at once.
+_recovery_codes = meter.create_counter(
     "inventory.admin.recovery_codes",
     unit="{event}",
     description="Recovery codes made, and reminders that few are left, by event",
 )
+recovery_codes_made = WriteMetric(log, _recovery_codes)
 
 
 def reminded() -> None:
     """Told, after signing in with one, that few recovery codes are left."""
-    recovery_code_events.add(1, {"event": "reminded"})
+    _recovery_codes.add(1, {"event": "reminded"})
 
 
 def make_recovery_codes(session: Session, admin_id: int, now: datetime) -> list[str]:
@@ -374,8 +380,12 @@ def make_recovery_codes(session: Session, admin_id: int, now: datetime) -> list[
         for code in codes
     )
     session.flush()
-    once_committed(session, log.info, "recovery codes made", admin_id=admin_id)
-    once_committed(session, recovery_code_events.add, 1, {"event": "made"})
+    recovery_codes_made.on_commit(
+        session,
+        "recovery codes made",
+        attributes={"event": "made"},
+        admin_id=admin_id,
+    )
     return [grouped(code, RECOVERY_CODE_GROUP, "-") for code in codes]
 
 
@@ -479,11 +489,10 @@ def sign_in(
     if factor is None:
         _refuse_sign_in("bad_code", admin)
     row, token = start_session(session, admin.id, user_agent, now)
-    once_committed(session, sign_ins.add, 1, {"outcome": "signed_in", "factor": factor})
-    once_committed(
+    signed_in.on_commit(
         session,
-        log.info,
         "signed in",
+        attributes={"outcome": "signed_in", "factor": factor},
         admin_id=admin.id,
         sign_in_id=row.id,
         factor=factor,
@@ -671,8 +680,9 @@ def _confirmation(
     at once, as nothing it refuses is written."""
     fields = {"admin_id": row.admin_id, "sign_in_id": row.id}
     if outcome == "confirmed":
-        once_committed(session, confirmations.add, 1, {"outcome": outcome})
-        once_committed(session, log.info, "confirmed", **fields)
+        confirmed.on_commit(
+            session, "confirmed", attributes={"outcome": outcome}, **fields
+        )
     else:
         confirmation_refused(
             "confirmation refused", level="warning", outcome=outcome, **fields
@@ -1179,14 +1189,17 @@ def use_reset_link(
 
 # The recovery token (docs/decisions/0012)
 
-recoveries = meter.create_counter(
+# Counts what is refused too, so is given to refusals() as well.
+_recoveries = meter.create_counter(
     "inventory.admin.recoveries",
     unit="{attempt}",
     description="Uses of the operator's recovery token, by outcome",
 )
+# A recovery link made is a warning: it lets in whoever holds it.
+recovery_links_made = WriteMetric(log, _recoveries, level="warning")
 
 
-@refusals(log, recoveries)
+@refusals(log, _recoveries)
 def recovery_refused(
     event: str, *, outcome: TokenRefusal, **fields: Unpack[Fields]
 ) -> None: ...
@@ -1229,8 +1242,12 @@ def recover(
     # Two at once both pass the check above: the unique index stops one.
     if not unique(session, make, admin_id=admin.id):
         _refuse("recovery", "used")
-    once_committed(session, recoveries.add, 1, {"outcome": "made"})
-    once_committed(session, log.warning, "recovery link made", admin_id=admin.id)
+    recovery_links_made.on_commit(
+        session,
+        "recovery link made",
+        attributes={"outcome": "made"},
+        admin_id=admin.id,
+    )
     activity.record(
         session,
         "recovery_link_made",
@@ -1300,10 +1317,13 @@ def _refuse_action(
     raise AdminRefused("themselves" if why == "themselves" else "not_found")
 
 
-sign_in_resets = meter.create_counter(
-    "inventory.admin.sign_in_resets",
-    unit="{reset}",
-    description="Administrators' sign-ins reset by another administrator",
+sign_in_resets = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.admin.sign_in_resets",
+        unit="{reset}",
+        description="Administrators' sign-ins reset by another administrator",
+    ),
 )
 
 
@@ -1340,7 +1360,7 @@ def reset_admin_sign_in(
     admin = _locked_other(session, "reset", admin_id, by_admin_id, retired=False)
     token, kind, ended = _reissue(session, admin, by_admin_id, now)
     if kind == "reset":
-        once_committed(session, sign_in_resets.add, 1, {"action": "reset"})
+        sign_in_resets.on_commit(session, attributes={"action": "reset"})
     once_committed(
         session,
         log.info,

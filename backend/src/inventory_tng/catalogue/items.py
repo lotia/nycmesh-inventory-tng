@@ -68,6 +68,7 @@ from inventory_tng.core.db_locking import (
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.rule_names import RuleName
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.models.catalogue import (
     CURRENT_ALIAS,
     SMALLEST_PACKAGE_FIRST,
@@ -86,11 +87,14 @@ from inventory_tng.models.stock import Movement, OpenPackage
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
-tracking_changed = meter.create_counter(
-    "inventory.package_tracking.changed",
-    unit="{change}",
-    description="Items or packages whose opened packages are followed, or "
-    "no longer, set by an administrator, by where it was set",
+tracking_changed = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.package_tracking.changed",
+        unit="{change}",
+        description="Items or packages whose opened packages are followed, or "
+        "no longer, set by an administrator, by where it was set",
+    ),
 )
 
 
@@ -102,9 +106,14 @@ def _tracking_changed(
     **ids: int | list[int],
 ) -> None:
     """Measure and log changes once committed: `ids` names what changed."""
-    once_committed(session, tracking_changed.add, changed, {"scope": scope})
-    once_committed(
-        session, log.info, "package tracking changed", scope=scope, track=track, **ids
+    tracking_changed.on_commit(
+        session,
+        "package tracking changed",
+        amount=changed,
+        attributes={"scope": scope},
+        scope=scope,
+        track=track,
+        **ids,
     )
 
 

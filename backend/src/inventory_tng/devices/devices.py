@@ -38,6 +38,7 @@ from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.rate_limits import limiter, refund
 from inventory_tng.core.refusals import Fields, refusals
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.models.devices import Device, RegistrationCode
 
 log = structlog.get_logger(__name__)
@@ -65,10 +66,13 @@ MadeHow = Literal["new", "another"]
 # first phone is "first".
 CodeUse = Literal["first", "again"]
 
-registered = meter.create_counter(
-    "inventory.devices.registered",
-    unit="{device}",
-    description="Devices registered with a code, by use: its first, or again",
+registered = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.devices.registered",
+        unit="{device}",
+        description="Devices registered with a code, by use: its first, or again",
+    ),
 )
 
 
@@ -85,10 +89,13 @@ def rejected(
 ) -> None: ...
 
 
-made = meter.create_counter(
-    "inventory.registration_codes.made",
-    unit="{code}",
-    description="Registration codes made, by how: new, or another like one",
+made = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.registration_codes.made",
+        unit="{code}",
+        description="Registration codes made, by how: new, or another like one",
+    ),
 )
 # Why another like a code is not made: no such code, or nothing left on it.
 AnotherRefusal = Literal["no_such_code", "nothing_left"]
@@ -107,10 +114,13 @@ def another_refused(
 ) -> None: ...
 
 
-revoked = meter.create_counter(
-    "inventory.devices.revoked",
-    unit="{device}",
-    description="Devices revoked by an administrator, by how: one, or in bulk",
+revoked = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.devices.revoked",
+        unit="{device}",
+        description="Devices revoked by an administrator, by how: one, or in bulk",
+    ),
 )
 
 
@@ -214,11 +224,10 @@ def _new_code(
     )
     session.add(code)
     session.flush()
-    once_committed(session, made.add, 1, {"how": how})
-    once_committed(
+    made.on_commit(
         session,
-        log.info,
         "registration code created",
+        attributes={"how": how},
         registration_code_id=code.id,
         max_uses=max_uses,
         like_registration_code_id=like,
@@ -259,11 +268,10 @@ def register(session: Session, phrase: str, address: str | None) -> tuple[Device
     )
     session.add(device)
     session.flush()
-    once_committed(session, registered.add, 1, {"use": use})
-    once_committed(
+    registered.on_commit(
         session,
-        log.info,
         "device registered",
+        attributes={"use": use},
         device_id=device.id,
         registration_code_id=code.id,
         use=use,
@@ -341,7 +349,7 @@ def revoke_device(session: Session, device_id: int) -> bool:
     """Refuse this device from its next request. False if there is no such
     current device."""
     if done := _revoke(session, Device, device_id, "device_id"):
-        once_committed(session, revoked.add, 1, {"how": "one"})
+        revoked.on_commit(session, attributes={"how": "one"})
     return done
 
 
@@ -420,7 +428,7 @@ def revoke_devices(
     for device in current:
         device.revoked_at = now
     if current:
-        once_committed(session, revoked.add, len(current), {"how": "bulk"})
+        revoked.on_commit(session, amount=len(current), attributes={"how": "bulk"})
     once_committed(
         session,
         log.info,

@@ -19,9 +19,9 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.admins import mail_messages
 from inventory_tng.core.db_lookups import values_by
-from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.mail import Notifier, Told
 from inventory_tng.core.phrases import gettext, lazy_gettext
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.models.admins import Activity, ActivityKind, Admin
 
 log = structlog.get_logger(__name__)
@@ -67,10 +67,13 @@ OPERATOR = lazy_gettext("The operator")
 # How many a page lists, newest first.
 SHOWN = 20
 
-recorded = meter.create_counter(
-    "inventory.admin.activity",
-    unit="{change}",
-    description="Changes every administrator is told of, by kind",
+recorded = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.admin.activity",
+        unit="{change}",
+        description="Changes every administrator is told of, by kind",
+    ),
 )
 
 
@@ -104,11 +107,10 @@ def record(
     row = Activity(kind=kind, by_admin_id=by_admin_id, admin_id=admin_id)
     session.add(row)
     session.flush()
-    once_committed(session, recorded.add, 1, {"kind": kind})
-    once_committed(
+    recorded.on_commit(
         session,
-        log.info,
         "activity recorded",
+        attributes={"kind": kind},
         activity_id=row.id,
         kind=kind,
         by_admin_id=by_admin_id,

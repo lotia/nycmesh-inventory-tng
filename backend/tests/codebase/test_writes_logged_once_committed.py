@@ -1,8 +1,12 @@
-"""What a write did is measured and logged through once_committed, never
-by hand after its commit (CONTRIBUTING.md, Logging; inventory-tng-kebu):
-a metric's add() or record(), or a log.info(), after a commit fails
-here, in the function itself or in a function of its module that it
-calls, directly or through another.
+"""What a write did is logged through once_committed, never by hand after
+its commit (CONTRIBUTING.md, Logging; inventory-tng-kebu): a log.info()
+after a commit fails here, in the function itself or in a function of
+its module that it calls, directly or through another.
+
+Metrics are left to `ty check` (inventory-tng-8xs0): a write's metric is
+a WriteMetric, with no add() or record(), and a metric made bare is no
+write's, by its declaration. To ty a log line is any call, so this test
+reads them.
 
 Deterministic, read from the source, function by function:
 - A commit is a call of .commit(), awaited or not, or the end of a
@@ -11,24 +15,19 @@ Deterministic, read from the source, function by function:
 - Functions and lambdas defined inside, which run when called, and
   except clauses, as a failure is measured and logged at once, are left
   out.
-- A metric is a name a module binds at its top level to a meter's
-  instrument, so a set's add() never matches.
 - Only info is read of the levels, as a refusal, a failure or a debug
   line is logged at once. A name given info in the function
   (`emit = log.debug if quiet else log.info`), or info chosen where
   called (`(log.info if quiet else log.warning)(...)`), counts as info.
 - Work handed to once_committed is a name passed, not a call.
-- Another module's function is not followed, as accounts.reminded(),
-  called after the sign-in's commit, measures a reminder shown, not a
-  write."""
+- Another module's function is not followed."""
 
 import ast
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 
 from helpers.source import parsed
 
 LOGGERS = {"log", "logger"}
-INSTRUMENTS = {"create_counter", "create_histogram", "create_up_down_counter"}
 FUNCTIONS = ast.FunctionDef | ast.AsyncFunctionDef
 # Left out of a function's own nodes: scopes of their own, and failures.
 LEFT_OUT = (
@@ -38,21 +37,6 @@ LEFT_OUT = (
     ast.ClassDef,
     ast.ExceptHandler,
 )
-
-
-def _metrics(trees: Iterable[ast.Module]) -> set[str]:
-    """The names the modules bind at their top level to an instrument."""
-    return {
-        target.id
-        for tree in trees
-        for node in tree.body
-        if isinstance(node, ast.Assign | ast.AnnAssign)
-        and isinstance(node.value, ast.Call)
-        and isinstance(node.value.func, ast.Attribute)
-        and node.value.func.attr in INSTRUMENTS
-        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
-        if isinstance(target, ast.Name)
-    }
 
 
 def _own(function: ast.AST) -> Iterator[ast.AST]:
@@ -102,17 +86,11 @@ def _info(expression: ast.expr) -> bool:
     return False
 
 
-def _by_hand(call: ast.Call, metrics: set[str], named: set[str]) -> bool:
-    """A metric added or recorded, an info line, or a call of a name in
-    `named`: a level given a name, or a function of the module that
-    measures or logs by hand."""
-    match call.func:
-        case ast.Attribute(
-            value=ast.Name(id=name) | ast.Attribute(attr=name), attr="add" | "record"
-        ):
-            return name in metrics
-        case ast.Name(id=name):
-            return name in named
+def _by_hand(call: ast.Call, named: set[str]) -> bool:
+    """An info line, or a call of a name in `named`: a level given a name,
+    or a function of the module that logs by hand."""
+    if isinstance(call.func, ast.Name):
+        return call.func.id in named
     return _info(call.func)
 
 
@@ -128,8 +106,8 @@ def _levels(nodes: list[ast.AST]) -> set[str]:
     }
 
 
-def _measuring(tree: ast.Module, metrics: set[str]) -> set[str]:
-    """The module's top-level functions that measure or log by hand,
+def _logging(tree: ast.Module) -> set[str]:
+    """The module's top-level functions that log by hand,
     themselves or through another of them, wherever they are called."""
     functions = {
         node.name: list(_own(node)) for node in tree.body if isinstance(node, FUNCTIONS)
@@ -140,8 +118,7 @@ def _measuring(tree: ast.Module, metrics: set[str]) -> set[str]:
         for name, nodes in functions.items()
         if name not in found
         and any(
-            isinstance(node, ast.Call)
-            and _by_hand(node, metrics, found | _levels(nodes))
+            isinstance(node, ast.Call) and _by_hand(node, found | _levels(nodes))
             for node in nodes
         )
     }:
@@ -149,9 +126,9 @@ def _measuring(tree: ast.Module, metrics: set[str]) -> set[str]:
     return found
 
 
-def _after_commit(tree: ast.Module, metrics: set[str]) -> list[int]:
-    """The lines of `tree` that measure or log by hand after a commit."""
-    measuring = _measuring(tree, metrics)
+def _after_commit(tree: ast.Module) -> list[int]:
+    """The lines of `tree` that log by hand after a commit."""
+    logging = _logging(tree)
     found: list[int] = []
     for function in ast.walk(tree):
         if not isinstance(function, FUNCTIONS):
@@ -160,43 +137,36 @@ def _after_commit(tree: ast.Module, metrics: set[str]) -> list[int]:
         committed = _committed_at(nodes)
         if committed is None:
             continue
-        named = measuring | _levels(nodes)
+        named = logging | _levels(nodes)
         found += [
             node.lineno
             for node in nodes
             if isinstance(node, ast.Call)
             and node.lineno > committed
-            and _by_hand(node, metrics, named)
+            and _by_hand(node, named)
         ]
     return sorted(found)
 
 
-def test_no_write_is_measured_or_logged_by_hand_after_its_commit() -> None:
-    trees = parsed()
-    metrics = _metrics(trees.values())
+def test_no_write_is_logged_by_hand_after_its_commit() -> None:
     found = {
         where: lines
-        for where, tree in trees.items()
-        if (lines := _after_commit(tree, metrics))
+        for where, tree in parsed().items()
+        if (lines := _after_commit(tree))
     }
     assert found == {}
 
 
-def test_finds_a_write_measured_or_logged_by_hand_after_its_commit() -> None:
+def test_finds_a_write_logged_by_hand_after_its_commit() -> None:
     """The check itself: each way of writing one is found, and what only
     looks like one is not."""
     source = (
-        'saved = meter.create_counter("inventory.saved")\n'
-        'took = meter.create_histogram("inventory.took")\n'
         "def route(session):\n"
-        "    saved.add(1)\n"
         '    log.info("saving")\n'
         "    session.commit()\n"
-        "    saved.add(1)\n"
-        "    telemetry.took.record(2)\n"
         '    log.info("saved")\n'
         '    log.warning("slow")\n'
-        "    seen.add(1)\n"
+        "    saved.add(1)\n"
         "    once_committed(session, log.info, 'saved')\n"
         "    def later():\n"
         '        log.info("not here")\n'
@@ -206,40 +176,29 @@ def test_finds_a_write_measured_or_logged_by_hand_after_its_commit() -> None:
         "def command(database):\n"
         "    with database.session() as session, session.begin():\n"
         '        log.info("inside")\n'
-        "    saved.add(1)\n"
+        '    log.info("done")\n'
         "def failed(database):\n"
         "    try:\n"
         "        with database.session() as session, session.begin():\n"
         "            pass\n"
         "    except TimeoutError:\n"
-        "        saved.add(1)\n"
+        '        log.info("failed")\n'
         "def no_commit():\n"
-        "    saved.add(1)\n"
-        "def measured():\n"
-        "    saved.add(1)\n"
+        '    log.info("saved")\n'
+        "def noted():\n"
+        '    log.info("saved")\n'
         "def logged():\n"
-        "    measured()\n"
+        "    noted()\n"
         "def form(session, quiet):\n"
-        "    once_committed(session, measured)\n"
+        "    once_committed(session, noted)\n"
         "    session.commit()\n"
-        "    measured()\n"
+        "    noted()\n"
         "    logged()\n"
         "    emit = log.debug if quiet else log.info\n"
         '    emit("saved")\n'
         '    (log.info if quiet else log.warning)("saved")\n'
         "    quieter = log.debug\n"
         '    quieter("saved")\n'
-        "    other.measured()\n"
+        "    other.noted()\n"
     )
-    tree = ast.parse(source)
-    assert _after_commit(tree, _metrics([tree])) == [
-        7,
-        8,
-        9,
-        17,
-        21,
-        37,
-        38,
-        40,
-        41,
-    ]
+    assert _after_commit(ast.parse(source)) == [4, 12, 16, 32, 33, 35, 36]

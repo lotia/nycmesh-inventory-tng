@@ -50,8 +50,8 @@ from inventory_tng.catalogue.name_keys import name_key
 from inventory_tng.catalogue.queries import Offer, current_offers
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import lock_catalogue, locked, relock
-from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.refusals import Fields, refusals
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import (
     Item,
@@ -71,11 +71,14 @@ from inventory_tng.web.forms import CHANGED, RETIRED
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
-recounted = meter.create_counter(
-    "inventory.unit_recounts",
-    unit="{recount}",
-    description="Items whose unit, wrong from the start, a guided recount "
-    "corrected, by the unit it was in and the one it is in now",
+recounted = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.unit_recounts",
+        unit="{recount}",
+        description="Items whose unit, wrong from the start, a guided recount "
+        "corrected, by the unit it was in and the one it is in now",
+    ),
 )
 
 
@@ -459,11 +462,10 @@ def _recounted(
     item.unit_recounted_after = _last_transaction(session, item.id)
     places = sorted(each.place.id for each in plan.held)
     residue_places = sorted({each.place.id for each in residue} - set(places))
-    once_committed(session, recounted.add, 1, {"from": old, "to": unit})
-    once_committed(
+    recounted.on_commit(
         session,
-        log.info,
         "item unit recounted",
+        attributes={"from": old, "to": unit},
         item_id=item.id,
         admin_id=admin_id,
         from_unit=old,

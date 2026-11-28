@@ -18,8 +18,8 @@ from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_locking import get_locked, locked_row
-from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.phrases import PATH_BETWEEN, gettext, lazy_gettext
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.labels import Label
 from inventory_tng.models.places import Location
@@ -33,20 +33,26 @@ Names = Literal["item", "package", "location"]
 MAX_COPIES = 120  # Ten pages of one label.
 MAX_LABELS = 600  # Fifty pages, of any labels.
 
-made = meter.create_counter(
-    "inventory.labels.made",
-    unit="{label}",
-    description="Label codes made, by what they name",
+made = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.labels.made",
+        unit="{label}",
+        description="Label codes made, by what they name",
+    ),
 )
 printed = meter.create_counter(
     "inventory.labels.printed",
     unit="{label}",
     description="Labels laid out on sheets to print, each copy counted",
 )
-revoked = meter.create_counter(
-    "inventory.labels.revoked",
-    unit="{label}",
-    description="Label codes revoked",
+revoked = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.labels.revoked",
+        unit="{label}",
+        description="Label codes revoked",
+    ),
 )
 
 
@@ -261,8 +267,9 @@ def _current_or_new(session: Session, label: Label, names: Names) -> Label:
         return existing
     session.add(label)
     session.flush()
-    once_committed(session, made.add, 1, {"names": names})
-    once_committed(session, log.info, "label made", label_id=label.id)
+    made.on_commit(
+        session, "label made", attributes={"names": names}, label_id=label.id
+    )
     return label
 
 
@@ -308,6 +315,5 @@ def revoke(session: Session, label_id: int, at: datetime) -> bool:
         return False
     label.revoked_at = at
     session.flush()
-    once_committed(session, revoked.add, 1)
-    once_committed(session, log.info, "label revoked", label_id=label_id)
+    revoked.on_commit(session, "label revoked", label_id=label_id)
     return True

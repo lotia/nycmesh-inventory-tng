@@ -18,8 +18,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken, enforce
-from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.models.places import Location
 from inventory_tng.models.stock import LedgerTransaction, OpenPackage
 from inventory_tng.stock import moments, units_shown
@@ -69,16 +69,22 @@ def _require_countable(session: Session, location_id: int) -> None:
 ItemLines = Sequence[tuple[int, Decimal]]
 
 
-recorded = meter.create_counter(
-    "inventory.counts.recorded",
-    unit="{transaction}",
-    description="Counts and adjustments written, by kind",
+recorded = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.counts.recorded",
+        unit="{transaction}",
+        description="Counts and adjustments written, by kind",
+    ),
 )
-withheld = meter.create_counter(
-    "inventory.count.lines.withheld",
-    unit="{line}",
-    description="Count lines not written because the item moved at the place "
-    "while it was counted, so it is counted again",
+withheld = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.count.lines.withheld",
+        unit="{line}",
+        description="Count lines not written because the item moved at the "
+        "place while it was counted, so it is counted again",
+    ),
 )
 
 
@@ -100,14 +106,21 @@ def _correct(
 ) -> list[Written]:
     """A count's or an adjustment's transaction, as written: none if its
     key is written already. The one place either is written, so each is
-    measured and logged here, once committed (_recorded), whichever page
+    measured and logged here, once committed, whichever page
     wrote it, and never twice (inventory-tng-vvp0)."""
     full = {"kind": kind, "admin_id": admin_id, **header}
     transaction = insert_transaction(session, key, full, lines)
     if transaction is None:
         return []
     written = Written(transaction.id, kind, len(lines))
-    once_committed(session, _recorded, admin_id, written)
+    recorded.on_commit(
+        session,
+        f"{kind} recorded",
+        attributes={"kind": kind},
+        ledger_transaction_id=transaction.id,
+        admin_id=admin_id,
+        lines=written.lines,
+    )
     return [written]
 
 
@@ -122,28 +135,6 @@ class Counted(NamedTuple):
     # total (no form), and each form of one counted by form. Nothing if an
     # earlier send of it did.
     put_right: list[tuple[int, Form | None]]
-
-
-def _recorded(admin_id: int, transaction: Written) -> None:
-    """Measure and log a count or an adjustment committed."""
-    recorded.add(1, {"kind": transaction.kind})
-    log.info(
-        f"{transaction.kind} recorded",
-        ledger_transaction_id=transaction.id,
-        admin_id=admin_id,
-        lines=transaction.lines,
-    )
-
-
-def _withheld(admin_id: int, location_id: int, lines: int) -> None:
-    """Measure and log a count's lines withheld as moved, once committed."""
-    withheld.add(lines)
-    log.info(
-        "count lines withheld",
-        location_id=location_id,
-        admin_id=admin_id,
-        lines=lines,
-    )
 
 
 def _hold_place(session: Session, location_id: int, *keys: uuid.UUID) -> int | None:
@@ -345,7 +336,14 @@ def record_count(
         put_right += [(item_id, form) for item_id, form, _ in kept_forms]
         # Withheld by no earlier send of it.
         if moved:
-            once_committed(session, _withheld, admin_id, location_id, len(moved))
+            withheld.on_commit(
+                session,
+                "count lines withheld",
+                amount=len(moved),
+                location_id=location_id,
+                admin_id=admin_id,
+                lines=len(moved),
+            )
     return Counted(bool(into or out), moved, written, put_right)
 
 

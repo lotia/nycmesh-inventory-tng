@@ -25,9 +25,9 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue.unit_conversion import converted_kept, convertible
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import locked
-from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.rule_names import RuleName
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.models.base import QUANTITY_MAX, QUANTITY_STEP
 from inventory_tng.models.catalogue import UNITS, Item, ItemPackage, VendorOffer
 from inventory_tng.models.core import CatalogueHistory
@@ -38,12 +38,15 @@ from inventory_tng.stock import units_shown
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
-unit_changes_converted = meter.create_counter(
-    "inventory.unit_changes.converted",
-    unit="{change}",
-    description="Changes to an item's unit between lengths that converted "
-    "what is recorded, once stock had moved or a label was printed, by the "
-    "unit it was in and the one it is in now",
+unit_changes_converted = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.unit_changes.converted",
+        unit="{change}",
+        description="Changes to an item's unit between lengths that converted "
+        "what is recorded, once stock had moved or a label was printed, by the "
+        "unit it was in and the one it is in now",
+    ),
 )
 
 # Why an item's unit is fixed, and the rule each refuses a change by.
@@ -303,11 +306,10 @@ def _converted(
     for row in reported:
         row.length_reported = lengths[row.id]
         row.length_reported_unit = new
-    once_committed(session, unit_changes_converted.add, 1, {"from": old, "to": new})
-    once_committed(
+    unit_changes_converted.on_commit(
         session,
-        log.info,
         "item unit converted",
+        attributes={"from": old, "to": new},
         item_id=item.id,
         reason=why,
         from_unit=old,

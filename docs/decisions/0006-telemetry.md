@@ -3,7 +3,7 @@
 **Status:** accepted · 2026-10-30 · amended 2026-11-19 (measured and
 logged once committed; camera sessions) and 2026-11-27 (every refusal
 logged and counted together; a rule's refusal counted once; a form's own
-problems counted)
+problems counted; a write's metric measured only once committed)
 
 ## Context
 
@@ -71,6 +71,19 @@ route measures its write.
 
 What was refused, or failed, is measured and logged at once, as nothing
 of it commits. Debug lines trace an attempt as it happens.
+
+### A write's metric measured only once committed (2026-11-27)
+
+Decided by Ali on 2026-11-27 (inventory-tng-8xs0): a write's metric is
+a `WriteMetric` (`core/write_metrics.py`), with no `add()` or
+`record()`. Its one method, `on_commit()`, registers the measure and the
+write's log line with `once_committed` together, so `ty check` refuses a
+write measured by hand, before its commit or after. Before, a codebase
+test caught one after a commit, but none before: a call site cannot tell
+a write's success from a refusal or a note. Metrics that measure no
+write, such as page reports and timings, stay the meter's own. We
+rejected an allow list of the notes logged inside a transaction, which
+every new one would need.
 
 ## Amendment: camera sessions (2026-11-19)
 

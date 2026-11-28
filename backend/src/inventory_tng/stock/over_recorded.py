@@ -29,6 +29,7 @@ from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.phrases import lazy_gettext
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import (
     LedgerTransaction,
@@ -65,25 +66,34 @@ CHECKED_REASONS = {
     "other": lazy_gettext("Put right another way:"),
 }
 
-raised_counter = meter.create_counter(
-    "inventory.over_recorded.raised",
-    unit="{line}",
-    description="Lines recorded with more than was moved, as a batch changed "
-    "after another tab recorded it said, raised or said again for an "
-    "administrator to correct",
+raised_counter = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.over_recorded.raised",
+        unit="{line}",
+        description="Lines recorded with more than was moved, as a batch "
+        "changed after another tab recorded it said, raised or said again for "
+        "an administrator to correct",
+    ),
 )
-settled_counter = meter.create_counter(
-    "inventory.over_recorded.settled",
-    unit="{line}",
-    description="Lines recorded with more than was moved that were settled, "
-    "by how: corrected with adjustments, marked checked, then by why it was "
-    "right as it was, or counted at every end",
+settled_counter = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.over_recorded.settled",
+        unit="{line}",
+        description="Lines recorded with more than was moved that were "
+        "settled, by how: corrected with adjustments, marked checked, then by "
+        "why it was right as it was, or counted at every end",
+    ),
 )
-brought_back_counter = meter.create_counter(
-    "inventory.over_recorded.places_brought_back",
-    unit="{location}",
-    description="Retired places an administrator brought back from Recorded "
-    "more than moved, to correct a line there",
+brought_back_counter = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.over_recorded.places_brought_back",
+        unit="{location}",
+        description="Retired places an administrator brought back from "
+        "Recorded more than moved, to correct a line there",
+    ),
 )
 
 WAITING = OverRecorded.settled_at.is_(None)
@@ -111,11 +121,9 @@ def raise_checks(session: Session, over: Mapping[int, Decimal]) -> None:
         ).returning(OverRecorded.id)
     ).all()
     for (check_id,) in changed:
-        once_committed(
-            session, log.info, "over recorded raised", over_recorded_id=check_id
+        raised_counter.on_commit(
+            session, "over recorded raised", over_recorded_id=check_id
         )
-    if changed:
-        once_committed(session, raised_counter.add, len(changed))
 
 
 def _since_recounts(
@@ -158,7 +166,7 @@ def _measure_settled(
     reason (CHECKED_REASONS), never its words."""
     if count:
         attributes = {"how": how} | ({"reason": reason} if reason else {})
-        once_committed(session, settled_counter.add, count, attributes)
+        settled_counter.on_commit(session, amount=count, attributes=attributes)
 
 
 def brought_back(
@@ -166,10 +174,8 @@ def brought_back(
 ) -> None:
     """A retired place brought back to correct one there: measured and
     logged once committed."""
-    once_committed(session, brought_back_counter.add, 1)
-    once_committed(
+    brought_back_counter.on_commit(
         session,
-        log.info,
         "over recorded place brought back",
         over_recorded_id=check_id,
         location_id=location_id,

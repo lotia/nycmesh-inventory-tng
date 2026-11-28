@@ -88,10 +88,10 @@ from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.core.db_errors import Gone as RowGone
 from inventory_tng.core.db_errors import refusal
-from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, ngettext
 from inventory_tng.core.sent_forms import form_key
+from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.places import Location
@@ -193,19 +193,25 @@ SAVED_AS_SHOWN = lazy_gettext(
 # any place.
 NOTHING_TYPED = lazy_gettext("Nothing was typed, so nothing was counted.")
 # A count of a store and its areas, saved (inventory-tng-8i4.51.4).
-places_counted = meter.create_histogram(
-    "inventory.count.places",
-    unit="{place}",
-    description="Places each count form saved counted: one, or a store or "
-    "area and the areas in it",
+places_counted = WriteMetric(
+    log,
+    meter.create_histogram(
+        "inventory.count.places",
+        unit="{place}",
+        description="Places each count form saved counted: one, or a store or "
+        "area and the areas in it",
+    ),
 )
 # A retired area emptied while it was counted, brought back from the count
 # form (inventory-tng-ygk5).
-areas_brought_back = meter.create_counter(
-    "inventory.count.areas_brought_back",
-    unit="{area}",
-    description="Retired areas emptied while they were counted, brought back "
-    "from the count form",
+areas_brought_back = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.count.areas_brought_back",
+        unit="{area}",
+        description="Retired areas emptied while they were counted, brought "
+        "back from the count form",
+    ),
 )
 # The rules places/locations.restore may refuse an area by; any other is a
 # bug, and raised. Not its custodian's: an area has none (location's
@@ -215,11 +221,15 @@ BRING_BACK_REFUSALS = ("location_area_parent", "location_parent_current")
 # A move from an area gone from a count form fixed on it: more or less
 # arrived than was moved, in any of the forms it arrived in
 # (inventory-tng-ygk5).
-moves_fixed = meter.create_counter(
-    "inventory.count.moves_fixed",
-    unit="{move}",
-    description="Moves from retired areas emptied while counted whose amount "
-    "a count form fixed, by whether more arrived (found) or less (lost)",
+moves_fixed = WriteMetric(
+    log,
+    meter.create_counter(
+        "inventory.count.moves_fixed",
+        unit="{move}",
+        description="Moves from retired areas emptied while counted whose "
+        "amount a count form fixed, by whether more arrived (found) or less "
+        "(lost)",
+    ),
 )
 
 
@@ -897,7 +907,7 @@ def count(
         except ShownOtherwise as broken:
             shown_now = broken.now
             raise
-        once_committed(session, _saved, place.id, saved, fixes)
+        _saved(session, place.id, saved, fixes)
         return saved
 
     result, broken = refusal(session, put_right, *RULE_REFUSALS, location_id=place.id)
@@ -1027,22 +1037,30 @@ def count(
     )
 
 
-def _saved(place_id: int, result: StoreCounted, fixes: Sequence[Fix]) -> None:
+def _saved(
+    session: Session, place_id: int, result: StoreCounted, fixes: Sequence[Fix]
+) -> None:
     """Measure and log a count form of the place saved, and the moves it
-    fixed: once committed (count's put_right)."""
+    fixed, once committed (count's put_right)."""
     counted = result.places
     if any(each.written for each in counted.values()):
-        places_counted.record(len(counted))
-        log.info("count saved", location_id=place_id, places=len(counted))
+        places_counted.on_commit(
+            session,
+            "count saved",
+            amount=len(counted),
+            location_id=place_id,
+            places=len(counted),
+        )
     if result.fixed:
         # A move fixed in two forms is one move, unless one form came out
         # more and the other less.
         for to_id, from_id, item_id, found in sorted(
             {(fix.to_id, fix.from_id, fix.item_id, fix.difference > 0) for fix in fixes}
         ):
-            moves_fixed.add(1, {"direction": "found" if found else "lost"})
-            log.info(
+            moves_fixed.on_commit(
+                session,
                 "count move fixed",
+                attributes={"direction": "found" if found else "lost"},
                 location_id=to_id,
                 from_location_id=from_id,
                 item_id=item_id,
@@ -1199,10 +1217,8 @@ def bring_back(
             locations.restore(session, area)
         except RowGone:  # Current already, as after a second press.
             return
-        once_committed(session, areas_brought_back.add, 1)
-        once_committed(
+        areas_brought_back.on_commit(
             session,
-            log.info,
             "count area brought back",
             location_id=place.id,
             area_id=area.id,
