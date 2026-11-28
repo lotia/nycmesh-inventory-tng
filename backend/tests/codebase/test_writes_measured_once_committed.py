@@ -1,30 +1,29 @@
 """What a write did is measured and logged through once_committed, never
 by hand after its commit (CONTRIBUTING.md, Logging; inventory-tng-kebu):
-a metric's add() or record(), or a log.info(), after a commit in the
-same function fails here, and so does a call, after a commit, of a
-function of the same module that does one of them, itself or through
-another such function.
+a metric's add() or record(), or a log.info(), after a commit fails
+here, in the function itself or in a function of its module that it
+calls, directly or through another.
 
-Deterministic, read from the source, function by function, each without
-the functions and lambdas defined in it, which run when called, not
-where they stand, and without its except clauses, as a failure is
-measured and logged at once. A commit is a call of .commit(), awaited
-or not, or the end of a `with ... .begin():` block. Only what comes
-after the first of them, by line, is read, so the same calls before it,
-inside the transaction, never match. A metric is a name the app's
-modules bind at the top level to a meter's create_counter(),
-create_histogram() or create_up_down_counter(), so a set's add() never
-matches; and only info is read of the log levels, as a refusal, a
-failure or a debug line is logged at once. Info given a name in the
-function (`emit = log.debug if quiet else log.info`), or chosen where
-it is called (`(log.info if quiet else log.warning)(...)`), is info
-too. Work handed to once_committed, as once_committed(session,
-log.info, ...), is a name passed, not a call, so it never matches
-either. Another module's function called after a commit is not followed,
-as accounts.reminded() measures a reminder shown, not a write."""
+Deterministic, read from the source, function by function:
+- A commit is a call of .commit(), awaited or not, or the end of a
+  `with ... .begin():` block. Only what comes after the first one is
+  read, so the same calls inside the transaction never match.
+- Functions and lambdas defined inside, which run when called, and
+  except clauses, as a failure is measured and logged at once, are left
+  out.
+- A metric is a name a module binds at its top level to a meter's
+  instrument, so a set's add() never matches.
+- Only info is read of the levels, as a refusal, a failure or a debug
+  line is logged at once. A name given info in the function
+  (`emit = log.debug if quiet else log.info`), or info chosen where
+  called (`(log.info if quiet else log.warning)(...)`), counts as info.
+- Work handed to once_committed is a name passed, not a call.
+- Another module's function is not followed, as accounts.reminded(),
+  called after the sign-in's commit, measures a reminder shown, not a
+  write."""
 
 import ast
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 
 from helpers.source import parsed
 
@@ -41,7 +40,7 @@ LEFT_OUT = (
 )
 
 
-def _metrics(trees: Iterator[ast.Module]) -> set[str]:
+def _metrics(trees: Iterable[ast.Module]) -> set[str]:
     """The names the modules bind at their top level to an instrument."""
     return {
         target.id
@@ -174,7 +173,7 @@ def _after_commit(tree: ast.Module, metrics: set[str]) -> list[int]:
 
 def test_no_write_is_measured_or_logged_by_hand_after_its_commit() -> None:
     trees = parsed()
-    metrics = _metrics(iter(trees.values()))
+    metrics = _metrics(trees.values())
     found = {
         where: lines
         for where, tree in trees.items()
@@ -233,7 +232,7 @@ def test_finds_a_write_measured_or_logged_by_hand_after_its_commit() -> None:
         "    other.measured()\n"
     )
     tree = ast.parse(source)
-    assert _after_commit(tree, _metrics(iter([tree]))) == [
+    assert _after_commit(tree, _metrics([tree])) == [
         7,
         8,
         9,

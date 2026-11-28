@@ -1515,16 +1515,15 @@ What a write did is measured and logged once its transaction commits,
 through `once_committed` (`core/db_once_committed.py`), registered by the
 function that writes the table, so every caller is counted and a write
 rolled back records nothing (docs/decisions/0006). Never measure or log a
-write by hand, before its commit or after. A metric added or recorded,
-or an `info` line, after a commit, itself or in a function of the same
-module called there, fails
-`tests/codebase/test_writes_measured_once_committed.py`. One before the
-commit, in the transaction, is left for review to find. A refusal or
-failure, which commits nothing, is measured and logged at once, and so
-are `debug` lines. Log a refusal through a kind declared with `@refusals`
-(`core/refusals.py`), which counts it as it logs it, by a reason from a
-fixed list, a `Literal` that `ty check` holds calls to; a refusal logged
-by hand fails `tests/codebase/test_refusals_counted.py`. A change a rule
+write by hand, before its commit or after. One after a commit, in the
+function or in a function of its module that it calls, fails
+`tests/codebase/test_writes_measured_once_committed.py`; review looks for
+one before. A refusal or failure, which commits nothing, is measured
+and logged at once, and so are `debug` lines. Log a refusal through a
+kind declared with `@refusals` (`core/refusals.py`), which counts it as
+it logs it, by a reason from a fixed list, a `Literal` that `ty check`
+holds calls to; a refusal logged by hand fails
+`tests/codebase/test_refusals_counted.py`. A change a rule
 refuses is logged and counted already, by `attempt()` and its kin in
 `core/db_errors.py`: pass them the ids to log, and count it again nowhere
 (`tests/codebase/test_rule_refusals.py`). A form's own problem with a box

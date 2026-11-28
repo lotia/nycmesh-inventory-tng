@@ -23,6 +23,7 @@ from opentelemetry.sdk.metrics.export import (
 from sqlalchemy import delete, exc, func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
+from structlog.typing import EventDict
 
 from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.admins.paths import ACCOUNT
@@ -562,6 +563,19 @@ def test_counts_the_places_a_count_was_saved_at(
     assert (after[0] - before[0], after[1] - before[1]) == (1, 2)
 
 
+@contextmanager
+def never_committed(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> Generator[list[EventDict]]:
+    """The log lines of what runs inside, its commits only flushes and its
+    transaction rolled back at the end, so nothing once_committed holds
+    runs (db_once_committed)."""
+    monkeypatch.setattr(session, "commit", session.flush)
+    with capture_logs() as logs:
+        yield logs
+        session.rollback()
+
+
 def test_a_count_form_saved_rolled_back_is_neither_measured_nor_logged(
     rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -576,10 +590,8 @@ def test_a_count_form_saved_rolled_back_is_neither_measured_nor_logged(
     form = count_form_at(client, place.store.id)
     name = "inventory.count.places"
     before = histogram_counts(reader, name)
-    monkeypatch.setattr(session, "commit", session.flush)
-    with capture_logs() as logs:
+    with never_committed(session, monkeypatch) as logs:
         assert client.post(path, data=form, follow_redirects=False).status_code == 303
-        session.rollback()
     assert added(reader, name, before, histogram_counts) == {}
     assert "count saved" not in [line["event"] for line in logs]
 
@@ -650,13 +662,11 @@ def test_an_area_brought_back_rolled_back_is_neither_counted_nor_logged(
     retire(session, shelf)
     path, refused = emptied_while_counted(client, session, place, shelf)
     brought = since(reader, "inventory.count.areas_brought_back")
-    monkeypatch.setattr(session, "commit", session.flush)
-    with capture_logs() as logs:
+    with never_committed(session, monkeypatch) as logs:
         back = client.post(
             f"{path}/bring-back", data=count_form(refused) | {"area_id": str(shelf.id)}
         )
         assert back.status_code == 200
-        session.rollback()
     assert brought() == {}
     assert "count area brought back" not in [line["event"] for line in logs]
 
