@@ -14,6 +14,9 @@ export type Prepared = {
   labelled: string;
   /** Another administrator, with the same password. */
   other: string;
+  /** An item recorded more than moved, whose Correct is always refused:
+   * the place it came from is retired and holds nothing. */
+  refused: string;
 };
 
 /**

@@ -38,10 +38,12 @@ async function named(page: Page, path: string, what: string): Promise<string> {
 /**
  * Adds the row filled in as `name`, and waits for its page, headed by it:
  * going to another page first cancels the add if it is still being sent.
+ * A form's answer, its taps wait a moment (settled).
  */
 async function added(page: Page, name: string): Promise<void> {
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
+  await settled(page);
 }
 
 /** A new volunteer, whose page is left open. Their name. */
@@ -88,9 +90,11 @@ export async function addItem(page: Page, shown: string): Promise<Locator> {
   const asked = page.getByText("A different item?");
   await expect(heading.or(asked)).toBeVisible();
   if (await asked.isVisible()) {
+    await settled(page);
     await add.click();
   }
   await expect(heading).toBeVisible();
+  await settled(page);
   return heading;
 }
 
@@ -116,8 +120,10 @@ export async function ownCable(
   await page
     .getByLabel(`When one of ${box} is opened`)
     .selectOption({ label: "Track" });
+  await settled(page);
   await page.getByRole("button", { name: `Set for ${box}` }).click();
   await expect(page.getByText("Opened ones followed")).toBeVisible();
+  await settled(page);
   return name;
 }
 
@@ -149,9 +155,11 @@ export async function invite(
   await expect(made.or(confirm)).toBeVisible();
   if (await confirm.isVisible()) {
     await asked.fill(shared);
+    await settled(page);
     await confirm.click();
   }
   await expect(made).toBeVisible();
+  await settled(page);
   const link = (await made.textContent()) ?? "";
   expect(link).toContain("/admin/reset?token=");
   return { username, link };
@@ -210,8 +218,10 @@ export const test = base.extend<{
     await admin.getByRole("button", { name: "Reset" }).click();
     await admin.getByLabel("Username").fill(username);
     await admin.getByLabel("Password").fill(password);
+    await settled(admin);
     await admin.getByRole("button", { name: "Sign in" }).click();
     await expect(admin).toHaveURL(/\/admin$/);
+    await settled(admin);
     await use({ page: admin, password });
     try {
       await assertNone(context, violations);

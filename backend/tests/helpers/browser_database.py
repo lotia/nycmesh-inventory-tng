@@ -7,8 +7,8 @@ crawl) from backend/, with PYTHONPATH set to pytest's pythonpath
 
 with BROWSER_RUN, a folder, and BROWSER_PORT set, each server's own. It
 makes a database of its own (databases.py), migrated and seeded, with a
-registration code for the tests' device and a box of the seed's cable
-opened, and in BROWSER_RUN: prepared.json, what the tests need,
+registration code for the tests' device, a box of the seed's cable
+opened and a correction refused (refused_correction), and in BROWSER_RUN: prepared.json, what the tests need,
 camera.y4m, the QR code of the seed's labelled item for Chromium to show
 as its camera, and totp-keys, a key of the run's own to seal
 authenticators with. It then serves the built
@@ -26,6 +26,7 @@ import signal
 import sys
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import segno
@@ -46,6 +47,7 @@ from inventory_tng.scan.batch_schemas import Batch
 from inventory_tng.volunteers import volunteers
 
 from helpers.databases import migrated_engine, new_database
+from helpers.stock import Place, raise_check, received, retire, write
 
 # What a run writes in its folder: these, and the signed-in session
 # sign-in.setup.ts keeps (frontend/browser-tests/prepared.ts, adminState).
@@ -126,6 +128,7 @@ def prepare(url: str, video: Path) -> dict[str, str]:
         duplicate = volunteers.add(session, f"{kept.name} (twice)", None)
         volunteers.merge(session, duplicate, kept.id, datetime.now(UTC))
         open_a_box(session, kept.id)
+        refused = refused_correction(session)
         # Another administrator, whose sign-in reset-links.spec.ts resets.
         other = Admin(username=OTHER_ADMIN)
         session.add(other)
@@ -143,7 +146,20 @@ def prepare(url: str, video: Path) -> dict[str, str]:
         "phrase": phrase,
         "labelled": seed.LABELLED,
         "other": OTHER_ADMIN,
+        "refused": refused,
     }
+
+
+def refused_correction(session: Session) -> str:
+    """Two more radios recorded moved from a store than were, and the store
+    retired, holding nothing: their Correct is refused, and offers to bring
+    the store back (stock/over_recorded.html), every time, as nothing a test
+    does there changes it. The radios' name."""
+    place = Place(session)
+    received(session, place)
+    raise_check(session, write(session, place), Decimal(2))
+    retire(session, place.store)
+    return place.item.name
 
 
 def open_a_box(session: Session, volunteer_id: int) -> None:

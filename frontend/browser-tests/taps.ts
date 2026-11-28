@@ -32,3 +32,16 @@ export async function doubleTap(page: Page, at: Point): Promise<void> {
   await page.waitForTimeout(150);
   await page.touchscreen.tap(at.x, at.y);
 }
+
+/** Two taps of a finger at `at`, the second as soon as the page the first
+ * sent for has come, its address matching `arrived`: a double tap whose
+ * second tap lands on the next page. */
+export async function doubleTapOnto(
+  page: Page,
+  at: Point,
+  arrived: RegExp,
+): Promise<void> {
+  await page.touchscreen.tap(at.x, at.y);
+  await page.waitForURL(arrived);
+  await page.touchscreen.tap(at.x, at.y);
+}

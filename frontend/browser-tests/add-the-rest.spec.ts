@@ -33,6 +33,8 @@ test("a save refused for a line goes back without it, saying why, and the rest i
   // sealed anywhere: the inventory refuses the save for that line.
   const admin = await page.context().newPage();
   await admin.goto(boxedPage);
+  // Its notice's taps wait a moment (docs/decisions/0019, Double taps).
+  await settled(admin);
   await admin.getByRole("button", { name: `Retire ${BOX}` }).click();
   await expect(
     admin.getByRole("button", { name: `Bring it back ${BOX}` }),

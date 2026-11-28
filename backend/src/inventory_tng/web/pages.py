@@ -154,7 +154,9 @@ def page(
     say so in `problem`. Each page has its number boxes'
     decimal separator as `decimal` (web/decimal_separator.py), which its
     <html data-decimal> tells its scripts. The forms' own problems it shows
-    are counted (form_problems.count_shown)."""
+    are counted (form_problems.count_shown). One that answers a form's POST,
+    as a refusal does, is `settle_on_load`: its taps wait a moment as it
+    loads (admin_base.html; docs/decisions/0019, Double taps)."""
     notice = NOTICES.get(request.query_params.get("notice", ""))
     section = request.query_params.get("section", "")
     full = {
@@ -162,6 +164,7 @@ def page(
         "values": {},
         "notice": notice,
         "decimal": decimal_separator(request),
+        "settle_on_load": request.method == "POST",
         # Only its section's heading says it (_notice.html), if there is one.
         "notice_section": section if notice and section in NOTICE_SECTIONS else None,
     } | dict(context)

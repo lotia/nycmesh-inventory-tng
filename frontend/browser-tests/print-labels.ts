@@ -1,6 +1,7 @@
 /** Label pages, made from an item's page as an administrator. */
 import { expect, type Page } from "@playwright/test";
 import { prepared } from "./prepared";
+import { settled } from "./taps";
 
 /** Prints `copies` labels of the item named `name` (the seed's labelled
  * item unless given), from its page. */
@@ -22,4 +23,6 @@ export async function printFromHere(page: Page, copies: number): Promise<void> {
   await expect(
     page.getByRole("heading", { name: "Print labels" }),
   ).toBeVisible();
+  // A form's answer: its taps wait a moment.
+  await settled(page);
 }

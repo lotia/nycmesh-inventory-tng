@@ -15,6 +15,7 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 import { test } from "./csp-violations";
 import { addItem, unique } from "./own-rows";
+import { settled } from "./taps";
 
 /** A unit the form asks about with no word near it (a data rate, or
  * not), and the data rate it is read as. */
@@ -52,6 +53,8 @@ test("a unit nothing settles is asked once, and the answer saves the item, read 
   const asked = page.getByRole("group", {
     name: `“${n}${unit}” is new. Is it a unit?`,
   });
+  // A form's answer, whose taps wait a moment (docs/decisions/0019).
+  await settled(page);
   await asked.getByLabel(`${n}${rate} · data rate`).check();
   // Shown with the unit spaced from its number (docs/decisions/0021).
   await addItem(page, name.replace(`${n}${unit}`, `${n} ${unit}`));

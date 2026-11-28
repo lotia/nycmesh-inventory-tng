@@ -79,6 +79,10 @@ def test_a_notice_about_the_whole_page_is_said_under_its_title(
 ) -> None:
     page = admin_client.get("/admin/categories?notice=added").text
     assert said_in(page) == "top"
+    # Its words marked for the page's script, which ignores taps a moment
+    # as the page loads, an ignored one focusing them: the notice pushed
+    # the page down under the finger (inventory-tng-0c2z).
+    read(page).one("p", role="status", data_settle="", tabindex="-1")
 
 
 def test_a_section_no_page_has_says_the_notice_under_the_title(

@@ -75,8 +75,9 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   inventory-tng-r3jx, inventory-tng-0c2z). A double tap's second tap
   lands a moment after the first. When the first takes away or shrinks
   something with controls below it, they move up; when it brings up a
-  question, a dialog, a confirmation page or a notice with an undo, its
-  choices appear. Either way the second lands on one never meant. So
+  question, a dialog, a confirmation page, or any administrator page
+  answering a form, that page's controls appear. Either way the second
+  lands on one never meant. So
   such a tap keeps that space blank, or has the page ignore taps, for
   `SETTLE_MS` (`frontend/src/shared/settling.ts`).
 - **Focus moves without scrolling**, to the heading of what moved up,
@@ -91,13 +92,16 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
 - **How:** any page ignores all of its taps with `ignoreTaps`. The scan
   page's hooks in `frontend/src/scan/settling-hooks.tsx` keep the space
   of a part that goes, and find a list's entry that moved up, by its id,
-  for focus. A confirmation page (`_confirm.html`'s macro) marks its
-  way back `data-settle`, and a notice with an undo (`_notice.html`) its
-  words; such a page waits as its script starts
-  (`frontend/src/admin/settle-on-load.ts`), leaving focus where a page's
-  starts until an ignored tap focuses what it marks. Only taps, and such
-  a page, start a wait: typing, picking from a list and a label read
-  leave taps taken.
+  for focus. An administrator page waits as its script starts
+  (`frontend/src/admin/settle-on-load.ts`) when it answers a form: sent
+  back by the form's POST, which `pages.page()` marks on `<html>`, or
+  reached by a redirect, as the browser tells. So does a page with a
+  notice (`_notice.html`), which marks its words `data-settle`, and a
+  confirmation page (`_confirm.html`'s macro), which marks its way
+  back. Focus stays where a page's starts until an ignored tap focuses
+  what the page marks, else its heading. A link followed to any other
+  page takes taps at once. Only taps, and such a page, start a wait:
+  typing, picking from a list and a label read leave taps taken.
   `backend/tests/codebase/test_focus_and_settling.py` refuses focus
   moved, or a tap told from a key's press, anywhere else.
 - We rejected deciding each place apart, as each fix found another (Ali,

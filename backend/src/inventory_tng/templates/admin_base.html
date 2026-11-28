@@ -1,5 +1,7 @@
 <!doctype html>
-<html lang="en" data-decimal="{{ decimal }}">
+{#- data-settle-on-load: a page answering a form's POST, whose taps wait a
+    moment as it loads (pages.page; frontend/src/admin/settle-on-load.ts). #}
+<html lang="en" data-decimal="{{ decimal }}"{% if settle_on_load %} data-settle-on-load{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,7 +16,8 @@
   <main class="admin page-width">
     {#- The way back, above the title (docs/decisions/0019): back_link = (path, words). #}
     {% if back_link %}<p class="back"><a href="{{ back_link[0] }}"><span aria-hidden="true">‹&nbsp;</span>{% trans page=back_link[1] %}<span class="sr-only">Back to </span>{{ page }}{% endtrans %}</a></p>{% endif %}
-    <h1>{{ title }}</h1>
+    {#- Focusable by script: an ignored tap's target (settle-on-load.ts). #}
+    <h1 tabindex="-1">{{ title }}</h1>
     {% if alert %}<p role="alert">{{ alert }}</p>{% endif %}
     {#- A notice about one section is said by its heading; any other, here. #}
     {% with section_id=none %}{% include "_notice.html" %}{% endwith %}

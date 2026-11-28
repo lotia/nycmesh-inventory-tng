@@ -9,6 +9,7 @@ import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { addItem, itemIdOf, record, unique } from "./own-rows";
 import { fillMove } from "./scan-page";
+import { settled } from "./taps";
 
 test("an amount typed in a unit changed since is asked for again at Record, and recorded in the new unit", async ({
   page,
@@ -30,6 +31,8 @@ test("an amount typed in a unit changed since is asked for again at Record, and 
   // Meanwhile, an administrator counts it in feet.
   const admin = await context.newPage();
   await admin.goto(itemPage);
+  // Its notice's taps wait a moment (docs/decisions/0019, Double taps).
+  await settled(admin);
   await admin.getByLabel(/^Unit/).selectOption("ft");
   await admin.getByRole("button", { name: "Save", exact: true }).click();
   await expect(admin).toHaveURL(/notice=saved/);

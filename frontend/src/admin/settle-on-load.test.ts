@@ -25,8 +25,26 @@ const tap = (on: HTMLElement) =>
 afterEach(() => {
   stopIgnoringTaps(document);
   vi.useRealTimers();
+  vi.restoreAllMocks();
+  document.documentElement.removeAttribute("data-settle-on-load");
   document.body.replaceChildren();
 });
+
+/** A form's answer, as it comes: sent back by its POST, or by a redirect. */
+const answers: [string, () => void][] = [
+  [
+    "sent back by its POST",
+    () => document.documentElement.setAttribute("data-settle-on-load", ""),
+  ],
+  [
+    "reached by the redirect after it",
+    () => {
+      vi.spyOn(performance, "getEntriesByType").mockReturnValue([
+        { redirectCount: 1 } as PerformanceNavigationTiming,
+      ]);
+    },
+  ],
+];
 
 describe("a page a tap brought up (Ali, 2026-11-27, inventory-tng-0c2z)", () => {
   it.each([
@@ -34,6 +52,11 @@ describe("a page a tap brought up (Ali, 2026-11-27, inventory-tng-0c2z)", () => 
       "a confirmation page",
       `<form><div class="actions"><button class="danger">Revoke</button><a href="/back" data-settle>Keep it</a></div></form>`,
       "Revoke",
+    ],
+    [
+      "a notice",
+      `<p role="status" data-settle tabindex="-1">Retired: it is no longer offered.</p><form><button>Retire</button></form>`,
+      "Retire",
     ],
     [
       "a notice that offers an undo",
@@ -55,6 +78,24 @@ describe("a page a tap brought up (Ali, 2026-11-27, inventory-tng-0c2z)", () => 
       await vi.advanceTimersByTimeAsync(SETTLE_MS);
       tap(button);
       expect(tapped).toEqual([words]);
+    },
+  );
+
+  it.each(answers)(
+    "a form's answer %s ignores taps a moment, an ignored one focusing its heading",
+    async (_, arrive) => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const button = page(
+        `<h1 tabindex="-1">Recorded more than moved</h1><form><button>Bring back Store</button></form>`,
+      );
+      arrive();
+      settleOnLoad(document);
+      tap(button);
+      expect(tapped).toEqual([]);
+      expect(document.activeElement).toBe(document.querySelector("h1"));
+      await vi.advanceTimersByTimeAsync(SETTLE_MS);
+      tap(button);
+      expect(tapped).toEqual(["Bring back Store"]);
     },
   );
 

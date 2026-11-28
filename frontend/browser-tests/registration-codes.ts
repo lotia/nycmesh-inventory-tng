@@ -1,6 +1,7 @@
 /** Registration codes, made from the devices page as an administrator. */
 import { expect, type Locator, type Page } from "@playwright/test";
 import { prepared } from "./prepared";
+import { settled } from "./taps";
 
 /**
  * Makes a code, or `count` alike, confirming with the password if asked,
@@ -22,10 +23,13 @@ export async function makeCode(
   const password = page.getByLabel("Your password");
   await expect(made.or(password)).toBeVisible();
   const asked = await password.isVisible();
+  // Each a form's answer, whose taps wait a moment.
   if (asked) {
     await password.fill(prepared().password);
+    await settled(page);
     await press(page.getByRole("button", { name: "Confirm" }));
   }
   await expect(made).toBeVisible();
+  await settled(page);
   return asked;
 }

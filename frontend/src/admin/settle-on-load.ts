@@ -1,17 +1,33 @@
 /**
- * A page a tap brought up with a button where that tap's finger may have
- * been: a confirmation page's danger button (templates/_confirm.html), or
- * a notice's Bring it back (templates/_notice.html). It marks what an
- * ignored tap focuses `data-settle`: the way to keep things as they are,
- * or the notice's words. As it loads, taps wait a moment (Ali, 2026-11-27,
- * inventory-tng-0c2z; docs/decisions/0019, Double taps).
+ * A page a tap brought up, which may put a button where that tap's finger
+ * was (Ali, 2026-11-27, inventory-tng-0c2z; docs/decisions/0019, Double
+ * taps): one answering a form, whether sent back by its POST (the server
+ * marks `<html data-settle-on-load>`, pages.page) or reached by the
+ * redirect after it; a confirmation page, which marks its way back
+ * `data-settle` (templates/_confirm.html); or one with a notice, whose
+ * words are marked so (templates/_notice.html). As it loads, taps wait a
+ * moment; an ignored one focuses what the page marks, else its heading.
+ * A link followed to any other page is not a double tap's to land on.
  */
 import { ignoreTaps } from "../shared/settling";
 
-/** Ignores taps for SETTLE_MS if this page marks a `data-settle`. */
+/** Whether this page was reached by a redirect, as a form's answer is. */
+const redirected = () =>
+  performance
+    .getEntriesByType("navigation")
+    .some(
+      (arrival) => (arrival as PerformanceNavigationTiming).redirectCount > 0,
+    );
+
+/** Ignores taps for SETTLE_MS if a tap brought this page up. */
 export function settleOnLoad(document: Document): void {
-  const target = document.querySelector<HTMLElement>("[data-settle]");
-  if (target !== null) {
-    ignoreTaps(document, () => target);
+  const marked = document.querySelector<HTMLElement>("[data-settle]");
+  if (
+    marked !== null ||
+    document.documentElement.hasAttribute("data-settle-on-load") ||
+    redirected()
+  ) {
+    // The heading, focusable by script (admin_base.html).
+    ignoreTaps(document, () => marked ?? document.querySelector("h1"));
   }
 }

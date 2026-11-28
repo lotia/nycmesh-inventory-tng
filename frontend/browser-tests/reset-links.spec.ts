@@ -34,6 +34,7 @@ test("resetting another administrator asks for the password, then shows the link
   await page.getByRole("button", { name: "Confirm" }).click();
   const link = (await page.locator(".key").textContent()) ?? "";
   expect(link).toContain("/admin/reset?token=");
+  await settled(page);
   const qr = page.locator(".qr");
   await expect(qr).toBeHidden();
   await page.getByText("Show a QR code for their phone").click();
