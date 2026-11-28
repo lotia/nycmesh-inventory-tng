@@ -334,6 +334,15 @@ def added(
     }
 
 
+def since(
+    reader: InMemoryMetricReader, name: str
+) -> Callable[[], dict[tuple[object, ...], int]]:
+    """What counter `name` has added from now on, read each time it is
+    called (added)."""
+    before = counted(reader, name)
+    return lambda: added(reader, name, before)
+
+
 def test_counts_registrations_and_refusals(
     rolled_back: Recorded, session: Session
 ) -> None:
@@ -2161,67 +2170,59 @@ def test_counts_places_brought_back_to_correct_one(
 
 def test_counts_cross_site_requests_refused(recorded: Recorded) -> None:
     client, _, reader, _ = recorded
-    name = "inventory.cross_site.refused"
-    before = counted(reader, name)
+    refused = since(reader, "inventory.cross_site.refused")
     sent = client.post("/api/transactions", headers={"sec-fetch-site": "cross-site"})
     assert sent.status_code == 403
-    assert added(reader, name, before) == {(): 1}
+    assert refused() == {(): 1}
 
 
 def test_counts_changes_to_a_row_deleted_meanwhile_by_table(
     recorded: Recorded, session: Session
 ) -> None:
-    reader = recorded[2]
     category = add(session, Category(name=f"Gone {tag()}"))
     session.execute(delete(Category).where(Category.id == category.id))
-    name = "inventory.edits.gone"
-    before = counted(reader, name)
+    gone = since(recorded[2], "inventory.edits.gone")
     with pytest.raises(Gone):
         db_locking.relock(session, category)
-    assert added(reader, name, before) == {(("table", "category"),): 1}
+    assert gone() == {(("table", "category"),): 1}
 
 
 def test_counts_policy_and_page_reports_refused_by_reason(
     recorded: Recorded, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client, _, reader, _ = recorded
-    csp, page = "inventory.csp.reports.refused", "inventory.page.reports.refused"
-    csp_before, page_before = counted(reader, csp), counted(reader, page)
+    csp = since(reader, "inventory.csp.reports.refused")
+    page = since(reader, "inventory.page.reports.refused")
     plain = {"content-type": "text/plain"}
     assert client.post(security_headers.REPORTS, headers=plain).status_code == 415
     monkeypatch.setattr(page_telemetry_api, "over_limit", lambda *_: True)
     sent = client.post("/api/telemetry", json={"events": [CAMERA_SESSION]})
     assert sent.status_code == 429
-    assert added(reader, csp, csp_before) == {(("reason", "not_a_report_type"),): 1}
-    assert added(reader, page, page_before) == {(("reason", "rate_limited"),): 1}
+    assert csp() == {(("reason", "not_a_report_type"),): 1}
+    assert page() == {(("reason", "rate_limited"),): 1}
 
 
 def test_counts_another_registration_code_refused(
     recorded: Recorded, session: Session
 ) -> None:
-    reader = recorded[2]
-    name = "inventory.registration_codes.refused"
-    before = counted(reader, name)
+    refused = since(recorded[2], "inventory.registration_codes.refused")
     assert devices.another_like(session, 0) is None
-    assert added(reader, name, before) == {(("reason", "no_such_code"),): 1}
+    assert refused() == {(("reason", "no_such_code"),): 1}
 
 
 def test_counts_setups_and_emailed_resets_refused_by_reason(
     recorded: Recorded, session: Session
 ) -> None:
     reader = recorded[2]
-    setups, resets = (
-        "inventory.admin.setups.refused",
-        "inventory.admin.emailed_resets.refused",
-    )
-    setups_before, resets_before = counted(reader, setups), counted(reader, resets)
+    setups = since(reader, "inventory.admin.setups.refused")
+    resets = since(reader, "inventory.admin.emailed_resets.refused")
     with pytest.raises(accounts.TokenRefused):
         accounts.check_setup_token(
             session, "the token", "not it", "192.0.2.9", RateLimits()
         )
     assert accounts.emailed_reset(session, f"nobody-{tag()}", datetime.now(UTC)) is None
-    assert added(reader, setups, setups_before) == {(("reason", "bad_token"),): 1}
-    assert added(reader, resets, resets_before) == {(("reason", "no_such_address"),): 1}
+    assert setups() == {(("reason", "bad_token"),): 1}
+    assert resets() == {(("reason", "no_such_address"),): 1}
 
 
 def test_counts_item_forms_and_unit_recounts_refused_by_reason(
@@ -2232,21 +2233,13 @@ def test_counts_item_forms_and_unit_recounts_refused_by_reason(
     reader = recorded[2]
     place = Place(session)
     add(session, ItemPackage(item_id=place.cable.id, name="Reel", size=Decimal("2.5")))
-    forms_name, recounts = (
-        "inventory.item_forms.refused",
-        "inventory.unit_recount.refused",
-    )
-    forms_before, recounts_before = (
-        counted(reader, forms_name),
-        counted(reader, recounts),
-    )
+    item_forms = since(reader, "inventory.item_forms.refused")
+    recounts = since(reader, "inventory.unit_recount.refused")
     assert forms.package_fraction(session, place.cable.id) is not None
     plan = unit_recounts.planned(session, place.cable)
     assert unit_recounts.stale_as_read(place.cable.id, plan, f"not {plan.seen}")
-    assert added(reader, forms_name, forms_before) == {
-        (("reason", "package_fraction"),): 1
-    }
-    assert added(reader, recounts, recounts_before) == {(("reason", "changed"),): 1}
+    assert item_forms() == {(("reason", "package_fraction"),): 1}
+    assert recounts() == {(("reason", "changed"),): 1}
 
 
 def test_counts_adjustments_and_answers_to_lines_recorded_more_refused(
@@ -2266,23 +2259,13 @@ def test_counts_adjustments_and_answers_to_lines_recorded_more_refused(
     monkeypatch.setattr(counts_routes, "record_adjustment", not_countable)
     _, key = new_admin(session)
     sign_in_with(client, key=key)
-    adjustments, answers = (
-        "inventory.adjustments.refused",
-        "inventory.over_recorded.refused",
-    )
-    adjustments_before, answers_before = (
-        counted(reader, adjustments),
-        counted(reader, answers),
-    )
+    adjustments = since(reader, "inventory.adjustments.refused")
+    answers = since(reader, "inventory.over_recorded.refused")
     assert client.post(ADJUSTMENTS, data=form).status_code == 400
     checked = {"seen": over_recorded.seen(check), "reason": ""}
     client.post(f"/admin/stock/recorded-more/{check.id}/checked", data=checked)
-    assert added(reader, adjustments, adjustments_before) == {
-        (("reason", counts.COUNTABLE),): 1
-    }
-    assert added(reader, answers, answers_before) == {
-        (("answer", "checked"), ("reason", "why_problem")): 1
-    }
+    assert adjustments() == {(("reason", counts.COUNTABLE),): 1}
+    assert answers() == {(("answer", "checked"), ("reason", "why_problem")): 1}
 
 
 def test_counts_admin_and_single_use_forms_refused_by_reason(
@@ -2291,24 +2274,16 @@ def test_counts_admin_and_single_use_forms_refused_by_reason(
     """A form carrying a secret field, and one that makes something shown
     once sent with no key."""
     client, _, reader, _ = rolled_back
-    admin_forms, single_use = (
-        "inventory.admin.forms.refused",
-        "inventory.single_use_forms.refused",
-    )
-    admin_before, single_before = (
-        counted(reader, admin_forms),
-        counted(reader, single_use),
-    )
+    admin_forms = since(reader, "inventory.admin.forms.refused")
+    single_use = since(reader, "inventory.single_use_forms.refused")
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     secret = {"email": f"ada-{tag()}@example.org", "api_token": "hunter2"}
     assert client.post(f"{ACCOUNT}/email", data=secret).status_code == 400
     no_key = {"uses": "1", "days": "1", "label": f"Open day {tag()}", "count": "1"}
     assert client.post(CODES, data=no_key).status_code == 400
-    assert added(reader, admin_forms, admin_before) == {
-        (("reason", "secret_field"),): 1
-    }
-    assert added(reader, single_use, single_before) == {
+    assert admin_forms() == {(("reason", "secret_field"),): 1}
+    assert single_use() == {
         (("made", "registration_code"), ("reason", "key_missing")): 1
     }
 
@@ -2319,8 +2294,7 @@ def test_counts_package_tracking_refused_by_scope_and_reason(
     """Items ticked whose open package moved meanwhile, then a package of
     an item retired."""
     client, _, reader, _ = rolled_back
-    name = "inventory.package_tracking.refused"
-    before = counted(reader, name)
+    refused = since(reader, "inventory.package_tracking.refused")
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     spools = Spools(session)
@@ -2336,7 +2310,7 @@ def test_counts_package_tracking_refused_by_scope_and_reason(
     session.flush()
     package = f"{ITEMS}/{cable.id}/packages/{spools.spool.id}/tracking"
     assert client.post(package, data={"track": "off"}).status_code == 409
-    assert added(reader, name, before) == {
+    assert refused() == {
         (("reason", CHANGED), ("scope", "bulk")): 1,
         (("reason", RETIRED), ("scope", "package")): 1,
     }
@@ -2347,30 +2321,28 @@ def test_counts_reading_rules_refused_by_reason(
 ) -> None:
     """A rule's reading sent from a page shown before a change since."""
     client, _, reader, _ = rolled_back
-    name = "inventory.reading_rules.refused"
-    before = counted(reader, name)
+    refused = since(reader, "inventory.reading_rules.refused")
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     (rule,) = reading_rules.decide(session, {f"Q{tag()}": units.Rule(None)}, None)
     later = str(int(shown(rule)) + 1)
     sent = {"reading": "none", "version": later}
     assert client.post(f"{READINGS}/{rule.id}", data=sent).status_code == 409
-    assert added(reader, name, before) == {(("reason", CHANGED),): 1}
+    assert refused() == {(("reason", CHANGED),): 1}
 
 
 def test_counts_lengths_set_on_length_checks_refused_by_reason(
     rolled_back: Recorded, session: Session
 ) -> None:
     client, _, reader, _ = rolled_back
-    name = "inventory.open_packages.length_checks.refused"
-    before = counted(reader, name)
+    refused = since(reader, "inventory.open_packages.length_checks.refused")
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     one = Spools(session).opened()
     lengths = "/admin/stock/length-checks"
     client.post(f"{lengths}/{one.id}/set", data={"left": "a lot"})
     client.post(f"{lengths}/{one.id}/set", data={"left": "250"})
-    assert added(reader, name, before) == {
+    assert refused() == {
         (("reason", "not_a_length"),): 1,
         (("reason", "not_as_shown"),): 1,
     }

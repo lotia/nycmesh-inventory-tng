@@ -1,13 +1,9 @@
 """A refusal, logged and counted together: a request or change refused,
 nothing written, so measured and logged at once (CONTRIBUTING.md#logging,
 inventory-tng-h3k0). Every refusal the app logs goes through a Refusals;
-tests/codebase/test_refusals_counted.py fails on one logged by hand.
-
-Each kind of refusal has its own counter, named for what is refused, as
-`inventory.<things>.refused` with a `reason`: what is refused differs in
-its unit (a request, a form, a report), and a total across kinds would
-mean nothing, so OpenTelemetry's naming conventions give each its own
-name, and attributes only what is worth summing across."""
+tests/codebase/test_refusals_counted.py fails on one logged by hand. Why
+each kind has a counter of its own, `inventory.<things>.refused`, is in
+docs/decisions/0006."""
 
 from collections.abc import Collection
 from typing import Literal
