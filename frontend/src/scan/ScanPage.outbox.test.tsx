@@ -16,6 +16,7 @@ import { KEY, moveBody, outboxEntry, storeOutbox } from "../testing/saves";
 import {
   expectBold,
   expectRefusal,
+  expectSpaceBlank,
   fillMove,
   find,
   open,
@@ -380,16 +381,11 @@ describe("a double tap on Dismiss (Ali, 2026-11-27, inventory-tng-34ns)", () => 
     fireEvent.click(dismissOf("Van"), { detail: 1 });
     expect(screen.queryByText(say(CARTS_FROM_DEVICE))).toBeNull();
     await vi.waitFor(() => expect(document.activeElement).toBe(cartHeading()));
-    const space = screen.getByRole("main").lastElementChild as HTMLElement;
-    expect(space.getAttribute("aria-hidden")).toBe("true");
-    expect(space.style.height).toBe("240px");
-    expect(space.textContent).toBe("");
-    // A tap on nothing there, which took focus to the page: it comes back.
-    (document.activeElement as HTMLElement).blur();
-    fireEvent.click(space, { detail: 1 });
-    expect(document.activeElement).toBe(cartHeading());
-    await vi.advanceTimersByTimeAsync(SETTLE_MS);
-    expect(document.contains(space)).toBe(false);
+    await expectSpaceBlank(
+      screen.getByRole("main").lastElementChild as HTMLElement,
+      240,
+      cartHeading,
+    );
     tall.mockRestore();
   });
 

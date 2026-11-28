@@ -11,6 +11,7 @@ import { stubInView } from "../testing/in-view";
 import { UPGRADE_WORDS } from "../testing/said";
 import {
   camera,
+  expectSpaceBlank,
   fillMove,
   find,
   isCatalogue,
@@ -664,14 +665,7 @@ describe("scanning labels with the camera", () => {
     // Where the question was, before the item search.
     const space = screen.getByLabelText(say(FIND)).closest("form > *")
       ?.previousElementSibling as HTMLElement;
-    expect(space.getAttribute("aria-hidden")).toBe("true");
-    expect(space.style.height).toBe("90px");
-    // The second tap of a double tap, on nothing there: focus comes back.
-    toList.blur();
-    fireEvent.click(space, { detail: 1 });
-    expect(document.activeElement).toBe(toList);
-    await vi.advanceTimersByTimeAsync(SETTLE_MS);
-    expect(document.contains(space)).toBe(false);
+    await expectSpaceBlank(space, 90, () => toList);
     tall.mockRestore();
     focus.mockRestore();
   });

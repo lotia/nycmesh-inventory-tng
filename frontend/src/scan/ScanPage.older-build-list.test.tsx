@@ -30,6 +30,7 @@ import {
 import {
   expectBold,
   expectRefusal,
+  expectSpaceBlank,
   fillMove,
   open,
   ready,
@@ -898,16 +899,8 @@ describe("what an older build left", () => {
     expect(screen.queryByText(HEADING)).toBeNull();
     await vi.waitFor(() => expect(document.activeElement).toBe(cartHeading()));
     const space = keptSpace();
-    expect(space.getAttribute("aria-hidden")).toBe("true");
-    expect(space.style.height).toBe("240px");
-    expect(space.textContent).toBe("");
-    // A tap on nothing there, which took focus to the page: it comes back.
-    (document.activeElement as HTMLElement).blur();
-    fireEvent.click(space, { detail: 1 });
-    expect(document.activeElement).toBe(cartHeading());
-    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    await expectSpaceBlank(space, 240, cartHeading);
     expect(keptSpace()).not.toBe(space);
-    expect(document.contains(space)).toBe(false);
     tall.mockRestore();
   }
 

@@ -5,6 +5,7 @@ import { SETTLE_MS } from "../shared/settling";
 import { CATALOGUE } from "../testing/catalogue";
 import { answering, json } from "../testing/fetch";
 import {
+  expectSpaceBlank,
   fillMove,
   open,
   pick,
@@ -120,16 +121,7 @@ describe("whose name it is", () => {
     expect(screen.queryByText(/Are you/)).toBeNull();
     expect(document.activeElement).toBe(nameList());
     expect(focus.mock.calls).toEqual([focused]);
-    const space = keptSpace();
-    expect(space.getAttribute("aria-hidden")).toBe("true");
-    expect(space.style.height).toBe("120px");
-    expect(space.textContent).toBe("");
-    // The second tap of a double tap, on nothing there: focus comes back.
-    nameList().blur();
-    fireEvent.click(space, { detail: 1 });
-    expect(document.activeElement).toBe(nameList());
-    await vi.advanceTimersByTimeAsync(SETTLE_MS);
-    expect(document.contains(space)).toBe(false);
+    await expectSpaceBlank(keptSpace(), 120, nameList);
     expect(keptSpace()).toBeNull();
     tall.mockRestore();
     focus.mockRestore();

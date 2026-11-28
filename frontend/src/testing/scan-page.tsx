@@ -10,7 +10,7 @@ import { FIND } from "../scan/Finder";
 import { ScanPage } from "../scan/ScanPage";
 import { say } from "../shared/i18n";
 import { Outbox } from "../shared/outbox";
-import { stopIgnoringTaps } from "../shared/settling";
+import { SETTLE_MS, stopIgnoringTaps } from "../shared/settling";
 import { fakeCamera } from "./camera";
 import { CATALOGUE } from "./catalogue";
 import { answering, json, saved } from "./fetch";
@@ -105,6 +105,25 @@ export function status(): HTMLElement {
 export function tap(element: Element) {
   stopIgnoringTaps(document);
   fireEvent.click(element);
+}
+
+/** That `space`, kept where a tap took something away, is blank, `height`
+ * px high and hidden from screen readers; that a tap on it, focus having
+ * left for the page, puts focus back on `refocused()`; and that it goes
+ * once taps are taken again (scan/settling-hooks.tsx). With fake timers. */
+export async function expectSpaceBlank(
+  space: HTMLElement,
+  height: number,
+  refocused: () => Element | null,
+) {
+  expect(space.getAttribute("aria-hidden")).toBe("true");
+  expect(space.style.height).toBe(`${height}px`);
+  expect(space.textContent).toBe("");
+  (document.activeElement as HTMLElement).blur();
+  fireEvent.click(space, { detail: 1 });
+  expect(document.activeElement).toBe(refocused());
+  await vi.advanceTimersByTimeAsync(SETTLE_MS);
+  expect(document.contains(space)).toBe(false);
 }
 
 export function find(text: string) {
