@@ -9,7 +9,8 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
 import { itemIdOf, ownCable, record } from "./own-rows";
-import { pick, SAM, SHELF, settled } from "./scan-page";
+import { pick, SAM, SHELF } from "./scan-page";
+import { doubleTap, middleOf, settled } from "./taps";
 
 const HEADING = "Checked out items. Add to cart or discard before sending";
 const PUT_BACK = "Added back to cart. Review before Record.";
@@ -469,19 +470,10 @@ test("a double tap on a line's Discard discards that line only, and focuses the 
   await page.reload();
 
   const listing = listingOf(page);
-  const box = await lineDiscard(
-    listing,
-    `${cable}: 3 m from an open package`,
-  ).boundingBox();
-  if (box === null) {
-    throw new Error("the line's Discard is not shown");
-  }
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  await page.touchscreen.tap(x, y);
-  // A finger's gap between the taps, the list redrawn after the first.
-  await page.waitForTimeout(150);
-  await page.touchscreen.tap(x, y);
+  const at = await middleOf(
+    lineDiscard(listing, `${cable}: 3 m from an open package`),
+  );
+  await doubleTap(page, at);
   await expect(
     listing.getByText(`${cable}: 3 m from an open package`),
   ).toHaveCount(0);
@@ -517,18 +509,10 @@ test("a double tap on a Discard that takes its entry away leaves the next entry,
   await page.reload();
 
   const listing = listingOf(page);
-  const box = await lineDiscard(
-    listing,
-    `${cable}: 3 m from an open package`,
-  ).boundingBox();
-  if (box === null) {
-    throw new Error("the line's Discard is not shown");
-  }
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  await page.touchscreen.tap(x, y);
-  await page.waitForTimeout(150);
-  await page.touchscreen.tap(x, y);
+  const at = await middleOf(
+    lineDiscard(listing, `${cable}: 3 m from an open package`),
+  );
+  await doubleTap(page, at);
   await expect(
     listing.getByText(`${cable}: 3 m from an open package`),
   ).toHaveCount(0);
@@ -551,15 +535,9 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
   await page.reload();
 
   const listing = listingOf(page);
-  const box = await lineDiscard(
-    listing,
-    `${cable}: 3 m from an open package`,
-  ).boundingBox();
-  if (box === null) {
-    throw new Error("the line's Discard is not shown");
-  }
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
+  const at = await middleOf(
+    lineDiscard(listing, `${cable}: 3 m from an open package`),
+  );
   const form = page.locator("form").first();
   const values = () =>
     form.evaluate((it) =>
@@ -567,9 +545,7 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
     );
   const before = await values();
   const cartHeading = page.getByRole("heading", { name: "Cart" });
-  await page.touchscreen.tap(x, y);
-  await page.waitForTimeout(150);
-  await page.touchscreen.tap(x, y);
+  await doubleTap(page, at);
   await expect(listing).toHaveCount(0);
   await expect(cartHeading).toBeFocused();
   // Once the space has gone, a form control is where the finger was: the
@@ -581,7 +557,7 @@ test("a double tap on a Discard that takes the last entry away leaves the form b
           document
             .elementFromPoint(x, y)
             ?.closest("input, select, button, textarea, label") != null,
-        { x, y },
+        at,
       ),
     )
     .toBe(true);

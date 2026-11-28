@@ -13,7 +13,7 @@ import {
 } from "@playwright/test";
 import { assertNone, test as base, watch } from "./csp-violations";
 import { prepared } from "./prepared";
-import { settled } from "./scan-page";
+import { settled } from "./taps";
 
 /**
  * A name no other test, or run of this one, has. Its end in letters only,

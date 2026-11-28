@@ -4,9 +4,9 @@
  * code shown only when asked for (inventory-tng-8i4.50.12).
  */
 import { expect } from "@playwright/test";
-import { SETTLE_MS } from "../src/shared/settling";
 import { test } from "./own-rows";
 import { prepared } from "./prepared";
+import { settled } from "./taps";
 
 test("resetting another administrator asks for the password, then shows the link to copy or scan", async ({
   ownAdmin: { page, password },
@@ -21,7 +21,7 @@ test("resetting another administrator asks for the password, then shows the link
   await page.getByRole("button", { name: "Reset their sign-in" }).click();
   // A confirmation page's taps wait a moment as it comes (docs/decisions/
   // 0019, Double taps).
-  await page.waitForTimeout(SETTLE_MS);
+  await settled(page);
   const reset = page.locator('form[method="post"][action$="/reset"]');
   const asked = reset.getByLabel("Your password");
   await expect(asked).toBeVisible();
@@ -29,7 +29,7 @@ test("resetting another administrator asks for the password, then shows the link
   await asked.fill(`not ${password}`);
   await reset.getByRole("button", { name: "Reset their sign-in" }).click();
   await expect(page.getByText("That isn't your password.")).toBeVisible();
-  await page.waitForTimeout(SETTLE_MS);
+  await settled(page);
   await page.getByLabel("Your password").fill(password);
   await page.getByRole("button", { name: "Confirm" }).click();
   const link = (await page.locator(".key").textContent()) ?? "";

@@ -7,7 +7,8 @@
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { ownCable, record } from "./own-rows";
-import { fillMove, fillOpening, pick, SAM, SHELF, settled } from "./scan-page";
+import { fillMove, fillOpening, pick, SAM, SHELF } from "./scan-page";
+import { settled } from "./taps";
 
 test("a package counted on the scan page is saved sealed", async ({ page }) => {
   const cable = await ownCable(page);

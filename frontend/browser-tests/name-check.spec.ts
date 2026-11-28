@@ -7,6 +7,7 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { SAM } from "./scan-page";
+import { doubleTap, middleOf } from "./taps";
 
 /** The scan page, Sam's name picked, its cart last used long ago, so it
  * asks. */
@@ -29,21 +30,13 @@ for (const answer of ["That's me", "Not me"]) {
     page,
   }) => {
     await asked(page);
-    const box = await page.getByRole("button", { name: answer }).boundingBox();
-    if (box === null) {
-      throw new Error(`"${answer}" is not shown`);
-    }
-    const x = box.x + box.width / 2;
-    const y = box.y + box.height / 2;
+    const at = await middleOf(page.getByRole("button", { name: answer }));
     const form = page.locator("form").first();
     const kind = () =>
       form.evaluate((it) => new FormData(it as HTMLFormElement).get("kind"));
     const before = await kind();
     const name = page.getByLabel("Your name");
-    await page.touchscreen.tap(x, y);
-    // A finger's gap between the taps, the form redrawn after the first.
-    await page.waitForTimeout(150);
-    await page.touchscreen.tap(x, y);
+    await doubleTap(page, at);
     await expect(page.getByText(`Are you ${SAM}?`)).toHaveCount(0);
     await expect(name).toBeFocused();
     // Once the space has gone, the form is where the finger was, the kinds'
@@ -55,7 +48,7 @@ for (const answer of ["That's me", "Not me"]) {
             document
               .elementFromPoint(x, y)
               ?.closest("fieldset, input, select, label") != null,
-          { x, y },
+          at,
         ),
       )
       .toBe(true);

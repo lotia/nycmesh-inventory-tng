@@ -8,7 +8,8 @@ import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { holdSaves } from "./held-saves";
 import { ownCable } from "./own-rows";
-import { fillMove, newestCart, settled } from "./scan-page";
+import { fillMove, newestCart } from "./scan-page";
+import { doubleTap, middleOf, settled } from "./taps";
 
 test("a save's entry keeps its height, Dismiss's room kept unseen, as it is sent and recorded", async ({
   page,
@@ -59,16 +60,8 @@ test("a double tap on a refused save's Dismiss dismisses that one only, and focu
   }
   const dismiss = newestCart(page).getByRole("button", { name: "Dismiss" });
   await dismiss.scrollIntoViewIfNeeded();
-  const box = await dismiss.boundingBox();
-  if (box === null) {
-    throw new Error("the newest save's Dismiss is not shown");
-  }
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  await page.touchscreen.tap(x, y);
-  // A finger's gap between the taps, the list redrawn after the first.
-  await page.waitForTimeout(150);
-  await page.touchscreen.tap(x, y);
+  const at = await middleOf(dismiss);
+  await doubleTap(page, at);
   // The one that moved up under the finger is still listed, focused.
   await expect(list.getByRole("button", { name: "Dismiss" })).toHaveCount(2);
   await expect(list.locator("#outbox-0")).toBeFocused();

@@ -6,7 +6,8 @@
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { ownCable, record } from "./own-rows";
-import { fillMove, pick, settled } from "./scan-page";
+import { fillMove, pick } from "./scan-page";
+import { settled } from "./taps";
 
 test("a line removed is put back where it was by Undo, from the keyboard", async ({
   page,

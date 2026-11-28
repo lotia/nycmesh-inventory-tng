@@ -7,7 +7,8 @@
 import { expect } from "@playwright/test";
 import { test } from "./csp-violations";
 import { itemIdOf, ownCable, record } from "./own-rows";
-import { fillMove, newestCart, pick, settled } from "./scan-page";
+import { fillMove, newestCart, pick } from "./scan-page";
+import { settled } from "./taps";
 
 const BOX = "Box of 305 m";
 const ADD_TO_CART = "Add to cart";

@@ -9,7 +9,8 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
 import { prepared } from "./prepared";
-import { looseBox, pick, settled, startMove } from "./scan-page";
+import { looseBox, pick, startMove } from "./scan-page";
+import { settled } from "./taps";
 
 const NOT_ADDED = "Not added. Fix the incorrect amount below, then scan again.";
 const TYPING = "Not reading while you type. Tap the picture to scan.";
