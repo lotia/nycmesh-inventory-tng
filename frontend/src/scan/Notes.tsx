@@ -3,8 +3,10 @@
  * discard. */
 import { msg } from "@lingui/core/macro";
 import { Fragment } from "preact";
+import { useLayoutEffect, useRef } from "preact/hooks";
 import { say } from "../shared/i18n";
 import { type Note, type Said, wordsOf } from "../shared/outbox-notes";
+import { focusAndIgnoreTaps } from "../shared/settling";
 
 /** Puts what the older list or a refused batch offers in an empty cart
  * (Ali, 2026-11-20, inventory-tng-r87e). */
@@ -56,7 +58,10 @@ export function NoteSaid({
   );
 }
 
-/** Row 15's confirmation, asked before a discard. */
+/** Row 15's confirmation, asked before a discard. It comes on a tap,
+ * under the finger: taps wait a moment, and focus goes to Keep it, the
+ * safe choice, which an ignored tap focuses again (Ali, 2026-11-27,
+ * inventory-tng-0c2z; docs/decisions/0019, Double taps). */
 export function ConfirmDiscard({
   onDiscard,
   onKeep,
@@ -66,6 +71,10 @@ export function ConfirmDiscard({
   onKeep: (event: MouseEvent) => void;
   describedBy?: string;
 }) {
+  const keep = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    focusAndIgnoreTaps(document, () => keep.current);
+  }, []);
   return (
     <div class="flex flex-col items-start gap-3">
       <div role="alert">{say(CONFIRM_DISCARD)}</div>
@@ -78,7 +87,7 @@ export function ConfirmDiscard({
         >
           {say(DISCARD)}
         </button>
-        <button type="button" onClick={onKeep}>
+        <button type="button" ref={keep} onClick={onKeep}>
           {say(KEEP_IT)}
         </button>
       </div>

@@ -5,7 +5,7 @@
  */
 import { msg } from "@lingui/core/macro";
 import { say } from "../shared/i18n";
-import { focusAndIgnoreTaps } from "../shared/settling";
+import { focusAndIgnoreTaps, ignoreTaps } from "../shared/settling";
 
 export const UNSAVED_CHANGES = msg`This page has changes you haven't saved. Retiring now loses them.`;
 export const GO_BACK = msg`Go back`;
@@ -101,5 +101,9 @@ export function guardRetire(document: Document): void {
       }
     });
     dialog.showModal();
+    // The question comes under the finger: taps wait a moment, and an
+    // ignored one focuses Go back, the safe choice (Ali, 2026-11-27,
+    // inventory-tng-0c2z).
+    ignoreTaps(document, () => dialog.querySelector("button"));
   });
 }

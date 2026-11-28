@@ -227,6 +227,8 @@ test("saves of an item retired since go by their line's Discard, or by their own
       timeout: 1000,
     });
   }).toPass();
+  // Taps wait a moment as the question comes (inventory-tng-0c2z).
+  await settled(page);
   await listing.getByRole("button", { name: "Discard" }).last().click();
   await expect(listing).toHaveCount(0);
   expect(
@@ -367,6 +369,7 @@ test("what a save another tab recorded first adds waits on a button while the ca
   ).toBeVisible();
   await expect(page.getByLabel(/^Loose/)).toHaveValue("5");
   await page.getByRole("button", { name: "Discard cart" }).click();
+  await settled(page);
   await page.getByRole("button", { name: "Discard", exact: true }).click();
   await expect(page.getByLabel(/^Loose/)).toHaveValue("1");
   await expect(entry.getByText(IN_CART)).toBeVisible();

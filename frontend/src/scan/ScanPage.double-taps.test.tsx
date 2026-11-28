@@ -231,6 +231,17 @@ describe("a tap that takes away what is above other controls (Ali, 2026-11-27, i
     });
   });
 
+  test("Discard cart: its question comes up under the finger, and Keep it has focus (Ali, 2026-11-27, inventory-tng-0c2z)", async () => {
+    await opened();
+    tap(button(say(DISCARD_CART)));
+    await expectSecondTapIgnored({
+      focused: () => button(say(KEEP_IT)),
+      second: () => button(say(DISCARD)),
+      seen: lineCount,
+      focus,
+    });
+  });
+
   test("Keep it: the question goes, and Discard cart has focus", async () => {
     await opened();
     tap(button(say(DISCARD_CART)));

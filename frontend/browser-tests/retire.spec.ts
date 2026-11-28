@@ -16,14 +16,16 @@ test("a page with unsaved changes asks before retiring", async ({ page }) => {
   await retire.click();
   const asked = page.getByRole("dialog");
   await expect(asked).toContainText("changes you haven't saved");
+  // Taps wait a moment as the question comes, and as it goes
+  // (docs/decisions/0019, Double taps).
+  await page.waitForTimeout(SETTLE_MS);
   await asked.getByRole("button", { name: "Go back" }).click();
   await expect(asked).toHaveCount(0);
   await expect(name).toHaveValue(`${was} (typed)`);
 
-  // Taps wait a moment once the question goes (docs/decisions/0019,
-  // Double taps).
   await page.waitForTimeout(SETTLE_MS);
   await retire.click();
+  await page.waitForTimeout(SETTLE_MS);
   await page.getByRole("button", { name: "Retire anyway" }).click();
   await expect(page.getByRole("status")).toContainText("Retired.");
   await page.getByRole("button", { name: "Bring them back" }).click();
@@ -38,6 +40,7 @@ test("a double tap on Go back closes the question and does nothing more (invento
   await name.fill(`${was} (typed)`);
   const retire = page.getByRole("button", { name: "Retire", exact: true });
   await retire.click();
+  await page.waitForTimeout(SETTLE_MS);
   const back = page
     .getByRole("dialog")
     .getByRole("button", { name: "Go back" });
@@ -54,6 +57,50 @@ test("a double tap on Go back closes the question and does nothing more (invento
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(retire).toBeFocused();
   // Nothing under Go back was tapped: no form sent, the change still there.
+  expect(page.url()).toBe(url);
+  await expect(name).toHaveValue(`${was} (typed)`);
+});
+
+test("a double tap on Retire brings up the question, and its second tap, on Retire anyway, is ignored (inventory-tng-0c2z)", async ({
+  page,
+}) => {
+  const was = await ownVolunteer(page);
+  const name = page.getByLabel(/^Name/);
+  await name.fill(`${was} (typed)`);
+  const retire = page.getByRole("button", { name: "Retire", exact: true });
+  // Where the question puts Retire anyway: Retire is moved there, as a
+  // Retire near the middle of the screen would be.
+  await retire.click();
+  const asked = page.getByRole("dialog");
+  const anyway = await asked
+    .getByRole("button", { name: "Retire anyway" })
+    .boundingBox();
+  if (anyway === null) {
+    throw new Error("Retire anyway is not shown");
+  }
+  const x = anyway.x + anyway.width / 2;
+  const y = anyway.y + anyway.height / 2;
+  await page.waitForTimeout(SETTLE_MS);
+  await asked.getByRole("button", { name: "Go back" }).click();
+  await page.waitForTimeout(SETTLE_MS);
+  await retire.evaluate(
+    (button, { x, y }) => {
+      const { width, height } = button.getBoundingClientRect();
+      Object.assign(button.style, {
+        position: "fixed",
+        left: `${x - width / 2}px`,
+        top: `${y - height / 2}px`,
+      });
+    },
+    { x, y },
+  );
+  const url = page.url();
+  await page.touchscreen.tap(x, y);
+  await page.waitForTimeout(150);
+  await page.touchscreen.tap(x, y);
+  // Still asked, the safe choice focused, nothing sent.
+  await expect(asked).toBeVisible();
+  await expect(asked.getByRole("button", { name: "Go back" })).toBeFocused();
   expect(page.url()).toBe(url);
   await expect(name).toHaveValue(`${was} (typed)`);
 });

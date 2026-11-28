@@ -957,6 +957,25 @@ describe("what an older build left", () => {
     vi.unstubAllGlobals();
   });
 
+  test("discarding's question comes up under the finger: taps wait a moment, an ignored one focusing Keep it (Ali, 2026-11-27, inventory-tng-0c2z)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    leaveSave();
+    open();
+    await ready();
+    tap(lastDiscard());
+    const keepIt = within(listing()).getByRole("button", {
+      name: say(KEEP_IT),
+    });
+    expect(document.activeElement).toBe(keepIt);
+    // The second tap of a double tap, on the question's Discard.
+    fireEvent.click(lastDiscard(), { detail: 1 });
+    expect(localStorage.getItem("inventory.outbox.v3")).not.toBeNull();
+    expect(document.activeElement).toBe(keepIt);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    fireEvent.click(lastDiscard(), { detail: 1 });
+    expect(localStorage.getItem("inventory.outbox.v3")).toBeNull();
+  });
+
   test("one an older tab sends meanwhile goes from the list, and is not put in the cart", async () => {
     leaveSave();
     open();

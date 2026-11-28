@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stopIgnoringTaps } from "../shared/settling";
 import { guardRetire, unsaved } from "./retire";
 
 guardRetire(document);
@@ -109,6 +110,24 @@ describe("retiring", () => {
     ).toBe(false);
     expect(sent).toHaveLength(1);
     expect(document.activeElement).toBe(retire);
+  });
+
+  it("asked, ignores taps a moment, an ignored one focusing Go back (Ali, 2026-11-27, inventory-tng-0c2z)", () => {
+    field("name").value = "Cable, grey";
+    form("retire").requestSubmit();
+    const dialog = document.querySelector("dialog") as HTMLDialogElement;
+    const [back, anyway] = dialog.querySelectorAll("button");
+    // The second tap of a double tap on Retire, on Retire anyway under it.
+    expect(
+      anyway?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }),
+      ),
+    ).toBe(false);
+    expect(dialog.open).toBe(true);
+    expect(document.activeElement).toBe(back);
+    expect(sent).toHaveLength(1);
+    stopIgnoringTaps(document);
+    dialog.close("back");
   });
 
   it("retires anyway when told", () => {

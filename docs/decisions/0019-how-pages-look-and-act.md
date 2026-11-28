@@ -71,16 +71,19 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
 
 ### Double taps
 
-- **A tap never moves what is under the finger** (Ali, 2026-11-27,
-  inventory-tng-r3jx). A double tap's second tap lands a moment after
-  the first. When the first takes away or shrinks something with
-  controls below it, they move up, and the second lands on one never
-  meant. So such a tap keeps that space blank, or has the page ignore
-  taps, for `SETTLE_MS` (`frontend/src/shared/settling.ts`).
+- **A tap never changes what is under the finger** (Ali, 2026-11-27,
+  inventory-tng-r3jx, inventory-tng-0c2z). A double tap's second tap
+  lands a moment after the first. When the first takes away or shrinks
+  something with controls below it, they move up; when it brings up a
+  question, a dialog or a confirmation page, its choices appear. Either
+  way the second lands on one never meant. So such a tap keeps that
+  space blank, or has the page ignore taps, for `SETTLE_MS`
+  (`frontend/src/shared/settling.ts`).
 - **Focus moves without scrolling**, to the heading of what moved up,
   the list's heading, or the control the removed content was about,
-  such as the Your name list after "That's me"; never to a text box,
-  whose keyboard would open. A tap
+  such as the Your name list after "That's me"; to a question's safe
+  choice, such as Go back or Keep it; never to a text box, whose
+  keyboard would open. A tap
   that asks to go somewhere far from it scrolls there, as Change goes
   to Your name, and taps then wait too, as everything moved.
 - **An ignored tap** puts focus back on that target; an ignored key's
@@ -88,7 +91,9 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
 - **How:** any page ignores all of its taps with `ignoreTaps`. The scan
   page's hooks in `frontend/src/scan/settling-hooks.tsx` keep the space
   of a part that goes, and find a list's entry that moved up, by its id,
-  for focus. Only taps start a wait: typing, picking from a list and a
+  for focus. A confirmation page marks its way back `data-keep`, and
+  waits as it loads (`frontend/src/admin/confirm-pages.ts`). Only taps,
+  and such a page, start a wait: typing, picking from a list and a
   label read leave taps taken.
   `backend/tests/codebase/test_focus_and_settling.py` refuses focus
   moved, or a tap told from a key's press, anywhere else.

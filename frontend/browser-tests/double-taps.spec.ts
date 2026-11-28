@@ -90,6 +90,8 @@ test("a double tap on Discard, confirming Discard cart, empties the cart and doe
 }) => {
   await twoLines(page);
   await page.getByRole("button", { name: "Discard cart" }).click();
+  // Taps wait a moment as the question comes (inventory-tng-0c2z).
+  await settled(page);
   await doubleTap(
     page,
     page.getByRole("button", { name: "Discard", exact: true }),

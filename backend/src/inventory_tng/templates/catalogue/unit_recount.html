@@ -90,7 +90,7 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
   {% endfor %}
   <div class="actions">
     <button class="danger">{% trans new=unit %}Recount in {{ new }}{% endtrans %}</button>
-    <a href="{{ back_link[0] }}">{% trans old=item.unit %}Keep it in {{ old }}{% endtrans %}</a>
+    <a href="{{ back_link[0] }}" data-keep>{% trans old=item.unit %}Keep it in {{ old }}{% endtrans %}</a>
   </div>
 </form>
 {% endif %}
