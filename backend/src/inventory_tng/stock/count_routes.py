@@ -88,6 +88,7 @@ from inventory_tng.admins.guards import AdminSignedIn, SignedIn
 from inventory_tng.catalogue.items_listing import SEARCHED
 from inventory_tng.core.db_errors import Gone as RowGone
 from inventory_tng.core.db_errors import refusal
+from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, ngettext
 from inventory_tng.core.sent_forms import form_key
@@ -1191,14 +1192,22 @@ def bring_back(
         gone=gone,
     )
 
-    def restore() -> bool:
+    def restore() -> None:
+        """The area brought back: measured and logged once committed."""
         try:
             locations.restore(session, area)
         except RowGone:  # Current already, as after a second press.
-            return False
-        return True
+            return
+        once_committed(session, areas_brought_back.add, 1)
+        once_committed(
+            session,
+            log.info,
+            "count area brought back",
+            location_id=place.id,
+            area_id=area.id,
+        )
 
-    brought, broken = refusal(
+    _, broken = refusal(
         session, restore, *BRING_BACK_REFUSALS, location_id=place.id, area_id=area.id
     )
     if broken is not None:
@@ -1212,9 +1221,6 @@ def bring_back(
             status_code=409,
         )
     session.commit()
-    if brought:
-        areas_brought_back.add(1)
-        log.info("count area brought back", location_id=place.id, area_id=area.id)
     # Shown with it, as of the same moment: what it saw there counted too,
     # and what left the areas gone as read already, split at that moment.
     # The tree is read again, as bringing the area back changed it.

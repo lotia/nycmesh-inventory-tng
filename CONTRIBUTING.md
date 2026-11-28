@@ -1515,7 +1515,9 @@ What a write did is measured and logged once its transaction commits,
 through `once_committed` (`core/db_once_committed.py`), registered by the
 function that writes the table, so every caller is counted and a write
 rolled back records nothing (docs/decisions/0006). Never measure or log a
-write after `session.commit()` by hand. A refusal or failure, which
+write after `session.commit()` by hand: a metric added or recorded, or an
+`info` line, after a commit fails
+`tests/codebase/test_writes_measured_once_committed.py`. A refusal or failure, which
 commits nothing, is measured and logged at once, and so are `debug`
 lines. Log a refusal through a kind declared with `@refusals`
 (`core/refusals.py`), which counts it as it logs it, by a reason from a

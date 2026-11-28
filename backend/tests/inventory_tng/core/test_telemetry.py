@@ -612,6 +612,33 @@ def test_counts_the_areas_brought_back_from_a_count_form(
     assert counted(reader, name)[()] == before + 1
 
 
+def test_an_area_brought_back_rolled_back_is_neither_counted_nor_logged(
+    rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Measured and logged once committed (db_once_committed): the count
+    form's Bring it back, its transaction never committed but rolled back,
+    leaves no trace in either (inventory-tng-kebu)."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    place = stocked(session)
+    shelf = add(
+        session, Location(name=f"Shelf {tag()}", kind="area", parent_id=place.store.id)
+    )
+    retire(session, shelf)
+    path, refused = emptied_while_counted(client, session, place, shelf)
+    brought = since(reader, "inventory.count.areas_brought_back")
+    monkeypatch.setattr(session, "commit", session.flush)
+    with capture_logs() as logs:
+        back = client.post(
+            f"{path}/bring-back", data=count_form(refused) | {"area_id": str(shelf.id)}
+        )
+        assert back.status_code == 200
+        session.rollback()
+    assert brought() == {}
+    assert "count area brought back" not in [line["event"] for line in logs]
+
+
 def test_counts_the_areas_bring_it_back_refused_by_rule(
     rolled_back: Recorded, session: Session
 ) -> None:
