@@ -39,6 +39,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.rate_limits import RateLimitedReply
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.web.browser import over_limit
 from inventory_tng.web.pages import NONCE, csp_nonce
 
@@ -137,6 +138,15 @@ violations = meter.create_counter(
     "inventory.csp.violations",
     unit="{violation}",
     description="Content-Security-Policy violations browsers reported, by directive",
+)
+reports_refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.csp.reports.refused",
+        unit="{report}",
+        description="Content-Security-Policy reports refused, none counted, by reason",
+    ),
+    reason=("rate_limited", "not_a_report_type", "too_large", "not_a_report"),
 )
 
 
@@ -278,23 +288,23 @@ async def report(request: Request) -> Response:
     # browsers that use report-uri.
     limit = request.app.state.settings.rate_limits.csp_reports
     if over_limit(request, limit, "csp"):
-        log.info("policy report refused", reason="rate_limited")
+        reports_refused("policy report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
         return JSONResponse(body, status_code=429)
     content_type = request.headers.get("content-type", "").split(";")[0]
     if content_type.strip().lower() not in REPORT_TYPES:
-        log.info("policy report refused", reason="not_a_report_type")
+        reports_refused("policy report refused", reason="not_a_report_type")
         return Response(status_code=415)
     raw = await _body(request)
     if raw is None:
-        log.info("policy report refused", reason="too_large")
+        reports_refused("policy report refused", reason="too_large")
         return Response(status_code=413)
     try:
         found = violated(json.loads(raw))
     except ValueError, RecursionError:
         found = []
     if not found:
-        log.info("policy report refused", reason="not_a_report")
+        reports_refused("policy report refused", reason="not_a_report")
         return Response(status_code=400)
     for directive in found:
         violations.add(1, {"directive": directive})

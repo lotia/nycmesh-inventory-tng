@@ -30,6 +30,7 @@ from inventory_tng.catalogue.unit_conversion import (
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.models.stock import LedgerTransaction, Movement, OpenPackage
 from inventory_tng.models.volunteers import Volunteer
@@ -62,14 +63,18 @@ replayed = meter.create_counter(
 # A batch refused only for these is of a page behind the catalogue.
 SHOWN_BEHIND = frozenset({"unit_changed", "package_resized"})
 
-refused = meter.create_counter(
-    "inventory.transactions.refused",
-    unit="{transaction}",
-    # FastAPI's own 422s, for a batch that cannot be at all, are a client's
-    # bug and are not counted here.
-    description="Batches refused for naming rows that do not exist, only "
-    "for a unit or package size changed since the page showed it, or for "
-    "reusing a key, by reason",
+refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.transactions.refused",
+        unit="{transaction}",
+        # FastAPI's own 422s, for a batch that cannot be at all, are a
+        # client's bug and are not counted here.
+        description="Batches refused for naming rows that do not exist, only "
+        "for a unit or package size changed since the page showed it, or for "
+        "reusing a key, by reason",
+    ),
+    reason=("invalid", "shown_otherwise", "key_reused"),
 )
 recorded = meter.create_counter(
     "inventory.transactions.recorded",
@@ -274,8 +279,7 @@ def record(
         # unit or a size; which, and how many, inventory.saves.shown_otherwise
         # counts.
         reason = "shown_otherwise" if kinds <= SHOWN_BEHIND else "invalid"
-        refused.add(1, {"reason": reason})
-        log.info("batch refused", problems=sorted(kinds))
+        refused("batch refused", reason=reason, problems=sorted(kinds))
         raise BatchRefused(problems)
     try:
         lines, opened = _opening(session, batch, packages, lines)
@@ -284,8 +288,7 @@ def record(
         # A rule _problems could not see: the catalogue changed since the
         # page's, as a package's setting, or a key used elsewhere. Said, so
         # the outbox shows it rather than sending it again and again.
-        refused.add(1, {"reason": "invalid"})
-        log.info("batch refused", rule=broken.rule)
+        refused("batch refused", reason="invalid", rule=broken.rule)
         raise BatchRefused([(("lines",), "refused")]) from broken
     if transaction is None:
         written = _replay(session, batch)
@@ -683,8 +686,12 @@ def _replay(session: Session, batch: batch_schemas.Batch) -> LedgerTransaction |
         and same_header
     )
     if not same:
-        refused.add(1, {"reason": "key_reused"})
-        log.warning("idempotency key reused", transaction_id=transaction.id)
+        refused(
+            "idempotency key reused",
+            level="warning",
+            reason="key_reused",
+            transaction_id=transaction.id,
+        )
         # Stock moves by kind and places alone: who, or an install's number,
         # changed, the lines are still compared.
         moved_alike = all(

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 import structlog
+from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue import items, reading_rules, units
@@ -18,6 +19,7 @@ from inventory_tng.catalogue.name_keys import nameless
 from inventory_tng.catalogue.reading_rules import chosen_rule, read_alike_words
 from inventory_tng.core.db_errors import Broken
 from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import (
     UNITS,
@@ -31,6 +33,21 @@ from inventory_tng.web.formatting import amount
 from inventory_tng.web.forms import chosen, name_problem, quantity
 
 log = structlog.get_logger(__name__)
+# Counted where the words for the refusal are found, each called once
+# for a form refused: a name or alias another item has, answers that would
+# read names alike, a package's fraction, or a fractional Reorder at the
+# form's own check let by (items_routes).
+item_form_refused = Refusals(
+    log,
+    metrics.get_meter(__name__).create_counter(
+        "inventory.item_forms.refused",
+        unit="{form}",
+        description="The item page's forms (the item, its packages and "
+        "aliases) refused for a name taken, names read alike or a fraction, "
+        "nothing saved, by reason",
+    ),
+    reason=("taken", "read_alike", "package_fraction", "alias_taken", "minimum_whole"),
+)
 
 TEXT_FIELDS = ("manufacturer", "part_number", "old_code", "notes", "ordering_notes")
 # The fields of the add form on the items list (templates/catalogue/
@@ -112,8 +129,10 @@ def taken(
     field, other = found or ("name", None)
     # Beside the name, whose field "alias" is.
     shown = "name" if field == "alias" else field
-    log.debug(
+    item_form_refused(
         "item refused",
+        level="debug",
+        reason="taken",
         rule=refused_by,
         field=field,
         item_id=item_id,
@@ -142,7 +161,9 @@ def read_alike(session: Session, typed: Typed) -> Words:
     """Words for answers refused as they would read names alike, naming
     them by id, the savepoint undone (items.read_alike)."""
     words = read_alike_words(session, typed.answered, typed.rules)
-    log.debug("unit answer refused", read_alike=len(words))
+    item_form_refused(
+        "unit answer refused", level="debug", reason="read_alike", read_alike=len(words)
+    )
     if not words:  # Renamed meanwhile: none to name now.
         return READ_AS_ONE
     return read_as_one("; ".join(words))
@@ -239,7 +260,13 @@ def package_fraction(session: Session, item_id: int) -> str | None:
     package = items.fractional_package(session, item_id)
     if package is None:
         return None
-    log.debug("unit change refused", item_id=item_id, item_package_id=package.id)
+    item_form_refused(
+        "unit change refused",
+        level="debug",
+        reason="package_fraction",
+        item_id=item_id,
+        item_package_id=package.id,
+    )
     return fraction_held(package)
 
 
@@ -456,8 +483,10 @@ def alias_problem(
     that item, or what is wrong with the name itself."""
     found = items.alias_taken_by(session, typed.name, typed.rules)
     whose, other = found or ("name", None)
-    log.debug(
+    item_form_refused(
         "alias refused",
+        level="debug",
+        reason="alias_taken",
         rule=broken,
         item_id=item.id,
         other_item_id=other and other.id,

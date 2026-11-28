@@ -15,7 +15,7 @@ The arithmetic of converting is unit_conversion's; the ledger's lines keep
 their unit and convert as they are read (stock/line_amounts.py)."""
 
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, get_args
 
 import structlog
 from opentelemetry import metrics
@@ -27,6 +27,7 @@ from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import locked
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.base import QUANTITY_MAX, QUANTITY_STEP
 from inventory_tng.models.catalogue import UNITS, Item, ItemPackage, VendorOffer
 from inventory_tng.models.core import CatalogueHistory
@@ -37,12 +38,6 @@ from inventory_tng.stock import units_shown
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
-unit_changes_refused = meter.create_counter(
-    "inventory.unit_changes.refused",
-    unit="{change}",
-    description="Changes to an item's unit refused, by why: what fixes it, "
-    "or, between lengths, what stops what is recorded converting",
-)
 unit_changes_converted = meter.create_counter(
     "inventory.unit_changes.converted",
     unit="{change}",
@@ -86,6 +81,22 @@ SINCE_SHOWN: dict[UnitFixed | None, tuple[str, str]] = {
 }
 SINCE_SHOWN_RULES = frozenset(rule for _, rule in SINCE_SHOWN.values())
 
+unit_changes_refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.unit_changes.refused",
+        unit="{change}",
+        description="Changes to an item's unit refused, by why: what fixes it, "
+        "or, between lengths, what stops what is recorded converting",
+    ),
+    reason=(
+        *get_args(UnitFixed),
+        "checks_waiting",
+        "out_of_range",
+        *(reason for reason, _ in SINCE_SHOWN.values()),
+    ),
+)
+
 # Refused: a package's amount typed in the unit its form showed, which its
 # item or package has left since (require_unit_shown).
 UNIT_CHANGED = "package_unit_changed"
@@ -103,13 +114,13 @@ def require_unit_shown(
     None for no form, as a command's, which means its unit as held."""
     if shown is None or row.unit == shown:
         return
-    log.info(
+    units_shown.refused(
         "package form refused: unit changed since shown",
-        form=form,
+        changed="unit",
+        save=form,
         table=row.__tablename__,
         row_id=row.id,
     )
-    units_shown.refused.add(1, {"changed": "unit", "save": form})
     enforce(UNIT_CHANGED)
 
 
@@ -249,8 +260,7 @@ def _refused(item_id: int, reason: str, rule: str) -> None:
     """A change of the item's unit refused by `rule`, logged and counted
     by `reason`, from a fixed list: UnitFixed's, "checks_waiting",
     "out_of_range" or SINCE_SHOWN's."""
-    log.info("unit change refused", item_id=item_id, reason=reason)
-    unit_changes_refused.add(1, {"reason": reason})
+    unit_changes_refused("unit change refused", item_id=item_id, reason=reason)
     enforce(rule)
 
 

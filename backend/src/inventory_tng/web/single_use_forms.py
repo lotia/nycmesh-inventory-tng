@@ -11,7 +11,7 @@ would show only the second answer, and the first's secret never.
 """
 
 import uuid
-from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast, get_args
 
 import structlog
 from babel.support import LazyProxy
@@ -20,10 +20,12 @@ from fastapi.responses import HTMLResponse
 from jinja2 import pass_context
 from jinja2.runtime import Context
 from markupsafe import Markup
+from opentelemetry import metrics
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException
 
 from inventory_tng.core.phrases import lazy_gettext
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.core.sent_forms import form_key, spend
 from inventory_tng.web.pages import page, templates
 
@@ -42,6 +44,17 @@ SingleUseKey = Annotated[str, Form(alias=FIELD)]
 Made = Literal[
     "registration_code", "registration_codes", "recovery_codes", "link", "change"
 ]
+refused = Refusals(
+    log,
+    metrics.get_meter(__name__).create_counter(
+        "inventory.single_use_forms.refused",
+        unit="{form}",
+        description="Forms that make something shown once refused, nothing "
+        "made: sent again, or with no key, by reason and what they make",
+    ),
+    reason=("sent_again", "key_missing"),
+    made=get_args(Made),
+)
 # What the page says of each but "change", which sent_again.html words.
 SENT_AGAIN: dict[Made, LazyProxy] = {
     "registration_code": lazy_gettext(
@@ -101,7 +114,12 @@ def sent_before(
     again. A key that isn't one is a bad request."""
     key = form_key(typed)
     if key is None:
-        log.info("form key missing", made=made, admin_id=signed.admin.id)
+        refused(
+            "form key missing",
+            reason="key_missing",
+            made=made,
+            admin_id=signed.admin.id,
+        )
         raise HTTPException(status_code=400)
     if spend(session, key):
         return None
@@ -112,7 +130,7 @@ def sent_again(
     request: Request, signed: SignedIn, made: Made, back: str
 ) -> HTMLResponse:
     """The page saying a form was already sent, with a way `back`."""
-    log.info("form sent again", made=made, admin_id=signed.admin.id)
+    refused("form sent again", reason="sent_again", made=made, admin_id=signed.admin.id)
     return page(
         request,
         "sent_again.html",

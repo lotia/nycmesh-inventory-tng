@@ -85,3 +85,22 @@ open, by `sendBeacon`, which outlives the page; shown again, what follows
 is a session of its own. Reports lost offline are not kept for later:
 they are numbers, not records, and stay out of the outbox. The endpoint
 reads no cookie, so a report cannot be joined to a registered device.
+
+## Amendment: every refusal logged and counted together (2026-11-27)
+
+Decided by Ali on 2026-11-27 (inventory-tng-h3k0): one helper logs a
+refusal and counts it together, with its reason from a fixed list in
+code. It is `Refusals` (`core/refusals.py`), and a codebase test fails on
+a refusal logged by hand. About thirty refusals had been logged but never
+counted, such as the emailed password reset not made.
+
+Each kind of refusal keeps a counter of its own, named for what is
+refused (`inventory.<things>.refused`, by `reason`), rather than one
+`inventory.refusals` counter told apart by an attribute. What is refused
+differs in its unit (a request, a form, a report), and a total across
+kinds would mean nothing, so OpenTelemetry's naming conventions give each
+its own name. Counters that measured refusals already kept their names
+and attributes, and now count through the helper.
+
+Operator commands log their refusals but count none: telemetry starts
+only in the server, so a counter in a command would always read nothing.

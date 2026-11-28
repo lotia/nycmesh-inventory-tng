@@ -15,7 +15,7 @@ import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Literal, NoReturn
+from typing import Literal, NoReturn, get_args
 
 import structlog
 from argon2 import PasswordHasher
@@ -40,6 +40,7 @@ from inventory_tng.core.db_sessions import exists_where, set_actor
 from inventory_tng.core.mail import Notifier
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.core.rate_limits import limiter
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.devices import devices
 from inventory_tng.devices.devices import digest
@@ -109,6 +110,9 @@ confirmations = meter.create_counter(
     unit="{attempt}",
     description="Codes typed to confirm a sensitive action, by outcome",
 )
+sign_in_refused = Refusals(log, sign_ins, outcome=("refused",), reason=get_args(Reason))
+# By Confirmation's outcomes but "confirmed".
+confirmation_refused = Refusals(log, confirmations, outcome=("refused", "rate_limited"))
 
 _hasher = PasswordHasher()
 # Checked against when there is no account, so an unknown username takes as
@@ -467,8 +471,13 @@ def sign_in(
 
 
 def _refuse_sign_in(reason: Reason, admin: Admin | None) -> NoReturn:
-    sign_ins.add(1, {"outcome": "refused", "reason": reason})
-    log.warning("sign-in refused", reason=reason, admin_id=admin.id if admin else None)
+    sign_in_refused(
+        "sign-in refused",
+        level="warning",
+        outcome="refused",
+        reason=reason,
+        admin_id=admin.id if admin else None,
+    )
     raise SignInRefused(reason)
 
 
@@ -644,8 +653,9 @@ def _confirmation(
         once_committed(session, confirmations.add, 1, {"outcome": outcome})
         once_committed(session, log.info, "confirmed", **fields)
     else:
-        confirmations.add(1, {"outcome": outcome})
-        log.warning("confirmation refused", outcome=outcome, **fields)
+        confirmation_refused(
+            "confirmation refused", level="warning", outcome=outcome, **fields
+        )
     return outcome
 
 
@@ -688,10 +698,22 @@ def _check_operator_token(
         _refuse(purpose, "bad_token")
 
 
+setup_refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.admin.setups.refused",
+        unit="{attempt}",
+        description="Uses of the operator's setup token refused, by reason",
+    ),
+    reason=get_args(TokenRefusal),
+)
+
+
 def _refuse(purpose: Literal["setup", "recovery"], reason: TokenRefusal) -> NoReturn:
-    log.warning(f"{purpose} refused", reason=reason)
     if purpose == "recovery":
-        recoveries.add(1, {"outcome": reason})
+        recovery_refused("recovery refused", level="warning", outcome=reason)
+    else:
+        setup_refused("setup refused", level="warning", reason=reason)
     raise TokenRefused(reason)
 
 
@@ -1018,6 +1040,18 @@ def may_ask_for_reset(session: Session, address: str, limits: RateLimits) -> boo
     return limiter(session).hit(_per_address(limits), "forgot", address)
 
 
+emailed_reset_refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.admin.emailed_resets.refused",
+        unit="{request}",
+        description="Password resets asked for by mail not made, none sent, by "
+        "reason; the person asking is told the same either way",
+    ),
+    reason=("no_such_address", "no_password", "rate_limited"),
+)
+
+
 def emailed_reset(
     session: Session, username: str, now: datetime
 ) -> EmailedReset | None:
@@ -1028,15 +1062,22 @@ def emailed_reset(
     # Locked and read again: a reset, a retire or a change of email may have
     # come while this looked them up.
     if admin is None or not lock_current(session, admin) or admin.email is None:
-        log.info("emailed reset not made", reason="no_such_address")
+        emailed_reset_refused("emailed reset not made", reason="no_such_address")
         return None
     # No password: an invite, or a reset another administrator made, which
     # asking by mail must never undo.
     if not has_password(session, admin.id):
-        log.info("emailed reset not made", reason="no_password", admin_id=admin.id)
+        emailed_reset_refused(
+            "emailed reset not made", reason="no_password", admin_id=admin.id
+        )
         return None
     if not limiter(session).hit(EMAILED_PER_ACCOUNT, "emailed_reset", str(admin.id)):
-        log.warning("emailed reset not made", reason="rate_limited", admin_id=admin.id)
+        emailed_reset_refused(
+            "emailed reset not made",
+            level="warning",
+            reason="rate_limited",
+            admin_id=admin.id,
+        )
         return None
     set_actor(session, f"admin:{admin.id}")
     token = make_reset_link(
@@ -1115,6 +1156,7 @@ recoveries = meter.create_counter(
     unit="{attempt}",
     description="Uses of the operator's recovery token, by outcome",
 )
+recovery_refused = Refusals(log, recoveries, outcome=get_args(TokenRefusal))
 
 
 def recover(

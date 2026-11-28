@@ -10,13 +10,24 @@ works the same way.
 from urllib.parse import urlsplit
 
 import structlog
+from opentelemetry import metrics
 from starlette.datastructures import Headers
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from inventory_tng.core.phrases import lazy_gettext
+from inventory_tng.core.refusals import Refusals
 
 log = structlog.get_logger(__name__)
+refused = Refusals(
+    log,
+    metrics.get_meter(__name__).create_counter(
+        "inventory.cross_site.refused",
+        unit="{request}",
+        description="Requests that change something refused as another "
+        "site's page sent them",
+    ),
+)
 REFUSED = lazy_gettext("Refused: this came from another site's page.")
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -43,7 +54,7 @@ class CrossSiteRefusal:
         if scope["type"] == "http" and cross_site(
             scope["method"], Headers(scope=scope)
         ):
-            log.warning("cross-site request refused", path=scope["path"])
+            refused("cross-site request refused", level="warning", path=scope["path"])
             response = PlainTextResponse(str(REFUSED), status_code=403)
             await response(scope, receive, send)
             return

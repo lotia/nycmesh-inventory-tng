@@ -1517,8 +1517,10 @@ function that writes the table, so every caller is counted and a write
 rolled back records nothing (docs/decisions/0006). Never measure or log a
 write after `session.commit()` by hand. A refusal or failure, which
 commits nothing, is measured and logged at once, and so are `debug`
-lines. A test that calls a write directly commits before it reads the
-metric or log line.
+lines. Log a refusal through a `Refusals` (`core/refusals.py`), which
+counts it as it logs it, by a reason from a fixed list; a refusal logged
+by hand fails `tests/codebase/test_refusals_counted.py`. A test that
+calls a write directly commits before it reads the metric or log line.
 
 Metric attributes take values from a fixed list in code. For a database error,
 log `describe_error(error)`: its class, code and constraint, never its message,

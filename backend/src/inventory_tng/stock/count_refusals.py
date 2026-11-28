@@ -1,11 +1,13 @@
-"""Why a count form was refused, nothing written, and the counter that
-measures it, by reason (inventory-tng-w7xt). The routes that refuse are
-stock/count_routes.py's."""
+"""Why a count form was refused, nothing written, and the Refusals that
+logs and measures it, by reason (inventory-tng-w7xt). The routes that
+refuse are stock/count_routes.py's."""
 
-from typing import Literal
+from typing import Literal, get_args
 
+import structlog
 from opentelemetry import metrics
 
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.stock.count_forms import (
     CLOSED_MEANWHILE,
     TYPE_IT_HERE,
@@ -15,6 +17,7 @@ from inventory_tng.stock.counts import COUNTABLE, WHOLE
 from inventory_tng.stock.units_shown import SHOWN_OTHERWISE
 from inventory_tng.web.forms import CHANGED
 
+log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
 # An open package found that its item does not follow once opened, and a
@@ -62,11 +65,16 @@ RULE_REFUSALS: dict[str, CountRefusal] = {
     SHOWN_OTHERWISE: "shown_otherwise",
 }
 
-refused = meter.create_counter(
-    "inventory.counts.refused",
-    unit="{count}",
-    description="Count forms refused, nothing written, by reason: one refused "
-    "for several is counted under each",
+# Each reason a form is refused for is logged and counted once.
+count_refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.counts.refused",
+        unit="{count}",
+        description="Count forms refused, nothing written, by reason: one "
+        "refused for several is counted under each",
+    ),
+    reason=get_args(CountRefusal),
 )
 
 
@@ -83,10 +91,3 @@ def box_refusals(sent: CountForm) -> list[CountRefusal]:
     ):
         reasons.append(BOX_PROBLEM)
     return reasons
-
-
-def count_refused(*reasons: CountRefusal) -> None:
-    """Measure a count form refused, under each of its reasons, which are
-    never repeated."""
-    for reason in reasons:
-        refused.add(1, {"reason": reason})

@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from importlib import resources
 from ipaddress import IPv4Address, IPv6Address, ip_address
-from typing import Literal, NoReturn
+from typing import Literal, NoReturn, get_args
 
 import structlog
 from limits import RateLimitItemPerMinute
@@ -37,6 +37,7 @@ from inventory_tng.core.db_locking import Seen, get_locked, locked, unchanged
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where
 from inventory_tng.core.rate_limits import limiter, refund
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.devices import Device, RegistrationCode
 
 log = structlog.get_logger(__name__)
@@ -69,15 +70,30 @@ registered = meter.create_counter(
     unit="{device}",
     description="Devices registered with a code, by use: its first, or again",
 )
-rejected = meter.create_counter(
-    "inventory.registrations.rejected",
-    unit="{registration}",
-    description="Registration attempts refused, by reason",
+rejected = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.registrations.rejected",
+        unit="{registration}",
+        description="Registration attempts refused, by reason",
+    ),
+    reason=(*get_args(BadCode), "rate_limited"),
 )
 made = meter.create_counter(
     "inventory.registration_codes.made",
     unit="{code}",
     description="Registration codes made, by how: new, or another like one",
+)
+# Why another like a code is not made: no such code, or nothing left on it.
+AnotherRefusal = Literal["no_such_code", "nothing_left"]
+another_refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.registration_codes.refused",
+        unit="{code}",
+        description="Another like a registration code refused, none made, by reason",
+    ),
+    reason=get_args(AnotherRefusal),
 )
 revoked = meter.create_counter(
     "inventory.devices.revoked",
@@ -151,7 +167,12 @@ def another_like(session: Session, code_id: int) -> tuple[RegistrationCode, str]
     before its uses are copied, or waits until they are."""
     code = get_locked(session, RegistrationCode, code_id, key_share=True)
     if code is None or not has_left(code, datetime.now(UTC)):
-        log.info("another registration code refused", registration_code_id=code_id)
+        reason: AnotherRefusal = "no_such_code" if code is None else "nothing_left"
+        another_refused(
+            "another registration code refused",
+            reason=reason,
+            registration_code_id=code_id,
+        )
         return None
     return _new_code(
         session,
@@ -271,9 +292,9 @@ def _ip(address: str | None) -> IPv4Address | IPv6Address | None:
 
 
 def _reject(reason: Rejection, code: RegistrationCode | None) -> NoReturn:
-    rejected.add(1, {"reason": reason})
-    log.warning(
+    rejected(
         "registration rejected",
+        level="warning",
         reason=reason,
         registration_code_id=code.id if code else None,
     )

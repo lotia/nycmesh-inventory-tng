@@ -13,11 +13,12 @@ counted (Ali, 2026-11-15, inventory-tng-dro)."""
 
 from collections.abc import Callable
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal, get_args
 
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
+from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn
@@ -25,6 +26,7 @@ from inventory_tng.core.db_errors import Gone, attempt
 from inventory_tng.core.db_sessions import DbSession, exists_where
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.names import canonical
 from inventory_tng.models.places import Location
@@ -67,6 +69,22 @@ from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
+# An answer to a line recorded more than moved refused, nothing changed:
+# which answer, and why. A count or a reason the form gave that is not
+# one; settled or changed meanwhile (MEANWHILE); or another rule, said
+# above the page.
+OverRecordedRefusal = Literal["count_problem", "why_problem", "meanwhile", "rule"]
+answer_refused = Refusals(
+    log,
+    metrics.get_meter(__name__).create_counter(
+        "inventory.over_recorded.refused",
+        unit="{answer}",
+        description="Answers to lines recorded with more than was moved "
+        "refused, nothing changed, by the answer and why",
+    ),
+    answer=("correct", "close", "checked", "count", "bring_back"),
+    reason=get_args(OverRecordedRefusal),
+)
 
 router = APIRouter(include_in_schema=False)
 
@@ -458,8 +476,10 @@ def bring_back(
     _, broken = attempt(session, restore)
     session.commit()
     if broken is not None:
-        log.info(
+        answer_refused(
             "over recorded place not brought back",
+            answer="bring_back",
+            reason="meanwhile" if broken in MEANWHILE else "rule",
             over_recorded_id=check_id,
             location_id=location.id,
             rule=broken,
@@ -507,7 +527,13 @@ def answer(
         )
         if not isinstance(count, Decimal):
             field = f"count-{check_id}"
-            log.debug("over recorded count refused", over_recorded_id=check_id)
+            answer_refused(
+                "over recorded count refused",
+                level="debug",
+                answer=do,
+                reason="count_problem",
+                over_recorded_id=check_id,
+            )
             return _page(
                 request,
                 signed,
@@ -523,7 +549,13 @@ def answer(
         problem = why_problem(reason, stripped)
         if problem is not None:
             # Never the words: free text.
-            log.debug("over recorded checked refused", over_recorded_id=check_id)
+            answer_refused(
+                "over recorded checked refused",
+                level="debug",
+                answer=do,
+                reason="why_problem",
+                over_recorded_id=check_id,
+            )
             values = {f"reason-{check_id}": reason, f"words-{check_id}": typed_words}
             return _page(
                 request,
@@ -565,7 +597,13 @@ def answer(
     how, broken = attempt(session, settle)
     session.commit()
     if how is None:
-        log.info("over recorded not settled", over_recorded_id=check_id, rule=broken)
+        answer_refused(
+            "over recorded not settled",
+            answer=do,
+            reason="meanwhile" if broken is None or broken in MEANWHILE else "rule",
+            over_recorded_id=check_id,
+            rule=broken,
+        )
         refused = None
         if broken is not None and broken not in MEANWHILE:
             refused = _refusal(session, check_id, do, broken, refused_at)

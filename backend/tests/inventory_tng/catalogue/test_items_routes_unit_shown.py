@@ -87,7 +87,7 @@ def test_a_package_added_in_a_unit_left_since_is_asked_again(
     assert problem(refused.text, "size") == now_counted_in("ft")
     assert _hidden(refused.text, action)[UNIT_SHOWN] == "ft"
     assert [
-        (line["form"], line["table"], line["row_id"])
+        (line["save"], line["table"], line["row_id"])
         for line in logs
         if line["event"] == "package form refused: unit changed since shown"
     ] == [("add_package", "item", cable.id)]

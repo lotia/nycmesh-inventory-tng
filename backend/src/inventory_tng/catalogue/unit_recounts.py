@@ -38,7 +38,7 @@ import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from decimal import Decimal
-from typing import NamedTuple
+from typing import Literal, NamedTuple, get_args
 
 import structlog
 from opentelemetry import metrics
@@ -51,6 +51,7 @@ from inventory_tng.catalogue.queries import Offer, current_offers
 from inventory_tng.core.db_errors import enforce
 from inventory_tng.core.db_locking import lock_catalogue, locked, relock
 from inventory_tng.core.db_once_committed import once_committed
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import (
     Item,
@@ -75,6 +76,21 @@ recounted = meter.create_counter(
     unit="{recount}",
     description="Items whose unit, wrong from the start, a guided recount "
     "corrected, by the unit it was in and the one it is in now",
+)
+# Why a recount is refused: places the item reached since its page was
+# shown, the item retired, its records changed since, or checks waiting.
+RecountRefusal = Literal["places_added", "retired", "changed", "checks_waiting"]
+# Named apart from inventory.unit_recounts, which is a metric, not a
+# namespace (OpenTelemetry's naming conventions).
+refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.unit_recount.refused",
+        unit="{recount}",
+        description="Guided recounts of an item's unit refused, nothing "
+        "written, by reason",
+    ),
+    reason=get_args(RecountRefusal),
 )
 
 
@@ -250,7 +266,7 @@ def stale_as_read(item_id: int, plan: Planned, seen: str) -> bool:
     its locks, so a change in between is refused then."""
     if plan.seen == seen:
         return False
-    log.info("unit recount refused", item_id=item_id, reason="changed")
+    refused("unit recount refused", item_id=item_id, reason="changed")
     return True
 
 
@@ -386,10 +402,10 @@ def _places_of(session: Session, item_id: int) -> set[int]:
     return set(session.scalars(been.union(opened)))
 
 
-def _refused(item_id: int, reason: str, rule: str) -> None:
-    """A recount of the item refused by `rule`, logged by `reason`, from a
-    fixed list: "places_added", "retired", "changed" or "checks_waiting"."""
-    log.info("unit recount refused", item_id=item_id, reason=reason)
+def _refused(item_id: int, reason: RecountRefusal, rule: str) -> None:
+    """A recount of the item refused by `rule`, logged and counted by
+    `reason`."""
+    refused("unit recount refused", item_id=item_id, reason=reason)
     enforce(rule)
 
 

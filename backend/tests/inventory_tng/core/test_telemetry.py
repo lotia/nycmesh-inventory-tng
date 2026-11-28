@@ -19,16 +19,16 @@ from opentelemetry.sdk.metrics.export import (
     Metric,
     NumberDataPoint,
 )
-from sqlalchemy import exc, func, select
+from sqlalchemy import delete, exc, func, select
 from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts, mail_messages
 from inventory_tng.app import create_app
-from inventory_tng.catalogue import items, unit_changes
+from inventory_tng.catalogue import forms, items, unit_changes, unit_recounts
 from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, unit_recount
-from inventory_tng.core import db_sessions, mail
-from inventory_tng.core.db_errors import NoSession, RuleBroken
+from inventory_tng.core import db_locking, db_sessions, mail
+from inventory_tng.core.db_errors import Gone, NoSession, RuleBroken
 from inventory_tng.core.masking import MASK, Masker
 from inventory_tng.core.settings import RateLimits, Settings
 from inventory_tng.core.telemetry import Telemetry, enabled
@@ -45,7 +45,14 @@ from inventory_tng.models.stock import (
     OverRecorded,
 )
 from inventory_tng.scan import page_builds, page_telemetry_api
-from inventory_tng.stock import counts, ledger, moments, open_packages, over_recorded
+from inventory_tng.stock import (
+    counts,
+    counts_routes,
+    ledger,
+    moments,
+    open_packages,
+    over_recorded,
+)
 from inventory_tng.stock.count_forms import NO_SUCH_PACKAGE
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web import security_headers
@@ -2136,3 +2143,133 @@ def test_counts_places_brought_back_to_correct_one(
     for _ in range(2):
         client.post(f"/admin/stock/recorded-more/{check.id}/bring-back", data=form)
     assert added(reader, name, before) == {(): 1}
+
+
+# Refusals, each logged and counted through core/refusals.py
+# (inventory-tng-h3k0): one test or more for each part of the app.
+
+
+def test_counts_cross_site_requests_refused(recorded: Recorded) -> None:
+    client, _, reader, _ = recorded
+    name = "inventory.cross_site.refused"
+    before = counted(reader, name)
+    sent = client.post("/api/transactions", headers={"sec-fetch-site": "cross-site"})
+    assert sent.status_code == 403
+    assert added(reader, name, before) == {(): 1}
+
+
+def test_counts_changes_to_a_row_deleted_meanwhile_by_table(
+    recorded: Recorded, session: Session
+) -> None:
+    reader = recorded[2]
+    category = add(session, Category(name=f"Gone {tag()}"))
+    session.execute(delete(Category).where(Category.id == category.id))
+    name = "inventory.edits.gone"
+    before = counted(reader, name)
+    with pytest.raises(Gone):
+        db_locking.relock(session, category)
+    assert added(reader, name, before) == {(("table", "category"),): 1}
+
+
+def test_counts_policy_and_page_reports_refused_by_reason(
+    recorded: Recorded, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _, reader, _ = recorded
+    csp, page = "inventory.csp.reports.refused", "inventory.page.reports.refused"
+    csp_before, page_before = counted(reader, csp), counted(reader, page)
+    plain = {"content-type": "text/plain"}
+    assert client.post(security_headers.REPORTS, headers=plain).status_code == 415
+    monkeypatch.setattr(page_telemetry_api, "over_limit", lambda *_: True)
+    sent = client.post("/api/telemetry", json={"events": [CAMERA_SESSION]})
+    assert sent.status_code == 429
+    assert added(reader, csp, csp_before) == {(("reason", "not_a_report_type"),): 1}
+    assert added(reader, page, page_before) == {(("reason", "rate_limited"),): 1}
+
+
+def test_counts_another_registration_code_refused(
+    recorded: Recorded, session: Session
+) -> None:
+    reader = recorded[2]
+    name = "inventory.registration_codes.refused"
+    before = counted(reader, name)
+    assert devices.another_like(session, 0) is None
+    assert added(reader, name, before) == {(("reason", "no_such_code"),): 1}
+
+
+def test_counts_setups_and_emailed_resets_refused_by_reason(
+    recorded: Recorded, session: Session
+) -> None:
+    reader = recorded[2]
+    setups, resets = (
+        "inventory.admin.setups.refused",
+        "inventory.admin.emailed_resets.refused",
+    )
+    setups_before, resets_before = counted(reader, setups), counted(reader, resets)
+    with pytest.raises(accounts.TokenRefused):
+        accounts.check_setup_token(
+            session, "the token", "not it", "192.0.2.9", RateLimits()
+        )
+    assert accounts.emailed_reset(session, f"nobody-{tag()}", datetime.now(UTC)) is None
+    assert added(reader, setups, setups_before) == {(("reason", "bad_token"),): 1}
+    assert added(reader, resets, resets_before) == {(("reason", "no_such_address"),): 1}
+
+
+def test_counts_item_forms_and_unit_recounts_refused_by_reason(
+    recorded: Recorded, session: Session
+) -> None:
+    """A unit change to each refused for a package's fraction, and a
+    recount whose page showed records since changed."""
+    reader = recorded[2]
+    place = Place(session)
+    add(session, ItemPackage(item_id=place.cable.id, name="Reel", size=Decimal("2.5")))
+    forms_name, recounts = (
+        "inventory.item_forms.refused",
+        "inventory.unit_recount.refused",
+    )
+    forms_before, recounts_before = (
+        counted(reader, forms_name),
+        counted(reader, recounts),
+    )
+    assert forms.package_fraction(session, place.cable.id) is not None
+    plan = unit_recounts.planned(session, place.cable)
+    assert unit_recounts.stale_as_read(place.cable.id, plan, f"not {plan.seen}")
+    assert added(reader, forms_name, forms_before) == {
+        (("reason", "package_fraction"),): 1
+    }
+    assert added(reader, recounts, recounts_before) == {(("reason", "changed"),): 1}
+
+
+def test_counts_adjustments_and_answers_to_lines_recorded_more_refused(
+    rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An adjustment its place refuses as it is saved, which its form's
+    own check cannot see, and Mark checked sent with no reason."""
+    client, _, reader, _ = rolled_back
+    place = Place(session)
+    line = {"item_id": place.item.id, "quantity": "2", "unit": place.item.unit}
+    check = raise_check(session, write(session, place, lines=[line]))
+    form = adjustment_form(session, place.store, place.item, direction="found")
+
+    def not_countable(*_: object, **__: object) -> None:
+        raise RuleBroken(counts.COUNTABLE)
+
+    monkeypatch.setattr(counts_routes, "record_adjustment", not_countable)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    adjustments, answers = (
+        "inventory.adjustments.refused",
+        "inventory.over_recorded.refused",
+    )
+    adjustments_before, answers_before = (
+        counted(reader, adjustments),
+        counted(reader, answers),
+    )
+    assert client.post(ADJUSTMENTS, data=form).status_code == 400
+    checked = {"seen": over_recorded.seen(check), "reason": ""}
+    client.post(f"/admin/stock/recorded-more/{check.id}/checked", data=checked)
+    assert added(reader, adjustments, adjustments_before) == {
+        (("reason", counts.COUNTABLE),): 1
+    }
+    assert added(reader, answers, answers_before) == {
+        (("answer", "checked"), ("reason", "why_problem")): 1
+    }

@@ -155,11 +155,11 @@ def test_a_count_sent_twice_is_written_once(
     assert expected(session, place.store.id) == {place.item.id: Decimal(2)}
 
 
-def boxes_refused(logs: list[MutableMapping[str, Any]]) -> list[list[str]]:
-    """The reasons of each count refused for its boxes, as logged
+def boxes_refused(logs: list[MutableMapping[str, Any]]) -> list[str]:
+    """The reasons a count was refused for its boxes, each logged
     (inventory-tng-0k3a)."""
     return [
-        each["reasons"]
+        each["reason"]
         for each in logs
         if each["event"] == "count refused for its boxes"
     ]
@@ -183,7 +183,7 @@ def test_a_count_refuses_what_is_not_a_quantity(
         assert {
             "event": "count refused for its boxes",
             "location_id": place.store.id,
-            "reasons": [count_refusals.BOX_PROBLEM],
+            "reason": count_refusals.BOX_PROBLEM,
             "log_level": "info",
         } in logs
     assert counts_written(session) == []
@@ -204,6 +204,7 @@ def test_a_count_naming_an_item_twice_is_refused(
     assert refused.status_code == 400
     assert {
         "event": "count refused: an item named twice",
+        "reason": "named_twice",
         "location_id": place.store.id,
         "item_ids": [place.item.id],
         "log_level": "info",
@@ -254,7 +255,7 @@ def test_a_count_named_twice_and_closed_meanwhile_says_both_alerts(
     )
     # Closed meanwhile is logged as that; named twice has a line of its
     # own, so its boxes are not logged again (inventory-tng-0k3a).
-    assert boxes_refused(logs) == ([[count_refusals.CLOSED]] if closed else [])
+    assert boxes_refused(logs) == ([count_refusals.CLOSED] if closed else [])
     assert counts_written(session) == written
 
 
@@ -278,6 +279,7 @@ def test_something_else_here_listed_on_a_count_of_one_place_is_refused(
     assert refused.status_code == 400
     assert {
         "event": "count refused: something else here listed there",
+        "reason": "listed_elsewhere",
         "location_id": spools.store.id,
         "found_location_id": spools.store.id,
         "item_id": cable,
@@ -497,6 +499,7 @@ def test_something_else_here_held_but_not_recounted_is_refused_with_its_line(
     assert refused.status_code == 400
     assert {
         "event": "count refused: something else here listed there",
+        "reason": "listed_elsewhere",
         "location_id": place.store.id,
         "found_location_id": place.store.id,
         "item_id": cable,
@@ -705,6 +708,7 @@ def test_a_count_of_a_place_changed_before_its_moment_is_shown_again(
     assert counted_box(refused.text, place.item.id) == "4"
     assert {
         "event": "count refused by a rule",
+        "reason": "changed_since_shown",
         "location_id": place.store.id,
         "rule": "changed_since_shown",
         "log_level": "info",

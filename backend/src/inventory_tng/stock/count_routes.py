@@ -90,6 +90,7 @@ from inventory_tng.core.db_errors import Gone as RowGone
 from inventory_tng.core.db_errors import refusal
 from inventory_tng.core.db_sessions import DbSession, SnapshotSession, by_name
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, ngettext
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.core.sent_forms import form_key
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item, ItemPackage
@@ -138,7 +139,6 @@ from inventory_tng.stock.count_groups import Group
 from inventory_tng.stock.count_refusals import (
     RULE_REFUSALS,
     SENT_AGAIN,
-    CountRefusal,
     box_refusals,
     count_refused,
 )
@@ -215,11 +215,15 @@ BRING_BACK_REFUSALS = {
     "location_parent_current": "parent_retired",
 }
 # Refused, so measured at once (inventory-tng-wmh2).
-bring_backs_refused = meter.create_counter(
-    "inventory.count.bring_backs_refused",
-    unit="{area}",
-    description="Retired areas the count form's Bring it back refused, by "
-    "reason, nothing changed",
+bring_backs_refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.count.bring_backs_refused",
+        unit="{area}",
+        description="Retired areas the count form's Bring it back refused, by "
+        "reason, nothing changed",
+    ),
+    reason=BRING_BACK_REFUSALS.values(),
 )
 
 # A move from an area gone from a count form fixed on it: more or less
@@ -779,12 +783,12 @@ def count(
     if place.id not in place_ids and not any(asked.values()):
         # Only a recount of some areas leaves its own place off.
         return not_found()
-    # Why it is refused, if it is, measured once that is certain.
-    reasons: list[CountRefusal] = []
+    # Why it is refused, logged and measured at once: each of these comes
+    # with problems, so the form is refused below.
     if sent.twice:
-        reasons.append("named_twice")
-        log.info(
+        count_refused(
             "count refused: an item named twice",
+            reason="named_twice",
             location_id=place.id,
             item_ids=sorted({item_id for item_id in sent.twice.values() if item_id}),
         )
@@ -810,7 +814,11 @@ def count(
     # `problems` all the same (count_forms.changed_words reads every field),
     # so the form is refused here, measured once (inventory-tng-xse9).
     if said:
-        reasons.append("shown_otherwise")
+        count_refused(
+            "count refused: shown otherwise",
+            reason="shown_otherwise",
+            location_id=place.id,
+        )
     # Every alert is said above the form, each in its own words: why it was
     # refused (named twice, then closed meanwhile), then a unit or size
     # changed since, then where an item is listed, so words beside a box
@@ -823,8 +831,9 @@ def count(
     tree = None
     off_form = None
     if sent.listed is not None:
-        log.info(
+        count_refused(
             "count refused: something else here listed there",
+            reason="listed_elsewhere",
             location_id=place.id,
             found_location_id=sent.listed.place_id,
             item_id=sent.listed.item_id,
@@ -834,11 +843,11 @@ def count(
         problems |= beside
         alerts.append(listed_alert)
         off_form = None if sent.listed.on_form else sent.listed
-        reasons.append("listed_elsewhere")
     if problems:
-        if boxes := box_refusals(sent):
-            log.info("count refused for its boxes", location_id=place.id, reasons=boxes)
-        count_refused(*reasons, *boxes)
+        for reason in box_refusals(sent):
+            count_refused(
+                "count refused for its boxes", reason=reason, location_id=place.id
+            )
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.
         return as_sent(
@@ -867,8 +876,9 @@ def count(
     if not counting and not fixes:
         # Nothing typed at any place: nothing to count, so the form again,
         # as sent, saying so (inventory-tng-fxsy).
-        log.info("count refused: nothing typed", location_id=place.id)
-        count_refused("nothing_typed")
+        count_refused(
+            "count refused: nothing typed", reason="nothing_typed", location_id=place.id
+        )
         return as_sent(alert=NOTHING_TYPED, left=left(), status_code=400)
 
     # Bound again, as checked, for put_right.
@@ -902,8 +912,12 @@ def count(
 
     result, broken = refusal(session, put_right, *RULE_REFUSALS)
     if broken is not None:
-        log.info("count refused by a rule", location_id=place.id, rule=broken)
-        count_refused(RULE_REFUSALS[broken])
+        count_refused(
+            "count refused by a rule",
+            reason=RULE_REFUSALS[broken],
+            location_id=place.id,
+            rule=broken,
+        )
         if broken == SENT_AGAIN:
             # The saved count is listed on Counts, to see what went through.
             return redirect(COUNTS, notice="count_saved_already", section="count")
@@ -946,8 +960,9 @@ def count(
             fresh, gone = _gone_now(
                 session, place.id, place_ids, retired, gone, at.as_of
             )
+            # Which areas: the refusal is logged and counted above.
             log.info(
-                "count refused: areas gone from the form",
+                "count form's areas gone",
                 location_id=place.id,
                 gone_ids=sorted(fresh),
             )
@@ -1204,9 +1219,9 @@ def bring_back(
 
     brought, broken = refusal(session, restore, *BRING_BACK_REFUSALS)
     if broken is not None:
-        bring_backs_refused.add(1, {"reason": BRING_BACK_REFUSALS[broken]})
-        log.info(
+        bring_backs_refused(
             "count area not brought back",
+            reason=BRING_BACK_REFUSALS[broken],
             location_id=place.id,
             area_id=area.id,
             rule=broken,

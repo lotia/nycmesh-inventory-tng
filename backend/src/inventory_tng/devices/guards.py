@@ -5,7 +5,7 @@ needing one declare. The rules are in devices.py.
 """
 
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, get_args
 
 import structlog
 from fastapi import Depends, FastAPI, Request
@@ -17,6 +17,7 @@ from sqlalchemy import select
 
 from inventory_tng.core import request_logging
 from inventory_tng.core.db_sessions import DbSession, record_last_seen
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.devices.devices import (
     COOKIE,
     LAST_SEEN_EVERY,
@@ -29,10 +30,14 @@ from inventory_tng.models.devices import Device
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
-refused = meter.create_counter(
-    "inventory.devices.refused",
-    unit="{request}",
-    description="Requests refused for want of a registered device, by reason",
+refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.devices.refused",
+        unit="{request}",
+        description="Requests refused for want of a registered device, by reason",
+    ),
+    reason=get_args(Refusal),
 )
 
 
@@ -68,8 +73,7 @@ def current_device(
     )
     if device is None or device.revoked_at is not None:
         reason: Refusal = "unregistered" if device is None else "revoked"
-        refused.add(1, {"reason": reason})
-        log.info("device refused", reason=reason, device_id=device and device.id)
+        refused("device refused", reason=reason, device_id=device and device.id)
         raise DeviceRefused(reason)
     request_logging.bind(device_id=device.id)
     now = datetime.now(UTC)

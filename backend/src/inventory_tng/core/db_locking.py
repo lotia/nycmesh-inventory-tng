@@ -26,6 +26,7 @@ from inventory_tng.core.db_protection import (
 )
 from inventory_tng.core.db_savepoints import innermost, savepoint_undone, within
 from inventory_tng.core.db_sessions import exists_where
+from inventory_tng.core.refusals import Refusals
 
 if TYPE_CHECKING:
     # The type with_for_update takes for `of`, which locked passes on.
@@ -107,10 +108,26 @@ def settings_row[M: Base](session: Session, model: type[M], *, seen: Seen) -> M:
 # there. Required, so no caller leaves it out by mistake.
 type Seen = int | None
 
-stale = metrics.get_meter(__name__).create_counter(
-    "inventory.edits.stale",
-    unit="{edit}",
-    description="Saves refused as the row changed since its form was shown, by table",
+meter = metrics.get_meter(__name__)
+stale = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.edits.stale",
+        unit="{edit}",
+        description="Saves refused as the row changed since its form was shown, "
+        "by table",
+    ),
+    table=Base.metadata.tables,
+)
+gone = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.edits.gone",
+        unit="{edit}",
+        description="Changes refused as another request deleted the row "
+        "meanwhile, by table",
+    ),
+    table=Base.metadata.tables,
 )
 
 
@@ -119,11 +136,9 @@ def unchanged(row: Base, seen: Seen) -> None:
     the version a form showed (models.base.Versioned): another save since would
     otherwise be undone, unseen (inventory-tng-8i4.123)."""
     if seen is not None and getattr(row, "edit_version") != seen:  # noqa: B009
-        table = type(row).__tablename__
-        stale.add(1, {"table": table})
-        log.info(
+        stale(
             "edit refused: changed since shown",
-            table=table,
+            table=type(row).__tablename__,
             row_id=getattr(row, "id"),  # noqa: B009
         )
         raise RuleBroken("changed_since_shown")
@@ -354,7 +369,7 @@ def relock(
         # Its id as the session knows it: read from the row, expired, it
         # would be loaded again, and is gone.
         assert ident is not None  # A row the session holds.
-        log.info(
+        gone(
             "change refused: deleted meanwhile",
             table=type(row).__tablename__,
             row_id=ident[0],

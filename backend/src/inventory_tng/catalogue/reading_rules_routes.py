@@ -13,6 +13,7 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, Response
+from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
@@ -31,6 +32,7 @@ from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import ReadingRule, reading_rules_held
 from inventory_tng.web.admin_pages import TextForm, admin_page
@@ -46,6 +48,17 @@ from inventory_tng.web.listing import (
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
+refused = Refusals(
+    log,
+    metrics.get_meter(__name__).create_counter(
+        "inventory.reading_rules.refused",
+        unit="{change}",
+        description="Changes to how names' units are read refused, nothing "
+        "saved, by the rule refusing them: names read alike, or the page shown "
+        "before a change since",
+    ),
+    reason=(items.READ_ALIKE, *ALERTS),
+)
 
 router = APIRouter(include_in_schema=False)
 
@@ -203,6 +216,9 @@ def _refused(
     """The rule's page again, saying why a change to it was refused: names
     it would read alike, by id, or one of ALERTS."""
     if broken != items.READ_ALIKE:
+        refused(
+            "reading refused", level="debug", reason=broken, reading_rule_id=rule.id
+        )
         return _rule_page(request, signed, rule, alert=RULES[broken])
     # What the change would have read, the savepoint undone.
     rules = {**reading_rules_held(session)}
@@ -211,7 +227,13 @@ def _refused(
     else:
         rules[rule.token] = change
     words = read_alike_words(session, [rule.token], rules)
-    log.debug("reading refused", reading_rule_id=rule.id, read_alike=len(words))
+    refused(
+        "reading refused",
+        level="debug",
+        reason=broken,
+        reading_rule_id=rule.id,
+        read_alike=len(words),
+    )
     return _rule_page(request, signed, rule, read_alike=words)
 
 
@@ -232,6 +254,9 @@ def save_reading(
     # Changed since it was shown: said before that no reading was chosen
     # (inventory-tng-ryjv). What is offered is read as locked.
     if stale_since(session, found, seen):
+        refused(
+            "reading refused", level="debug", reason=CHANGED, reading_rule_id=rule_id
+        )
         return _rule_page(request, signed, found, alert=RULES[CHANGED])
     offers = offered(found.token, found.rule)
     change = chosen_rule(reading, offers, respell=respell == "on")
@@ -365,7 +390,12 @@ def accept(
     )
     if broken is not None:
         words = read_alike_words(session, chosen, {**rules, **chosen})
-        log.debug("readings refused", read_alike=len(words))
+        refused(
+            "readings refused",
+            level="debug",
+            reason=items.READ_ALIKE,
+            read_alike=len(words),
+        )
         return _seed_page(
             request,
             session,

@@ -42,6 +42,7 @@ import structlog
 from babel.support import LazyProxy
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, Response
+from opentelemetry import metrics
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
@@ -68,6 +69,7 @@ from inventory_tng.core.db_sessions import (
 )
 from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.core.sent_forms import is_spent
 from inventory_tng.core.settings import RateLimits
 from inventory_tng.models.admins import Admin, AdminSession
@@ -77,6 +79,16 @@ from inventory_tng.web.navigation import Badge, sections
 from inventory_tng.web.pages import page, redirect, remember_signed_in, templates
 
 log = structlog.get_logger(__name__)
+form_refused = Refusals(
+    log,
+    metrics.get_meter(__name__).create_counter(
+        "inventory.admin.forms.refused",
+        unit="{form}",
+        description="Administrators' forms refused before their route, nothing "
+        "done, by reason: a secret field it would carry, or signed out meanwhile",
+    ),
+    reason=("secret_field", "signed_out"),
+)
 
 COOKIE = "inventory_admin"
 
@@ -347,7 +359,12 @@ async def _confirmed(
     # bad request, window open or not, so any test of a form that gains one
     # fails until it joins RETYPED. The name stays out: the browser chose it.
     if any(masking.is_secret_name(n) and n not in RETYPED for n, _ in carried):
-        log.warning("secret field refused", admin_id=signed.admin.id)
+        form_refused(
+            "secret field refused",
+            level="warning",
+            reason="secret_field",
+            admin_id=signed.admin.id,
+        )
         raise HTTPException(status_code=400)
     was_open = need.window(signed.row, signed.settings, _now())
     # A form sent again, as Back then Forward offers, while a code would be
@@ -401,7 +418,12 @@ def _hold(session: Session, signed: SignedIn) -> SignedIn:
     them read again, as a reset, a retire or a settings change may have
     come first."""
     if not accounts.hold_signed_in(session, signed.row, _now):
-        log.warning("form refused", admin_id=signed.admin.id, reason="signed_out")
+        form_refused(
+            "form refused",
+            level="warning",
+            reason="signed_out",
+            admin_id=signed.admin.id,
+        )
         raise Redirect(SIGN_IN)
     # Their admin row and session were read again with the lock.
     session.refresh(signed.settings)

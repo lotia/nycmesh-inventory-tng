@@ -12,7 +12,7 @@ forms, compared by catalogue/unit_changes.py, are measured here too.
 
 from collections.abc import Collection, Mapping
 from decimal import Decimal
-from typing import Literal, NamedTuple
+from typing import Literal, NamedTuple, get_args
 
 import structlog
 from opentelemetry import metrics
@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_errors import RuleBroken
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.catalogue import Item, ItemPackage
 from inventory_tng.stock.queries import units_of
 
@@ -34,12 +35,17 @@ Save = Literal[
     "batch", "count", "adjustment", "confirm_count", "add_package", "package_settings"
 ]
 
-refused = meter.create_counter(
-    "inventory.saves.shown_otherwise",
-    unit="{change}",
-    description="Item and package units and package sizes a save showed "
-    "that changed since, one for each item or package, so the save was "
-    "refused and asked again, by what changed and the save",
+refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.saves.shown_otherwise",
+        unit="{change}",
+        description="Item and package units and package sizes a save showed "
+        "that changed since, one for each item or package, so the save was "
+        "refused and asked again, by what changed and the save",
+    ),
+    changed=get_args(Changed),
+    save=get_args(Save),
 )
 
 SHOWN_OTHERWISE = "shown_otherwise"
@@ -108,20 +114,24 @@ def changed_since(
 
 
 def refusing(save: Save, now: Now) -> None:
-    """Log and measure a save refused as shown otherwise (`now`)."""
-    changes: tuple[tuple[Changed, Mapping[int, object]], ...] = (
-        ("unit", now.units),
-        ("package_size", now.sizes),
-    )
-    for what, changed in changes:
-        if changed:
-            refused.add(len(changed), {"changed": what, "save": save})
-    log.info(
-        "save refused: shown otherwise",
-        save=save,
-        item_ids=sorted(now.units),
-        item_package_ids=sorted(now.sizes),
-    )
+    """Log and measure a save refused as shown otherwise (`now`): once
+    for the units changed, by item, and once for the sizes, by package."""
+    if now.units:
+        refused(
+            "save refused: shown otherwise",
+            count=len(now.units),
+            changed="unit",
+            save=save,
+            item_ids=sorted(now.units),
+        )
+    if now.sizes:
+        refused(
+            "save refused: shown otherwise",
+            count=len(now.sizes),
+            changed="package_size",
+            save=save,
+            item_package_ids=sorted(now.sizes),
+        )
 
 
 def require_as_shown(

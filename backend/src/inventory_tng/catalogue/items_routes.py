@@ -18,6 +18,7 @@ from typing import Annotated, NamedTuple
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn, SignedIn
@@ -46,6 +47,7 @@ from inventory_tng.core.phrases import (
     lazy_gettext,
     ngettext,
 )
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.labels import labels
 from inventory_tng.labels.paths import item_labels
 from inventory_tng.models.base import INTEGER_MAX, whole
@@ -101,6 +103,20 @@ from inventory_tng.web.pages import NOTICES, add_notices, not_found, redirect
 log = structlog.get_logger(__name__)
 
 router = APIRouter(include_in_schema=False)
+
+# "Track each opened package" refused, for a package or items ticked on
+# the list: the item retired, or the page shown before a change since.
+tracking_refused = Refusals(
+    log,
+    metrics.get_meter(__name__).create_counter(
+        "inventory.package_tracking.refused",
+        unit="{change}",
+        description="Settings of whether opened packages are followed refused, "
+        "nothing changed, by where it was set and why",
+    ),
+    scope=("package", "bulk"),
+    reason=(RETIRED, CHANGED),
+)
 
 # Refused by _change_or_note, as a rule would be, to ask about close names.
 CLOSE = "close_names"
@@ -196,7 +212,12 @@ def _change_or_note[T](
         problems["unit"] = fraction or WHOLE_UNITS
     elif broken in REFUSED_FIELDS:
         if broken == items.MINIMUM_WHOLE:  # The form's own check let it by.
-            log.warning("database refused a fractional reorder at", item_id=item_id)
+            forms.item_form_refused(
+                "database refused a fractional reorder at",
+                level="warning",
+                reason="minimum_whole",
+                item_id=item_id,
+            )
         problems[REFUSED_FIELDS[broken]] = RULES[broken]
     return done, broken
 
@@ -760,7 +781,7 @@ def track_items(
         CHANGED,
     )
     if done is None:
-        log.info("package tracking refused", rule=broken, scope="bulk")
+        tracking_refused("package tracking refused", scope="bulk", reason=broken)
         return redirect(back, notice="tracking_changed")
     changed, loose = done
     session.commit()
@@ -1356,6 +1377,12 @@ def track_package(
         CHANGED,
     )
     if done is None:
+        tracking_refused(
+            "package tracking refused",
+            scope="package",
+            reason=broken,
+            item_package_id=package_id,
+        )
         found = session.get_one(Item, item_id)
         return _item_page(request, session, signed, found, alert=RULES[str(broken)])
     session.commit()

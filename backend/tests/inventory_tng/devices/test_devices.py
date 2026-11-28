@@ -139,6 +139,7 @@ def test_another_like_a_code_has_its_uses_and_time_left(session: Session) -> Non
         assert devices.another_like(session, other.id) is None
     assert {
         "event": "another registration code refused",
+        "reason": "nothing_left",
         "registration_code_id": other.id,
         "log_level": "info",
     } in logs

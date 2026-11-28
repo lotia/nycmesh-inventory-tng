@@ -8,7 +8,7 @@ import re
 import unicodedata
 from decimal import Decimal
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, get_args
 
 import structlog
 from opentelemetry import metrics
@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from inventory_tng.catalogue.amount_rules import whole_enough
 from inventory_tng.core.db_base import Base
 from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext, number
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.base import (
     INTEGER_MAX,
     QUANTITY_MAX,
@@ -305,6 +306,9 @@ other_separators = meter.create_counter(
     "does not use, refused, by which: a point, a comma, or either followed by "
     "three digits after a whole part above 0, as thousands are grouped",
 )
+# The server's own boxes' refusals; the scan page's come counted
+# (scan/page_telemetry_api).
+number_refused = Refusals(log, other_separators, separator=get_args(OtherSeparator))
 
 
 def other_separator(refused: Unreadable, separator: Separator) -> OtherSeparator | None:
@@ -351,8 +355,7 @@ def quantity(
     value = read_decimal(text, separator)
     if isinstance(value, Unreadable):
         if counted and (which := other_separator(value, separator)) is not None:
-            other_separators.add(1, {"separator": which})
-            log.info("number refused", separator=which)
+            number_refused("number refused", separator=which)
         return refused_words(value, separator)
     if value > QUANTITY_MAX:
         return str(TOO_BIG)

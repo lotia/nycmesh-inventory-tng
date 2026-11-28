@@ -18,6 +18,7 @@ import structlog
 from babel.support import LazyProxy
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
+from opentelemetry import metrics
 from sqlalchemy import ColumnElement, and_, or_
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,7 @@ from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import DbSession
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Separator, Words, lazy, lazy_gettext
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.stock import OpenPackage
@@ -64,6 +66,16 @@ from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
+set_refused = Refusals(
+    log,
+    metrics.get_meter(__name__).create_counter(
+        "inventory.open_packages.length_checks.refused",
+        unit="{check}",
+        description="Lengths set on Length checks refused, nothing set, by "
+        "reason: not a length, or the form not saying what it showed",
+    ),
+    reason=("not_a_length", "not_as_shown"),
+)
 
 router = APIRouter(include_in_schema=False)
 
@@ -461,6 +473,7 @@ def set_one(
     separator = decimal_separator(request)
     length = forms.length(session, row.item_id, left, separator=separator)
     if not isinstance(length, Decimal):
+        set_refused("length not set", reason="not_a_length", open_package_id=open_id)
         return redirect(back.link(), notice=length_refused(left, separator))
     # The volunteer's figure, as the box is filled, is set against what it
     # showed at the report; any other, against what the page showed.
@@ -469,8 +482,9 @@ def set_one(
     else:
         shown, moment = read_amount(showed), whole(as_of, 0, INTEGER_MAX)
         if shown is None or moment is None:
-            log.info(
+            set_refused(
                 "length not set: the form said not what it showed",
+                reason="not_as_shown",
                 open_package_id=open_id,
             )
             return redirect(back.link(), notice="length_reload")

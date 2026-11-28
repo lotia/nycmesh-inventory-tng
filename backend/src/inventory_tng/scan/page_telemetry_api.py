@@ -22,6 +22,7 @@ from opentelemetry import metrics
 from pydantic import BaseModel, ConfigDict, Field
 
 from inventory_tng.core.rate_limits import RateLimitedReply
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.web import forms
 from inventory_tng.web.browser import over_limit
 
@@ -215,6 +216,16 @@ class Report(Strict):
     events: Annotated[list[Event], Field(min_length=1, max_length=MOST_EVENTS)]
 
 
+reports_refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.page.reports.refused",
+        unit="{report}",
+        description="Reports the scan and register pages sent about themselves "
+        "refused, none recorded, by reason",
+    ),
+    reason=("rate_limited",),
+)
 page_errors = meter.create_counter(
     "inventory.page.errors",
     unit="{error}",
@@ -405,7 +416,7 @@ async def report(report: Report, request: Request) -> Response:
     # address.
     limit = request.app.state.settings.rate_limits.page_reports
     if over_limit(request, limit, "telemetry"):
-        log.info("page report refused", reason="rate_limited")
+        reports_refused("page report refused", reason="rate_limited")
         body = RateLimitedReply(reason="rate_limited").model_dump()
         return JSONResponse(body, status_code=429)
     for event in report.events:
