@@ -120,6 +120,11 @@ def test_the_page_says_beforehand_all_it_will_do(
     assert box_values(page.text, "on_order") == ["50"]
     assert box_values(page.text, f"per_order_{_offer(session, cable.id).id}") == ["305"]
     assert "Units per order from https://example.org" in said
+    # A confirmation page's actions, its way back marked for the page's
+    # script (inventory-tng-0c2z).
+    shown = read(page.text)
+    shown.one("button", "Recount in ft", class_="danger")
+    shown.one("a", "Keep it in m", data_keep="")
 
 
 OTHER_LENGTH = {"m": "ft", "ft": "m"}

@@ -1,6 +1,7 @@
 {% extends "admin_base.html" %}
 {% from "_table.html" import table %}
 {% from "_described_by.html" import described_by with context %}
+{% from "_confirm.html" import confirm %}
 {#- An amount's box in the new unit, the unit right after it and in its
 description, not its name (decision 0019, Amounts; inventory-tng-0mor,
 inventory-tng-h39f); refused, marked invalid, its problem heard in its
@@ -49,7 +50,7 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
 {% if plan.waiting %}
 <p class="problem" id="waiting">{{ waiting }}</p>
 {% else %}
-<form method="post" action="{{ here }}">
+{% call confirm(here, _("Recount in %(new)s", new=unit), back_link[0], _("Keep it in %(old)s", old=item.unit)) %}
   <input type="hidden" name="key" value="{{ values.get('key', key) }}">
   <input type="hidden" name="seen" value="{{ plan.seen }}">
   <input type="hidden" name="unit" value="{{ unit }}">
@@ -88,10 +89,6 @@ amounts to give again in the new unit (Ali, 2026-11-25). -#}
     {% endif %}
   </fieldset>
   {% endfor %}
-  <div class="actions">
-    <button class="danger">{% trans new=unit %}Recount in {{ new }}{% endtrans %}</button>
-    <a href="{{ back_link[0] }}" data-keep>{% trans old=item.unit %}Keep it in {{ old }}{% endtrans %}</a>
-  </div>
-</form>
+{% endcall %}
 {% endif %}
 {% endblock %}

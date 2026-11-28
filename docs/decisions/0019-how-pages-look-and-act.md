@@ -91,8 +91,10 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
 - **How:** any page ignores all of its taps with `ignoreTaps`. The scan
   page's hooks in `frontend/src/scan/settling-hooks.tsx` keep the space
   of a part that goes, and find a list's entry that moved up, by its id,
-  for focus. A confirmation page marks its way back `data-keep`, and
-  waits as it loads (`frontend/src/admin/confirm-pages.ts`). Only taps,
+  for focus. A confirmation page (`_confirm.html`'s macro) marks its
+  way back `data-keep`, and waits as its script starts
+  (`frontend/src/admin/confirm-pages.ts`), leaving focus where a page's
+  starts until an ignored tap focuses that link. Only taps,
   and such a page, start a wait: typing, picking from a list and a
   label read leave taps taken.
   `backend/tests/codebase/test_focus_and_settling.py` refuses focus
