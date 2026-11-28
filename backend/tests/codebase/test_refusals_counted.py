@@ -5,8 +5,8 @@ or not made, set, settled or brought back, fails here, outside that
 module.
 
 Deterministic, read from the source: only a call of a log level's method
-(log.info("...")) with its event written in it, a string or an f-string,
-is read, and only its event, by whole words, so a docstring, a comment,
+(log.info("...")), or of a name given one (emit = log.info), with its
+event written in it, a string or an f-string, is read, and only its event, by whole words, so a docstring, a comment,
 a variable or a refusal's own words to a person (RULES, notices) never
 match. The few that are not a request refused are named in NOT_COUNTED,
 each with why, and one no longer found there fails too, so the list
@@ -37,12 +37,33 @@ NOT_COUNTED = {
 }
 
 
-def _event(node: ast.Call) -> str | None:
+def _levels(tree: ast.Module) -> set[str]:
+    """The names `tree` gives a log level's method, as in
+    emit = log.warning if bad else log.info."""
+    return {
+        target.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(part, ast.Attribute) and part.attr in LEVELS
+            for part in ast.walk(node.value)
+        )
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+
+
+def _event(node: ast.Call, levels: set[str]) -> str | None:
     """The event a log call writes in it: an f-string's text without its
-    values."""
-    if not (
-        isinstance(node.func, ast.Attribute) and node.func.attr in LEVELS and node.args
-    ):
+    values. `levels`, the names given a level's method."""
+    match node.func:
+        case ast.Attribute(attr=attr) if attr in LEVELS:
+            pass
+        case ast.Name(id=name) if name in levels:
+            pass
+        case _:
+            return None
+    if not node.args:
         return None
     match node.args[0]:
         case ast.Constant(value=str(text)):
@@ -58,11 +79,12 @@ def _event(node: ast.Call) -> str | None:
 
 def _refusals_logged(tree: ast.Module) -> list[tuple[int, str]]:
     """Each log call in `tree` whose event says it refused, by line."""
+    levels = _levels(tree)
     return [
         (node.lineno, event)
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
-        and (event := _event(node)) is not None
+        and (event := _event(node, levels)) is not None
         and REFUSED.search(event)
     ]
 
@@ -105,6 +127,8 @@ def test_finds_a_refusal_logged_by_hand() -> None:
         'log.info("unrefused")\n'
         'refusals("thing refused", reason="x")\n'
         '"""log.info("refused")"""\n'
+        "emit = log.warning if bad else log.info\n"
+        'emit("action refused")\n'
     )
     found = _refusals_logged(ast.parse(source))
-    assert sorted(line for line, _ in found) == [1, 2, 5, 6, 7]
+    assert sorted(line for line, _ in found) == [1, 2, 5, 6, 7, 13]

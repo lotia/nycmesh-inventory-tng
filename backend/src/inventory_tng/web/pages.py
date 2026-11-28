@@ -21,6 +21,7 @@ from inventory_tng.core.db_errors import Gone
 from inventory_tng.core.local_time import show, show_day
 from inventory_tng.core.phrases import BRAND, joined, lazy_gettext, number
 from inventory_tng.web.decimal_separator import decimal_separator
+from inventory_tng.web.form_problems import count_shown
 from inventory_tng.web.formatting import (
     amount,
     box_amount,
@@ -149,9 +150,11 @@ def page(
     """A page, never cached: some show secrets once, and all show what only
     the person signed in may see. Forms read `problems` and `values`. A page
     for an administrator (`admin`) has the navigation, unless the context
-    gives its `sections`, read already. Each page has its number boxes'
+    gives its `sections`, read already. A form refused as a whole may
+    say so in `problem`. Each page has its number boxes'
     decimal separator as `decimal` (web/decimal_separator.py), which its
-    <html data-decimal> tells its scripts."""
+    <html data-decimal> tells its scripts. The forms' own problems it shows
+    are counted (form_problems.count_shown)."""
     notice = NOTICES.get(request.query_params.get("notice", ""))
     section = request.query_params.get("section", "")
     full = {
@@ -164,6 +167,7 @@ def page(
     } | dict(context)
     if full.get("admin") is not None and full.get("sections") is None:
         full["sections"] = sections(full["admin"])
+    count_shown(template, full)
     return templates.TemplateResponse(
         request,
         template,

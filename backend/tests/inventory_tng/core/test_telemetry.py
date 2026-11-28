@@ -81,6 +81,7 @@ from helpers.sign_in import (
     TOTP_KEYS,
     codes_with_left,
     new_admin,
+    new_admin_id,
     sign_in_with,
 )
 from helpers.stock import (
@@ -337,6 +338,8 @@ def added(
 
 # Changes a rule refused, by its name (core/db_errors.py).
 RULES_REFUSED = "inventory.changes.refused"
+# A form's own problems a page showed, by form and kind (web/form_problems.py).
+FORM_PROBLEMS = "inventory.forms.problems"
 
 
 def since(
@@ -687,8 +690,9 @@ def test_counts_count_forms_refused_by_reason(
     rolled_back: Recorded, session: Session
 ) -> None:
     """Counted at once, as a refusal writes nothing to commit: by each
-    reason a form is refused for, once (inventory-tng-w7xt); as it was
-    saved, by the rule refusing it (inventory-tng-v8sq)."""
+    reason a form is refused for, once (inventory-tng-w7xt); its boxes'
+    own problems, each as the page shows it; as it was saved, by the rule
+    refusing it (inventory-tng-v8sq)."""
     client, _, reader, _ = rolled_back
     _, key = new_admin(session)
     sign_in_with(client, key=key)
@@ -699,6 +703,7 @@ def test_counts_count_forms_refused_by_reason(
     name = "inventory.counts.refused"
     before = counted(reader, name)
     rules = since(reader, RULES_REFUSED)
+    boxes = since(reader, FORM_PROBLEMS)
     sent = (
         (form | {radio: "lots"}, 400),
         (form | {radio: "3", f"counted_0{place.item.id}": "2", cable: "lots"}, 400),
@@ -709,10 +714,8 @@ def test_counts_count_forms_refused_by_reason(
     for data, status in sent:
         answer = client.post(path, data=data, follow_redirects=False)
         assert answer.status_code == status
-    assert added(reader, name, before) == {
-        (("reason", "box_problem"),): 2,
-        (("reason", "named_twice"),): 1,
-    }
+    assert added(reader, name, before) == {(("reason", "named_twice"),): 1}
+    assert boxes() == {(("form", "stock/count"), ("kind", "number")): 2}
     assert rules() == {
         (("rule", CHANGED),): 1,
         (("rule", count_refusals.SENT_AGAIN),): 1,
@@ -2220,6 +2223,54 @@ def test_counts_setups_and_emailed_resets_refused_by_reason(
     assert resets() == {(("reason", "no_such_address"),): 1}
 
 
+def test_counts_form_problems_shown_by_form_and_kind(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """Counted and logged as the page shows them, once each, by its form
+    and their kind: a name left empty, then an item with no category or
+    unit picked; a rule's words beside a box are not."""
+    client, _, reader, _ = rolled_back
+    problems = since(reader, FORM_PROBLEMS)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    radios = add(session, Category(name=f"Radios {tag()}"))
+    with capture_logs() as logs:
+        assert client.post(CATEGORIES, data={"name": " "}).status_code == 400
+        item = {"name": f"Omni {tag()}"}
+        assert client.post(ITEMS, data=item).status_code == 400
+        taken = {"name": radios.name}
+        assert client.post(CATEGORIES, data=taken).status_code == 400
+    assert problems() == {
+        (("form", "catalogue/categories"), ("kind", "required")): 1,
+        (("form", "catalogue/items"), ("kind", "not_chosen")): 2,
+    }
+    assert [
+        (line["form"], line["kind"], line["boxes"])
+        for line in logs
+        if line["event"] == "form refused for its boxes"
+    ] == [
+        ("catalogue/categories", "required", ["name"]),
+        ("catalogue/items", "not_chosen", ["category_id", "unit"]),
+    ]
+
+
+def test_counts_administrator_actions_refused_by_action_and_why(
+    recorded: Recorded, session: Session
+) -> None:
+    """Retiring oneself, and an administrator there is not."""
+    reader = recorded[2]
+    refused = since(reader, "inventory.admin.actions.refused")
+    admin_id = new_admin_id(session)
+    at = datetime.now(UTC)
+    for target in (admin_id, 0):
+        with pytest.raises(accounts.AdminRefused):
+            accounts.retire_admin(session, target, admin_id, at, NO_MAIL)
+    assert refused() == {
+        (("action", "retire"), ("why", "themselves")): 1,
+        (("action", "retire"), ("why", "no_such_admin")): 1,
+    }
+
+
 def test_counts_unit_recounts_refused_before_their_save(
     recorded: Recorded, session: Session
 ) -> None:
@@ -2232,7 +2283,7 @@ def test_counts_unit_recounts_refused_before_their_save(
     assert recounts() == {(("reason", "changed"),): 1}
 
 
-def test_counts_adjustments_and_answers_to_lines_recorded_more_refused(
+def test_counts_an_adjustment_refused_by_a_rule_and_an_answer_by_its_form(
     rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """An adjustment its place refuses as it is saved, which its form's
@@ -2250,12 +2301,12 @@ def test_counts_adjustments_and_answers_to_lines_recorded_more_refused(
     _, key = new_admin(session)
     sign_in_with(client, key=key)
     rules = since(reader, RULES_REFUSED)
-    answers = since(reader, "inventory.over_recorded.refused")
+    answers = since(reader, FORM_PROBLEMS)
     assert client.post(ADJUSTMENTS, data=form).status_code == 400
     checked = {"seen": over_recorded.seen(check), "reason": ""}
     client.post(f"/admin/stock/recorded-more/{check.id}/checked", data=checked)
     assert rules() == {(("rule", counts.COUNTABLE),): 1}
-    assert answers() == {(("answer", "checked"), ("reason", "why_problem")): 1}
+    assert answers() == {(("form", "stock/over_recorded"), ("kind", "not_chosen")): 1}
 
 
 def test_counts_admin_and_single_use_forms_refused_by_reason(

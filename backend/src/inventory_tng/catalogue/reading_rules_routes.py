@@ -34,6 +34,7 @@ from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.base import INTEGER_MAX, whole
 from inventory_tng.models.catalogue import ReadingRule, reading_rules_held
 from inventory_tng.web.admin_pages import TextForm, admin_page
+from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.forms import ALERTS, CHANGED, RULES, form_version
 from inventory_tng.web.listing import (
     AskedView,
@@ -235,7 +236,8 @@ def save_reading(
     offers = offered(found.token, found.rule)
     change = chosen_rule(reading, offers, respell=respell == "on")
     if change is None:
-        return _rule_page(request, signed, found, problem=CHOOSE_ONE)
+        problem = Problem(CHOOSE_ONE, "not_chosen")
+        return _rule_page(request, signed, found, problem=problem)
     _, broken = refusal(
         session,
         lambda: reading_rules.change(
@@ -356,7 +358,7 @@ def accept(
             one=one,
             at=at,
             sent=form,
-            problem=CHOOSE,
+            problem=Problem(CHOOSE, "not_chosen"),
             proposals=made,
         )
     written, broken = refusal(

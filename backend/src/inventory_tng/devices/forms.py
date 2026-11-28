@@ -12,6 +12,7 @@ from inventory_tng.core.local_time import parse_local, site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.devices import devices
 from inventory_tng.models.base import whole
+from inventory_tng.web.form_problems import Problem, whole_problem
 from inventory_tng.web.forms import NAME_MAX, up_to
 
 MAX_USES = 500
@@ -70,11 +71,11 @@ def code_settings(
     many = whole(count, 1, MAX_CODES)
     label = label.strip()
     if many is None:
-        problems["count"] = codes_problem(MAX_CODES)
+        problems["count"] = whole_problem(count, codes_problem(MAX_CODES))
     if max_uses is None:
-        problems["uses"] = uses_problem(MAX_USES)
+        problems["uses"] = whole_problem(uses, uses_problem(MAX_USES))
     if lifetime is None:
-        problems["days"] = days_problem(MAX_DAYS)
+        problems["days"] = whole_problem(days, days_problem(MAX_DAYS))
     if (problem := label_problem(label)) is not None:
         problems["label"] = problem
     if problems or many is None or max_uses is None or lifetime is None:
@@ -93,13 +94,13 @@ def device_filter(
     problems: dict[str, Words] = {}
     start = end = None
     if since.strip() and (start := parse_local(since, zone)) is None:
-        problems["since"] = A_TIME
+        problems["since"] = Problem(A_TIME, "not_valid")
     if until.strip():
         end = parse_local(until, zone)
         if end is None:
-            problems["until"] = A_TIME
+            problems["until"] = Problem(A_TIME, "not_valid")
         elif start is not None and end < start:
-            problems["until"] = AFTER_FROM
+            problems["until"] = Problem(AFTER_FROM, "not_valid")
         else:
             # Whatever seconds were typed. At the last minute a datetime
             # holds, no end at all.
@@ -109,7 +110,7 @@ def device_filter(
                 end = None
     code_id = whole(code, 1, 2**31 - 1) if code.strip() else None
     if code.strip() and code_id is None:
-        problems["code"] = A_CODE_NUMBER
+        problems["code"] = Problem(A_CODE_NUMBER, "not_valid")
     chosen = devices.DeviceFilter(
         since=start, until=end, code_id=code_id, current=STATES[shown]
     )

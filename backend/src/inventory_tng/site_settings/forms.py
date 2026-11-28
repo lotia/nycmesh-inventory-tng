@@ -19,6 +19,7 @@ from inventory_tng.models.site_settings import (
     SESSION_DAYS,
     TOTP_POLICIES,
 )
+from inventory_tng.web.form_problems import Problem, whole_problem
 
 REASON_TAKEN = lazy_gettext("There is already a reason by that name.")
 REQUIRED_OR_OPTIONAL = lazy_gettext("Required or optional?")
@@ -97,12 +98,12 @@ NUMBERS = (
 )
 
 
-def scan_minutes(typed: str) -> int | str:
+def scan_minutes(typed: str) -> int | Problem:
     """How long the scan page waits before it checks a name, as typed, or
-    what is wrong with it as a str."""
+    what is wrong with it."""
     minutes = whole(typed, *NAME_CHECK_MINUTES)
     if minutes is None:
-        return whole_minutes(*NAME_CHECK_MINUTES)
+        return whole_problem(typed, whole_minutes(*NAME_CHECK_MINUTES))
     return minutes
 
 
@@ -113,10 +114,11 @@ def sign_in_fields(
     problems: dict[str, Words] = {}
     policy = form.get("totp_policy", "")
     if policy not in TOTP_POLICIES:
-        problems["totp_policy"] = REQUIRED_OR_OPTIONAL
+        problems["totp_policy"] = Problem(REQUIRED_OR_OPTIONAL, "not_chosen")
     chosen: dict[str, object] = {"totp_policy": policy}
     for n in NUMBERS:
-        chosen[n.field] = whole(form.get(n.field, ""), n.low, n.high)
+        typed = form.get(n.field, "")
+        chosen[n.field] = whole(typed, n.low, n.high)
         if chosen[n.field] is None:
-            problems[n.field] = WHOLE[n.unit](n.low, n.high)
+            problems[n.field] = whole_problem(typed, WHOLE[n.unit](n.low, n.high))
     return chosen, problems

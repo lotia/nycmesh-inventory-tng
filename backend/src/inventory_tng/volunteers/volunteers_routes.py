@@ -29,6 +29,7 @@ from inventory_tng.volunteers.forms import (
 )
 from inventory_tng.volunteers.paths import VOLUNTEERS
 from inventory_tng.web.admin_pages import admin_page, now, retirement, undo_retire
+from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.forms import ALERTS, CHANGED, RULES, form_version, rule_words
 from inventory_tng.web.listing import AskedView, Listing, Searched, Sort, Sorting
 from inventory_tng.web.navigation import SECTION_VOLUNTEERS
@@ -340,7 +341,9 @@ def confirm_merge(
     if found is None:
         return not_found()
     if into is None:
-        return _refused(request, session, signed, found, PICK_INTO)
+        return _refused(
+            request, session, signed, found, Problem(PICK_INTO, "not_chosen")
+        )
     return admin_page(
         request,
         signed,
@@ -368,7 +371,9 @@ def merge_volunteer(
     if found is None:
         return not_found()
     if into is None:
-        return _refused(request, session, signed, found, PICK_INTO)
+        return _refused(
+            request, session, signed, found, Problem(PICK_INTO, "not_chosen")
+        )
     _, broken = attempt(
         session, lambda: volunteers.merge(session, found, into.id, now())
     )

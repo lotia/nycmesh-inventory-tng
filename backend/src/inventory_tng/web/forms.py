@@ -25,6 +25,7 @@ from inventory_tng.models.base import (
     whole,
 )
 from inventory_tng.models.names import canonical
+from inventory_tng.web.form_problems import Kind, Problem
 
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
@@ -167,13 +168,13 @@ def chosen[T: Base](
     return row
 
 
-def up_to(limit: int) -> str:
+def up_to(limit: int) -> Problem:
     """A field's longest, refused: in characters."""
-    return gettext("Up to %(max)s characters.", max=number(limit))
+    return Problem(gettext("Up to %(max)s characters.", max=number(limit)), "too_long")
 
 
 def name_up_to(limit: int) -> str:
-    """A name too long, refused: in characters."""
+    """A name too long, or none, refused: in characters."""
     return gettext("Give it a name of up to %(max)s characters.", max=number(limit))
 
 
@@ -182,11 +183,12 @@ def at_most_places(places: int) -> str:
     return gettext("Use at most %(digits)s decimal places.", digits=number(places))
 
 
-def name_problem(name: str) -> str | None:
+def name_problem(name: str) -> Problem | None:
     """What is wrong with a name, stripped: blank, or too long."""
     # As stored (models.names.CanonicalName): °C for ℃ is a character longer.
-    if not 1 <= len(canonical(name)) <= NAME_MAX:
-        return name_up_to(NAME_MAX)
+    length = len(canonical(name))
+    if not 1 <= length <= NAME_MAX:
+        return Problem(name_up_to(NAME_MAX), "too_long" if length else "required")
     return None
 
 
@@ -321,6 +323,15 @@ def other_separator(refused: Unreadable, separator: Separator) -> OtherSeparator
     return None
 
 
+# Each Unreadable as the kind of problem a form counts it as.
+UNREADABLE: dict[Unreadable, Kind] = {
+    Unreadable.NUMBER: "number",
+    Unreadable.SEPARATOR: "separator",
+    Unreadable.THOUSANDS: "thousands",
+    Unreadable.PLACES: "places",
+}
+
+
 def refused_words(refused: Unreadable, separator: Separator) -> str:
     """What a box whose decimal separator is `separator` says of what it
     could not read, refused for `refused`."""
@@ -351,18 +362,18 @@ def quantity(
     more; whole, for an item in `unit` counted each (whole_enough)."""
     text = text.strip()
     if not text:
-        return None if required is None else str(required)
+        return None if required is None else Problem(required, "required")
     value = read_decimal(text, separator)
     if isinstance(value, Unreadable):
         if counted and (which := other_separator(value, separator)) is not None:
             number_refused("number refused", separator=which)
-        return refused_words(value, separator)
+        return Problem(refused_words(value, separator), UNREADABLE[value])
     if value > QUANTITY_MAX:
-        return str(TOO_BIG)
+        return Problem(TOO_BIG, "too_big")
     if value < 0 or (positive and value == 0):
-        return str(ABOVE_ZERO if positive else ZERO_OR_MORE)
+        return Problem(ABOVE_ZERO if positive else ZERO_OR_MORE, "too_small")
     if unit is not None and not whole_enough(unit, value):
-        return str(WHOLE_UNITS)
+        return Problem(WHOLE_UNITS, "not_whole")
     return value
 
 

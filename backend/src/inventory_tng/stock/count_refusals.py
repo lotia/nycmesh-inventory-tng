@@ -12,8 +12,6 @@ from opentelemetry import metrics
 from inventory_tng.core.refusals import Refusals
 from inventory_tng.stock.count_forms import (
     CLOSED_MEANWHILE,
-    TYPE_IT_HERE,
-    CountForm,
 )
 from inventory_tng.stock.counts import COUNTABLE, WHOLE
 from inventory_tng.stock.units_shown import SHOWN_OTHERWISE
@@ -37,16 +35,12 @@ CountRefusal = Literal[
     "named_twice",
     "listed_elsewhere",
     "closed_meanwhile",
-    "box_problem",
     "shown_otherwise",
     "nothing_typed",
 ]
-# Why a count form is refused for its boxes, as logged too: a package it
-# counts closed meanwhile, or a box's own problem, such as no number
-# (inventory-tng-0k3a). An item named twice and something else here
-# listed elsewhere are logged on their own.
+# A package the form counts closed meanwhile. A box's own problem, such
+# as no number, is counted as the page shows it (web/form_problems.py).
 CLOSED: CountRefusal = "closed_meanwhile"
-BOX_PROBLEM: CountRefusal = "box_problem"
 
 # The rules that may refuse a count as it is saved, a place retired since
 # included, though answered as not found.
@@ -72,18 +66,3 @@ count_refused = Refusals(
     ),
     reason=get_args(CountRefusal),
 )
-
-
-def box_refusals(sent: CountForm) -> list[CountRefusal]:
-    """Why read_count's problems refuse the count, from CLOSED and
-    BOX_PROBLEM, leaving out the boxes of an item named twice and the line
-    something else here should be typed on."""
-    reasons: list[CountRefusal] = [CLOSED] if CLOSED_MEANWHILE in sent.problems else []
-    if any(
-        field != CLOSED_MEANWHILE
-        and field not in sent.twice
-        and words is not TYPE_IT_HERE
-        for field, words in sent.problems.items()
-    ):
-        reasons.append(BOX_PROBLEM)
-    return reasons

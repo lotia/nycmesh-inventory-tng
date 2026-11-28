@@ -34,6 +34,7 @@ from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
 from inventory_tng.models.admins import running_low
 from inventory_tng.web.admin_pages import admin_page, now
+from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
 from inventory_tng.web.single_use_forms import SingleUseKey, sent_before
 
@@ -215,7 +216,12 @@ def confirm_remove_authenticator(
     if found is None:
         return not_found()  # Someone else's, or gone: ids reveal nothing.
     if outcome == "last_required":
-        return _refused(request, session, signed, {"authenticators": LAST_REQUIRED})
+        return _refused(
+            request,
+            session,
+            signed,
+            {"authenticators": Problem(LAST_REQUIRED, "other")},
+        )
     return admin_page(
         request,
         signed,
@@ -245,7 +251,12 @@ def remove_authenticator(
     if outcome == "missing":
         return not_found()
     if outcome == "last_required":
-        return _refused(request, session, signed, {"authenticators": LAST_REQUIRED})
+        return _refused(
+            request,
+            session,
+            signed,
+            {"authenticators": Problem(LAST_REQUIRED, "other")},
+        )
     done = _done(signed, session, outcome, section="authenticators")
     notify.tell(
         signed.admin.email,
@@ -268,7 +279,7 @@ def new_recovery_codes(
     if not signed.uses_totp:
         # Sent from a page shown before the last authenticator went, which
         # took the recovery codes section with it: said by the authenticators.
-        problem = CODES_NEED_TOTP
+        problem = Problem(CODES_NEED_TOTP, "other")
         return _refused(request, session, signed, {"authenticators": problem})
     if again := sent_before(
         request, session, signed, single_use, "recovery_codes", ACCOUNT

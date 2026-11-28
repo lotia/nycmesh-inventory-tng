@@ -316,9 +316,9 @@ def test_a_count_refused_as_an_area_is_gone_says_a_switch_since(
     refusal = count_routes.refusal
 
     def switched_after(
-        held: Session, change: Callable[[], object], *expected: str
+        held: Session, change: Callable[[], object], *expected: str, **ids: int
     ) -> tuple[object, str | None]:
-        refused = refusal(held, change, *expected)
+        refused = refusal(held, change, *expected, **ids)
         # Another administrator's edit, as the test's own rows are written.
         setting_up(session)
         wire.unit = "ft"

@@ -157,33 +157,35 @@ def test_a_count_sent_twice_is_written_once(
 
 def boxes_refused(logs: list[MutableMapping[str, Any]]) -> list[str]:
     """The reasons a count was refused for its boxes, each logged
-    (inventory-tng-0k3a)."""
+    (inventory-tng-0k3a): a package closed meanwhile, and the kinds of
+    the boxes' own problems (web/form_problems.py)."""
     return [
         each["reason"]
         for each in logs
-        if each["event"] == "count refused for its boxes"
-    ]
+        if each["event"] == "count refused: a package closed meanwhile"
+    ] + [each["kind"] for each in logs if each["event"] == "form refused for its boxes"]
 
 
 def test_a_count_refuses_what_is_not_a_quantity(
     admin_client: TestClient, session: Session
 ) -> None:
-    """Logged with the place's id and a reason from a fixed list, never
-    what was typed (inventory-tng-0k3a)."""
+    """Logged with its box and a kind from a fixed list, never what was
+    typed (inventory-tng-0k3a, inventory-tng-v8sq)."""
     place = stocked(session)
     path = f"{COUNTS}/{place.store.id}"
     shown = count_form(admin_client.get(path))
-    for typed, problem in (("lots", type_a_number()), ("1.5", WHOLE_UNITS)):
+    cases = (("lots", type_a_number(), "number"), ("1.5", WHOLE_UNITS, "not_whole"))
+    for typed, problem, kind in cases:
+        box = f"counted_{place.item.id}"
         with capture_logs() as logs:
-            refused = admin_client.post(
-                path, data=shown | {f"counted_{place.item.id}": typed}
-            )
+            refused = admin_client.post(path, data=shown | {box: typed})
         assert refused.status_code == 400
         assert str(problem) in text(refused)
         assert {
-            "event": "count refused for its boxes",
-            "location_id": place.store.id,
-            "reason": count_refusals.BOX_PROBLEM,
+            "event": "form refused for its boxes",
+            "form": "stock/count",
+            "kind": kind,
+            "boxes": [box],
             "log_level": "info",
         } in logs
     assert counts_written(session) == []

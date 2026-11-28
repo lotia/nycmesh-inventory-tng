@@ -56,6 +56,7 @@ from inventory_tng.core.mail import Notify
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.admins import Admin, AdminSession, running_low
 from inventory_tng.web.browser import rate_key, set_private_cookie
+from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.pages import add_notices, not_found, page, redirect
 from inventory_tng.web.qr_codes import qr_svg
 
@@ -443,7 +444,7 @@ def new_authenticator(
     if "authenticator_name" not in problems and accounts.authenticator_named(
         session, admin_id, name
     ):
-        problems["authenticator_name"] = NAME_TAKEN
+        problems["authenticator_name"] = Problem(NAME_TAKEN, "taken")
     # Recovery codes come with the first authenticator, unless some are
     # left: set up again after the operator retired the old one, the printed
     # codes still work, and making new ones would void them.

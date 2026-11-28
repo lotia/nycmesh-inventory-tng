@@ -13,12 +13,11 @@ counted (Ali, 2026-11-15, inventory-tng-dro)."""
 
 from collections.abc import Callable
 from decimal import Decimal
-from typing import Annotated, Any, Literal, get_args
+from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
-from opentelemetry import metrics
 from sqlalchemy.orm import Session
 
 from inventory_tng.admins.guards import AdminSignedIn
@@ -26,7 +25,6 @@ from inventory_tng.core.db_errors import Gone, attempt
 from inventory_tng.core.db_sessions import DbSession, exists_where
 from inventory_tng.core.local_time import site_zone
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
-from inventory_tng.core.refusals import Refusals
 from inventory_tng.models.catalogue import Item
 from inventory_tng.models.names import canonical
 from inventory_tng.models.places import Location
@@ -69,23 +67,6 @@ from inventory_tng.web.navigation import SECTION_STOCK
 from inventory_tng.web.pages import add_notices, not_found, redirect
 
 log = structlog.get_logger(__name__)
-# An answer to a line recorded more than moved refused by its form,
-# nothing changed: which answer, and why, a count or a reason the form gave
-# that is not one. One a rule refused, settled or changed meanwhile
-# (MEANWHILE) or otherwise, is logged and counted by core/db_errors.py.
-OverRecordedRefusal = Literal["count_problem", "why_problem"]
-answer_refused = Refusals(
-    log,
-    metrics.get_meter(__name__).create_counter(
-        "inventory.over_recorded.refused",
-        unit="{answer}",
-        description="Answers to lines recorded with more than was moved "
-        "refused, nothing changed, by the answer and why",
-    ),
-    answer=("checked", "count"),
-    reason=get_args(OverRecordedRefusal),
-)
-
 router = APIRouter(include_in_schema=False)
 
 TITLE = lazy_gettext("Recorded more than moved")
@@ -521,35 +502,14 @@ def answer(
         )
         if not isinstance(count, Decimal):
             field = f"count-{check_id}"
-            answer_refused(
-                "over recorded count refused",
-                level="debug",
-                answer=do,
-                reason="count_problem",
-                over_recorded_id=check_id,
-            )
-            return _page(
-                request,
-                signed,
-                session,
-                only,
-                view,
-                {field: str(count)},
-                {field: typed},
-            )
+            # Counted as the page shows it (web/form_problems.py).
+            problems: dict[str, Words] = {field: count or ""}
+            return _page(request, signed, session, only, view, problems, {field: typed})
     words = None
     if do == "checked":
         stripped = canonical(typed_words.strip())
         problem = why_problem(reason, stripped)
         if problem is not None:
-            # Never the words: free text.
-            answer_refused(
-                "over recorded checked refused",
-                level="debug",
-                answer=do,
-                reason="why_problem",
-                over_recorded_id=check_id,
-            )
             values = {f"reason-{check_id}": reason, f"words-{check_id}": typed_words}
             return _page(
                 request,

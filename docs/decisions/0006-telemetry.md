@@ -2,7 +2,8 @@
 
 **Status:** accepted · 2026-10-30 · amended 2026-11-19 (measured and
 logged once committed; camera sessions) and 2026-11-27 (every refusal
-logged and counted together; a rule's refusal counted once)
+logged and counted together; a rule's refusal counted once; a form's own
+problems counted)
 
 ## Context
 
@@ -123,3 +124,17 @@ for what its form refuses before the save. A form shown before its row
 changed is counted by `inventory.edits.stale` alone, by table.
 `tests/codebase/test_rule_refusals.py` fails on a rule refusal caught
 anywhere else, and on a rule missing from the list.
+
+### A form's own problems, counted where the page shows them (2026-11-27)
+
+Decided by Ali on 2026-11-27 (inventory-tng-v8sq): a form's own problems
+(a box left empty, a number that is not one) are logged and counted too,
+by form and kind from fixed lists. A form's check says each as a
+`Problem` with its kind (`web/form_problems.py`), and `page()` in
+`web/pages.py`, which draws every page, counts those it shows
+(`inventory.forms.problems`, by the page's template and `kind`). A rule's
+words beside a box are no `Problem`, so a rule refusal is not counted
+again. The count form's box problems and an answer to a line recorded
+more than moved refused by its form are counted here alone now.
+`tests/codebase/test_form_problems_counted.py` fails on a forms module
+that leaves a phrase of its own bare.

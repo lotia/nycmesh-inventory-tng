@@ -24,6 +24,7 @@ from inventory_tng.models.stock import (
 )
 from inventory_tng.stock import over_recorded, queries, units_shown
 from inventory_tng.stock.units_shown import Now, Shown
+from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.forms import (
     chosen,
     quantity,
@@ -148,10 +149,10 @@ def adjustment(
     location_id = row_id(form.get("location_id", ""))
     place = session.get(Location, location_id) if location_id is not None else None
     if place is None:
-        problems["location_id"] = PICK_A_PLACE
+        problems["location_id"] = Problem(PICK_A_PLACE, "not_chosen")
     item = chosen(session, Item, form.get("item_id", ""), current=False)
     if item is None:
-        problems["item_id"] = PICK_AN_ITEM
+        problems["item_id"] = Problem(PICK_AN_ITEM, "not_chosen")
     # Shown in another unit, or in none: asked again in its unit now, which
     # the form shown again shows, whatever else is wrong (units_shown); what
     # is wrong with the amount in any unit is said after, read once so the
@@ -173,12 +174,12 @@ def adjustment(
         )
     direction = form.get("direction")
     if direction not in ("found", "off"):
-        problems["direction"] = FOUND_OR_OFF
+        problems["direction"] = Problem(FOUND_OR_OFF, "not_chosen")
     reason = chosen(session, AdjustmentReason, form.get("reason_id", ""))
     if reason is None:
-        problems["reason_id"] = PICK_A_REASON
+        problems["reason_id"] = Problem(PICK_A_REASON, "not_chosen")
     if key is None:
-        problems["amount"] = OUT_OF_DATE
+        problems["amount"] = Problem(OUT_OF_DATE, "other")
     if (
         problems
         or not (place and item and reason and key and direction)
@@ -223,16 +224,16 @@ def confirmed_count(
     return read
 
 
-def why_problem(reason: str, words: str) -> Words | None:
+def why_problem(reason: str, words: str) -> Problem | None:
     """What is wrong with why one is marked checked, `words` stripped: no
     reason picked, put right another way with no words or too many, or
     words with another reason."""
     if reason not in over_recorded.CHECKED_REASONS:
-        return SAY_WHY
+        return Problem(SAY_WHY, "not_chosen")
     if reason != "other":
-        return WORDS_FOR_ANOTHER if words else None
+        return Problem(WORDS_FOR_ANOTHER, "other") if words else None
     if not words:
-        return SAY_WHY
+        return Problem(SAY_WHY, "required")
     if len(words) > OVER_RECORDED_WORDS_MAX:
         return up_to(OVER_RECORDED_WORDS_MAX)
     return None

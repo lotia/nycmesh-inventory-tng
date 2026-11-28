@@ -6,6 +6,7 @@ and sign_in_routes.py read the request and pass the form's fields."""
 
 from inventory_tng.admins import accounts, authenticator_totp
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext
+from inventory_tng.web.form_problems import Problem
 
 TAKEN = lazy_gettext("Another administrator already has that username or email.")
 OWN_RESET = lazy_gettext("Change your own on your account page.")
@@ -57,5 +58,5 @@ def authenticator_problems(name: str, step: int | None) -> dict[str, Words]:
     if problem := accounts.authenticator_name_problem(name):
         problems["authenticator_name"] = problem
     if step is None:
-        problems["code"] = code_mismatch()
+        problems["code"] = Problem(code_mismatch(), "mismatch")
     return problems

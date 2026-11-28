@@ -26,6 +26,7 @@ from inventory_tng.stock.forms import (
 )
 from inventory_tng.stock.ledger import LOOSE, Form, repeated
 from inventory_tng.stock.units_shown import Now
+from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.forms import (
     QUANTITY_MAX,
     RULES,
@@ -160,18 +161,18 @@ def by_form(
             package = session.get(ItemPackage, row_id(package_part) or 0)
             count = whole(typed, 0, INTEGER_MAX)
             if package is None or package.item_id != row_id(item_part):
-                problems[field] = NO_SUCH_PACKAGE
+                problems[field] = Problem(NO_SUCH_PACKAGE, "not_found")
             elif count is None:
-                problems[field] = WHOLE_PACKAGES
+                problems[field] = Problem(WHOLE_PACKAGES, "not_whole")
             elif count * package.size_in_items_unit > QUANTITY_MAX:
-                problems[field] = TOO_MANY
+                problems[field] = Problem(TOO_MANY, "too_big")
             else:
                 held = count * package.size_in_items_unit
                 lines.append((package.item_id, Form(package_id=package.id), held))
         elif field.startswith(LOOSE_FIELD):
             item = items.get(row_id(field.removeprefix(LOOSE_FIELD)) or 0)
             if item is None:
-                problems[field] = NO_SUCH_ITEM
+                problems[field] = Problem(NO_SUCH_ITEM, "not_found")
                 continue
             amount = quantity(
                 typed, positive=False, unit=item.unit, separator=separator
@@ -184,7 +185,7 @@ def by_form(
         elif field.startswith(OPENED):
             row = session.get(OpenPackage, row_id(field.removeprefix(OPENED)) or 0)
             if row is None or row.location_id != place_id or state not in STATES:
-                problems[field] = NO_SUCH_OPEN_PACKAGE
+                problems[field] = Problem(NO_SUCH_OPEN_PACKAGE, "not_found")
             elif (reason := STATES[state]) is not None:
                 # Closed already, by this form saved and sent again or
                 # meanwhile, it is as said: closing it writes nothing
@@ -209,7 +210,7 @@ def by_form(
         if package is None:
             # What is left is not read, so not counted refused
             # (inventory-tng-ndrg).
-            problems[FOUND_PACKAGE] = NO_SUCH_PACKAGE
+            problems[FOUND_PACKAGE] = Problem(NO_SUCH_PACKAGE, "not_found")
         else:
             left = quantity(
                 form.get(FOUND_LEFT, ""),
@@ -366,7 +367,7 @@ def by_place(
         if place_id in split:
             split[place_id] |= {name: form[name] for name in names if name in form}
         elif any(form.get(name, "").strip() for name in names):
-            problems[picker] = PICK_A_PLACE
+            problems[picker] = Problem(PICK_A_PLACE, "not_chosen")
     return split, problems
 
 
@@ -517,7 +518,7 @@ def item_counts(
     problems: dict[str, Words] = {}
     for field, item_id, typed in found:
         if item_id is None or (unit := units.get(item_id)) is None:
-            problems[field] = NO_SUCH_ITEM
+            problems[field] = Problem(NO_SUCH_ITEM, "not_found")
             continue
         amount = quantity(typed, positive=False, unit=unit, separator=separator)
         if isinstance(amount, str):

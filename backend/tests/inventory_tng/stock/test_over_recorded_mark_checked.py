@@ -190,7 +190,9 @@ def test_marking_one_checked_asks_why(
         assert checked(response.text, "reason") == ["other"]
         assert form.get("words", "") in box_values(response.text, "words")
     assert check.settled_at is None
-    assert "over recorded checked refused" in [line["event"] for line in logs]
+    # Logged by its box and kind (web/form_problems.py), never the words.
+    (line,) = [each for each in logs if each["event"] == "form refused for its boxes"]
+    assert line["boxes"] == [f"reason-{check.id}"]
     assert not any("words" in line for line in logs)
 
 

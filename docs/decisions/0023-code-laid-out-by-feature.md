@@ -78,8 +78,9 @@ decided the structure below on 2026-11-17.
 - **Imports go one way**, held by
   `backend/tests/codebase/test_import_directions.py`:
   - rules, queries and forms import neither FastAPI nor `web/`, but for
-    `web/formatting.py` and `web/forms.py`, which import neither
-    themselves (inventory-tng-atmx.2, inventory-tng-atmx.7);
+    `web/formatting.py`, `web/forms.py` and `web/form_problems.py`, which
+    import neither themselves (inventory-tng-atmx.2, inventory-tng-atmx.7,
+    inventory-tng-v8sq);
   - route files run no queries (`select`, `execute`, `scalar`, `scalars`);
   - core imports nothing of the app but core and `models/`;
   - no feature's routes import another feature's routes; they link

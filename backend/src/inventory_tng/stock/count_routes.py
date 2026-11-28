@@ -136,9 +136,9 @@ from inventory_tng.stock.count_forms import (
 from inventory_tng.stock.count_gone_areas import gone_words, moved_sections
 from inventory_tng.stock.count_groups import Group
 from inventory_tng.stock.count_refusals import (
+    CLOSED,
     RULE_REFUSALS,
     SENT_AGAIN,
-    box_refusals,
     count_refused,
 )
 from inventory_tng.stock.count_units_shown import (
@@ -829,9 +829,11 @@ def count(
         alerts.append(listed_alert)
         off_form = None if sent.listed.on_form else sent.listed
     if problems:
-        for reason in box_refusals(sent):
+        if CLOSED_MEANWHILE in sent.problems:
             count_refused(
-                "count refused for its boxes", reason=reason, location_id=place.id
+                "count refused: a package closed meanwhile",
+                reason=CLOSED,
+                location_id=place.id,
             )
         # What was typed is as of when the form was shown, of the places it
         # showed; a recount asks again for its own items only.

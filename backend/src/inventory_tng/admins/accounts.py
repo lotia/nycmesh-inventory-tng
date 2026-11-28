@@ -56,6 +56,7 @@ from inventory_tng.models.admins import (
 )
 from inventory_tng.models.labels import mint_code
 from inventory_tng.models.site_settings import SignInSettings
+from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.forms import name_up_to
 
 log = structlog.get_logger(__name__)
@@ -172,29 +173,32 @@ NOT_AN_EMAIL = lazy_gettext("That doesn't look like an email address.")
 PASSWORDS_DIFFER = lazy_gettext("The two passwords are different.")
 
 
-def username_problem(username: str) -> str | None:
+def username_problem(username: str) -> Problem | None:
     if not USERNAME.fullmatch(username):
-        return gettext(
+        words = gettext(
             "Use 1 to %(max)s letters, digits, dots, dashes or underscores.",
             max=number(USERNAME_MAX),
         )
+        return Problem(words, "not_valid" if username else "required")
     return None
 
 
-def email_problem(email: str) -> Words | None:
+def email_problem(email: str) -> Problem | None:
     if email and (not EMAIL.fullmatch(email) or len(email) > EMAIL_MAX):
-        return NOT_AN_EMAIL
+        return Problem(NOT_AN_EMAIL, "not_valid")
     return None
 
 
-def _length_problem(password: str) -> Words | None:
+def _length_problem(password: str) -> Problem | None:
     if len(password) < PASSWORD_MIN:
-        return gettext(
+        words = gettext(
             "Use at least %(min)s characters. A few words make a good one.",
             min=number(PASSWORD_MIN),
         )
+        return Problem(words, "too_short" if password else "required")
     if len(password) > PASSWORD_MAX:
-        return gettext("Use at most %(max)s characters.", max=number(PASSWORD_MAX))
+        words = gettext("Use at most %(max)s characters.", max=number(PASSWORD_MAX))
+        return Problem(words, "too_long")
     return None
 
 
@@ -206,7 +210,9 @@ def password_problems(password: str, again: str) -> dict[str, Words]:
     if problem := _length_problem(password):
         return {"password": problem}
     if password != again:
-        return dict.fromkeys(("password", "password_again"), PASSWORDS_DIFFER)
+        return dict.fromkeys(
+            ("password", "password_again"), Problem(PASSWORDS_DIFFER, "mismatch")
+        )
     return {}
 
 
@@ -261,9 +267,10 @@ def retire(authenticator: Authenticator, now: datetime) -> None:
     authenticator.retired_at = now
 
 
-def authenticator_name_problem(name: str) -> str | None:
+def authenticator_name_problem(name: str) -> Problem | None:
     if not 1 <= len(name) <= AUTHENTICATOR_NAME_MAX:
-        return name_up_to(AUTHENTICATOR_NAME_MAX)
+        words = name_up_to(AUTHENTICATOR_NAME_MAX)
+        return Problem(words, "too_long" if name else "required")
     return None
 
 
@@ -1234,6 +1241,17 @@ AdminAction = Literal["invite", "reset", "retire", "restore"]
 # Why, for the log: the page says only not found, but an operator should
 # tell a session cut off meanwhile (signed_out, a warning) from a stale id.
 Why = Literal["themselves", "no_such_admin", "signed_out"]
+action_refused = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.admin.actions.refused",
+        unit="{action}",
+        description="Invitations, resets, retires and bring-backs of an "
+        "administrator refused, nothing changed, by the action and why",
+    ),
+    action=get_args(AdminAction),
+    why=get_args(Why),
+)
 
 
 def _refuse_action(
@@ -1242,9 +1260,9 @@ def _refuse_action(
     by_admin_id: int,
     target_admin_id: int | None = None,
 ) -> NoReturn:
-    emit = log.warning if why == "signed_out" else log.info
-    emit(
+    action_refused(
         "administrator action refused",
+        level="warning" if why == "signed_out" else "info",
         action=action,
         why=why,
         by_admin_id=by_admin_id,

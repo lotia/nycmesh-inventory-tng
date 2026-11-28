@@ -58,7 +58,7 @@ RULES = {
 }
 # What of web/ rules may import. They are rules themselves, so they import
 # neither FastAPI nor the rest of web/.
-RULES_MAY_IMPORT = {"web/formatting.py", "web/forms.py"}
+RULES_MAY_IMPORT = {"web/formatting.py", "web/forms.py", "web/form_problems.py"}
 FASTAPI = {"fastapi", "starlette"}
 # Decorators that add a route to a router: @router.get(...) and the like.
 ROUTE_DECORATORS = {"get", "post", "put", "patch", "delete", "api_route", "websocket"}

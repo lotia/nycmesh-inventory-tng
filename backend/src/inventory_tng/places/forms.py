@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.core.phrases import Words, lazy_gettext
 from inventory_tng.models.places import Location
+from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.forms import chosen, name_problem
 
 # What an administrator makes here; custody comes with a volunteer.
@@ -39,10 +40,10 @@ def new_place(
     if problem := name_problem(name):
         problems["name"] = problem
     if kind not in KINDS:
-        problems["kind"] = PICK_WHAT
+        problems["kind"] = Problem(PICK_WHAT, "not_chosen")
     parent = chosen(session, Location, parent_id) if kind == "area" else None
     if kind == "area" and parent is None:
-        problems["parent_id"] = PICK_WHERE
+        problems["parent_id"] = Problem(PICK_WHERE, "not_chosen")
     return parent, problems
 
 
@@ -56,5 +57,5 @@ def place_change(
         problems["name"] = problem
     parent = chosen(session, Location, parent_id) if found.kind == "area" else None
     if found.kind == "area" and parent is None:
-        problems["parent_id"] = PICK_WHERE
+        problems["parent_id"] = Problem(PICK_WHERE, "not_chosen")
     return parent, problems

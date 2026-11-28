@@ -143,8 +143,10 @@ def refused_then(
     is refused, before the page says why (inventory-tng-k4l)."""
     attempt = over_recorded_routes.attempt
 
-    def then[T](at: Session, change: Callable[[], T]) -> tuple[T | None, str | None]:
-        done = attempt(at, change)
+    def then[T](
+        at: Session, change: Callable[[], T], **ids: int
+    ) -> tuple[T | None, str | None]:
+        done = attempt(at, change, **ids)
         meanwhile()
         return done
 

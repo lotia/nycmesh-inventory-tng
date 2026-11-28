@@ -619,7 +619,7 @@ def test_a_count_refused_by_a_rule_after_a_switch_says_both(
         "extra_quantity": "50",
     }
 
-    def refused_once(*_: object) -> tuple[object, str]:
+    def refused_once(*_: object, **__: object) -> tuple[object, str]:
         # Another administrator's edit, as the test's own rows are written.
         to_feet(setting_up(session), place.cable)
         del session.info[UNGUARDED_INFO]
@@ -831,9 +831,9 @@ def test_an_adjustment_refused_otherwise_says_a_switch_since(
     refusal = counts_routes.refusal
 
     def switched_after(
-        held: Session, change: Callable[[], object], *expected: str
+        held: Session, change: Callable[[], object], *expected: str, **ids: int
     ) -> tuple[object, str | None]:
-        refused = refusal(held, change, *expected)
+        refused = refusal(held, change, *expected, **ids)
         # Another administrator's edit, as the test's own rows are written.
         to_feet(setting_up(session), place.cable)
         del session.info[UNGUARDED_INFO]

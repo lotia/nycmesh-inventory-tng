@@ -27,6 +27,7 @@ from inventory_tng.models.catalogue import (
     reading_rules_held,
 )
 from inventory_tng.models.names import canonical
+from inventory_tng.web.form_problems import Problem
 from inventory_tng.web.formatting import amount
 from inventory_tng.web.forms import chosen, name_problem, quantity
 
@@ -198,7 +199,7 @@ def item_name_problem(
     if problem := name_problem(name):
         return problem
     if nameless(name):
-        return NO_LETTERS
+        return Problem(NO_LETTERS, "not_valid")
     if asked:
         log.debug("unit asked about", item_id=item_id, asked=len(asked))
         return ASK_UNIT
@@ -339,17 +340,17 @@ def item_fields(
         problems["name"] = problem
     category = chosen(session, Category, form.get("category_id", ""))
     if category is None:
-        problems["category_id"] = PICK_A_CATEGORY
+        problems["category_id"] = Problem(PICK_A_CATEGORY, "not_chosen")
     unit = form.get("unit", "")
     if unit not in UNITS:
-        problems["unit"] = PICK_A_UNIT
+        problems["unit"] = Problem(PICK_A_UNIT, "not_chosen")
     # Checked again under the lock (items.save).
     elif (
         item is not None
         and becomes_counted_whole(item.unit, unit)
         and (fraction := package_fraction(session, item.id))
     ):
-        problems["unit"] = fraction
+        problems["unit"] = Problem(fraction, "not_whole")
     minimum = quantity(
         form.get("minimum", ""), positive=False, unit=unit, separator=separator
     )
@@ -433,7 +434,7 @@ def package_settings_fields(
     if (problem := short_problem(short, package.size)) is not None:
         problems["short_below"] = problem
     if minimum_sealed.strip() and minimum is None:
-        problems["minimum_sealed"] = WHOLE_PACKAGES
+        problems["minimum_sealed"] = Problem(WHOLE_PACKAGES, "not_whole")
     return (None if isinstance(short, str) else short), minimum, problems
 
 
@@ -443,7 +444,7 @@ def short_problem(short: Decimal | str | None, size: Decimal | None) -> Words | 
     if isinstance(short, str):
         return short
     if short is not None and size is not None and short >= size:
-        return SHORTER_THAN_WHOLE
+        return Problem(SHORTER_THAN_WHOLE, "too_big")
     return None
 
 
