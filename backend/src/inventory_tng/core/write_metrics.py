@@ -9,9 +9,10 @@ nothing else holds it:
     closed.on_commit(session, "thing closed", attributes={"how": how}, thing_id=1)
 
 A counter that also counts refusals, such as a sign-in's outcome, is
-bound to a private name (`_sign_ins`) and given to both the WriteMetric
-and refusals(); one that also counts what writes nothing, such as a
-reminder shown, adds that by hand."""
+declared shared (core/metrics_at_once.py), bound to a private name
+(`_sign_ins`), and given to both the WriteMetric and refusals(); one that
+also counts what writes nothing, such as a reminder shown, adds that by
+hand."""
 
 from collections.abc import Mapping
 from typing import Literal, overload

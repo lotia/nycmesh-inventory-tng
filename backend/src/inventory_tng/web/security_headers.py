@@ -38,6 +38,7 @@ from opentelemetry import metrics
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from inventory_tng.core.metrics_at_once import at_once
 from inventory_tng.core.phrases import BRAND
 from inventory_tng.core.rate_limits import RateLimitedReply
 from inventory_tng.core.refusals import Fields, refusals
@@ -135,10 +136,13 @@ PERMISSIONS = ", ".join(
 # same-origin post its real Origin, not null (core/cross_site.py).
 REFERRER_POLICY = "same-origin"
 
-violations = meter.create_counter(
-    "inventory.csp.violations",
-    unit="{violation}",
-    description="Content-Security-Policy violations browsers reported, by directive",
+violations = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.csp.violations",
+        unit="{violation}",
+        description="Content-Security-Policy violations browsers reported, by directive",
+    ),
 )
 
 

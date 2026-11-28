@@ -3,9 +3,10 @@ its commit (CONTRIBUTING.md, Logging; inventory-tng-kebu): a log.info()
 after a commit fails here, in the function itself or in a function of
 its module that it calls, directly or through another.
 
-Metrics are left to `ty check` (inventory-tng-8xs0): a write's metric is
-a WriteMetric, with no add() or record(), and a metric made bare is no
-write's, by its declaration. To ty a log line is any call, so this test
+Metrics are held elsewhere (inventory-tng-8xs0): a write's metric is a
+WriteMetric, with no add() or record(), which `ty check` holds, and
+test_metrics_declared.py fails on a metric made as no declared kind. To
+ty a log line is any call, and a line has no declaration, so this test
 reads them.
 
 Deterministic, read from the source, function by function:

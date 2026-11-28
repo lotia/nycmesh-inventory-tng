@@ -18,6 +18,7 @@ from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.orm import Session
 
 from inventory_tng.core.db_locking import get_locked, locked_row
+from inventory_tng.core.metrics_at_once import at_once
 from inventory_tng.core.phrases import PATH_BETWEEN, gettext, lazy_gettext
 from inventory_tng.core.write_metrics import WriteMetric
 from inventory_tng.models.catalogue import Item, ItemPackage
@@ -41,10 +42,13 @@ made = WriteMetric(
         description="Label codes made, by what they name",
     ),
 )
-printed = meter.create_counter(
-    "inventory.labels.printed",
-    unit="{label}",
-    description="Labels laid out on sheets to print, each copy counted",
+printed = at_once(
+    "nothing written",
+    meter.create_counter(
+        "inventory.labels.printed",
+        unit="{label}",
+        description="Labels laid out on sheets to print, each copy counted",
+    ),
 )
 revoked = WriteMetric(
     log,

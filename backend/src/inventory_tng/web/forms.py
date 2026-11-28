@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from inventory_tng.catalogue.amount_rules import whole_enough
 from inventory_tng.core.db_base import Base
+from inventory_tng.core.metrics_at_once import at_once
 from inventory_tng.core.phrases import Separator, Words, gettext, lazy_gettext, number
 from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.core.rule_names import RuleName
@@ -302,12 +303,15 @@ def use_separator(separator: Separator) -> str:
 # (scan/page_telemetry_api).
 OtherSeparator = Literal["point", "comma", "thousands"]
 
-other_separators = meter.create_counter(
-    "inventory.numbers.other_separator",
-    unit="{refusal}",
-    description="Numbers typed in a box with the decimal separator its locale "
-    "does not use, refused, by which: a point, a comma, or either followed by "
-    "three digits after a whole part above 0, as thousands are grouped",
+other_separators = at_once(
+    "shared",
+    meter.create_counter(
+        "inventory.numbers.other_separator",
+        unit="{refusal}",
+        description="Numbers typed in a box with the decimal separator its locale "
+        "does not use, refused, by which: a point, a comma, or either followed by "
+        "three digits after a whole part above 0, as thousands are grouped",
+    ),
 )
 
 

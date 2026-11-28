@@ -21,6 +21,7 @@ from limits.strategies import MovingWindowRateLimiter
 from opentelemetry import metrics
 from pydantic import BaseModel, ConfigDict, Field
 
+from inventory_tng.core.metrics_at_once import at_once
 from inventory_tng.core.rate_limits import RateLimitedReply
 from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.web import forms
@@ -230,119 +231,173 @@ def reports_refused(
 ) -> None: ...
 
 
-page_errors = meter.create_counter(
-    "inventory.page.errors",
-    unit="{error}",
-    description="Errors the scan and register pages caught, by page and source",
+page_errors = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.page.errors",
+        unit="{error}",
+        description="Errors the scan and register pages caught, by page and source",
+    ),
 )
 # Buckets around each vital's thresholds (web.dev: good up to 0.2 s for
 # INP and 2.5 s for LCP, poor past 0.5 s and 4 s; good up to 0.1 for CLS,
 # poor past 0.25): the SDK's own, from 5 up, would put nearly all in one.
 VITAL_SECONDS = (0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 4, 6, 10, 20, 60)
 LAYOUT_SHIFTS = (0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.5, 1, 2.5)
-vital_durations = meter.create_histogram(
-    "inventory.page.web_vital.duration",
-    unit="s",
-    description="Largest Contentful Paint and Interaction to Next Paint",
-    explicit_bucket_boundaries_advisory=VITAL_SECONDS,
+vital_durations = at_once(
+    "browser report",
+    meter.create_histogram(
+        "inventory.page.web_vital.duration",
+        unit="s",
+        description="Largest Contentful Paint and Interaction to Next Paint",
+        explicit_bucket_boundaries_advisory=VITAL_SECONDS,
+    ),
 )
-layout_shifts = meter.create_histogram(
-    "inventory.page.web_vital.layout_shift",
-    unit="1",
-    description="Cumulative Layout Shift",
-    explicit_bucket_boundaries_advisory=LAYOUT_SHIFTS,
+layout_shifts = at_once(
+    "browser report",
+    meter.create_histogram(
+        "inventory.page.web_vital.layout_shift",
+        unit="1",
+        description="Cumulative Layout Shift",
+        explicit_bucket_boundaries_advisory=LAYOUT_SHIFTS,
+    ),
 )
-outbox_retries = meter.create_counter(
-    "inventory.outbox.retries",
-    unit="{attempt}",
-    description="Batches the scan page will send again, by why",
+outbox_retries = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.outbox.retries",
+        unit="{attempt}",
+        description="Batches the scan page will send again, by why",
+    ),
 )
-out_of_date = meter.create_counter(
-    "inventory.page.out_of_date",
-    unit="{tab}",
-    description="Scan page tabs that learned a newer build is out, by how",
+out_of_date = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.page.out_of_date",
+        unit="{tab}",
+        description="Scan page tabs that learned a newer build is out, by how",
+    ),
 )
-older_storage = meter.create_counter(
-    "inventory.page.older_storage",
-    unit="{load}",
-    description="Scan page loads that found saves not sent, or a cart, left "
-    "by an older build, by which",
+older_storage = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.page.older_storage",
+        unit="{load}",
+        description="Scan page loads that found saves not sent, or a cart, left "
+        "by an older build, by which",
+    ),
 )
-older_acted_on = meter.create_counter(
-    "inventory.page.older_acted_on",
-    unit="{entry}",
-    description="Saves not sent, or carts, left by an older build that a "
-    "volunteer put back in the cart, discarded or discarded a line of, or the "
-    "page put back in an empty cart itself, by which and how",
+older_acted_on = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.page.older_acted_on",
+        unit="{entry}",
+        description="Saves not sent, or carts, left by an older build that a "
+        "volunteer put back in the cart, discarded or discarded a line of, or the "
+        "page put back in an empty cart itself, by which and how",
+    ),
 )
-cart_discards = meter.create_counter(
-    "inventory.cart.discards",
-    unit="{cart}",
-    description="Carts a volunteer discarded on the scan page",
+cart_discards = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.cart.discards",
+        unit="{cart}",
+        description="Carts a volunteer discarded on the scan page",
+    ),
 )
-lines_removed = meter.create_counter(
-    "inventory.cart.lines_removed",
-    unit="{line}",
-    description="Lines a volunteer removed from the scan page's cart",
+lines_removed = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.cart.lines_removed",
+        unit="{line}",
+        description="Lines a volunteer removed from the scan page's cart",
+    ),
 )
-removals_undone = meter.create_counter(
-    "inventory.cart.removals_undone",
-    unit="{line}",
-    description="Lines removed from the scan page's cart that a volunteer put "
-    "back with Undo",
+removals_undone = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.cart.removals_undone",
+        unit="{line}",
+        description="Lines removed from the scan page's cart that a volunteer put "
+        "back with Undo",
+    ),
 )
-camera_returns = meter.create_counter(
-    "inventory.scan.camera.returns",
-    unit="{tap}",
-    description="Taps on the scan page's Back to camera, which scrolls the "
-    "camera's picture back onto the screen",
+camera_returns = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.scan.camera.returns",
+        unit="{tap}",
+        description="Taps on the scan page's Back to camera, which scrolls the "
+        "camera's picture back onto the screen",
+    ),
 )
-differences_added = meter.create_counter(
-    "inventory.cart.differences_added",
-    unit="{batch}",
-    description="What saves refused as another tab recorded their cart first "
-    "held more of, put in the scan page's cart, by the page itself or a tap",
+differences_added = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.cart.differences_added",
+        unit="{batch}",
+        description="What saves refused as another tab recorded their cart first "
+        "held more of, put in the scan page's cart, by the page itself or a tap",
+    ),
 )
-rests_put_back = meter.create_counter(
-    "inventory.cart.rests_put_back",
-    unit="{batch}",
-    description="Batches refused for some of their lines whose other lines a "
-    "volunteer put in the scan page's cart with Add to cart",
+rests_put_back = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.cart.rests_put_back",
+        unit="{batch}",
+        description="Batches refused for some of their lines whose other lines a "
+        "volunteer put in the scan page's cart with Add to cart",
+    ),
 )
-camera_sessions = meter.create_counter(
-    "inventory.scan.camera.sessions",
-    unit="{session}",
-    description="Sessions of the scan page's camera, by how each ended and the "
-    "decoder that read: opened, refused, closed while opening, or resumed as the "
-    "page was shown again with it open",
+camera_sessions = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.scan.camera.sessions",
+        unit="{session}",
+        description="Sessions of the scan page's camera, by how each ended and the "
+        "decoder that read: opened, refused, closed while opening, or resumed as the "
+        "page was shown again with it open",
+    ),
 )
 # Most cameras open in a second or two; a first one waits on the
 # browser's question to allow it.
 OPEN_SECONDS = (0.25, 0.5, 1, 1.5, 2, 3, 5, 10, 20, 30, 60, 120)
-camera_open = meter.create_histogram(
-    "inventory.scan.camera.open.duration",
-    unit="s",
-    description="From asking for the scan page's camera to its opening",
-    explicit_bucket_boundaries_advisory=OPEN_SECONDS,
+camera_open = at_once(
+    "browser report",
+    meter.create_histogram(
+        "inventory.scan.camera.open.duration",
+        unit="s",
+        description="From asking for the scan page's camera to its opening",
+        explicit_bucket_boundaries_advisory=OPEN_SECONDS,
+    ),
 )
 # From a refusal in a second to a hub tablet's camera open all day: the
 # SDK's own buckets stop short of a working day.
 SESSION_SECONDS = (1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600, 7200, 14400, 28800)
-camera_session_durations = meter.create_histogram(
-    "inventory.scan.camera.session.duration",
-    unit="s",
-    description="How long the scan page's camera stayed open, or took to be refused",
-    explicit_bucket_boundaries_advisory=SESSION_SECONDS,
+camera_session_durations = at_once(
+    "browser report",
+    meter.create_histogram(
+        "inventory.scan.camera.session.duration",
+        unit="s",
+        description="How long the scan page's camera stayed open, or took to be refused",
+        explicit_bucket_boundaries_advisory=SESSION_SECONDS,
+    ),
 )
-camera_labels = meter.create_counter(
-    "inventory.scan.camera.labels",
-    unit="{label}",
-    description="Labels the scan page's camera read, by what each names",
+camera_labels = at_once(
+    "browser report",
+    meter.create_counter(
+        "inventory.scan.camera.labels",
+        unit="{label}",
+        description="Labels the scan page's camera read, by what each names",
+    ),
 )
-scan_to_save = meter.create_histogram(
-    "inventory.scan.to_save.duration",
-    unit="s",
-    description="From a batch's first line to saving it",
+scan_to_save = at_once(
+    "browser report",
+    meter.create_histogram(
+        "inventory.scan.to_save.duration",
+        unit="s",
+        description="From a batch's first line to saving it",
+    ),
 )
 
 

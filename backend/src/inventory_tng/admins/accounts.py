@@ -38,6 +38,7 @@ from inventory_tng.core.db_locking import get_locked, locked
 from inventory_tng.core.db_once_committed import once_committed
 from inventory_tng.core.db_sessions import exists_where, set_actor
 from inventory_tng.core.mail import Notifier
+from inventory_tng.core.metrics_at_once import at_once
 from inventory_tng.core.phrases import Words, gettext, lazy_gettext, number
 from inventory_tng.core.rate_limits import limiter
 from inventory_tng.core.refusals import Fields, refusals
@@ -103,16 +104,22 @@ Reason = Literal["unknown_user", "bad_password", "bad_code", "rate_limited"]
 Factor = Literal["totp", "recovery", "password"]
 
 # Each counts what is refused too, so is given to refusals() as well.
-_sign_ins = meter.create_counter(
-    "inventory.admin.sign_ins",
-    unit="{attempt}",
-    description="Administrators' sign-in attempts, by outcome",
+_sign_ins = at_once(
+    "shared",
+    meter.create_counter(
+        "inventory.admin.sign_ins",
+        unit="{attempt}",
+        description="Administrators' sign-in attempts, by outcome",
+    ),
 )
 signed_in = WriteMetric(log, _sign_ins)
-_confirmations = meter.create_counter(
-    "inventory.admin.confirmations",
-    unit="{attempt}",
-    description="Codes typed to confirm a sensitive action, by outcome",
+_confirmations = at_once(
+    "shared",
+    meter.create_counter(
+        "inventory.admin.confirmations",
+        unit="{attempt}",
+        description="Codes typed to confirm a sensitive action, by outcome",
+    ),
 )
 confirmed = WriteMetric(log, _confirmations)
 
@@ -357,10 +364,13 @@ def _recovery_digest(typed: str) -> bytes:
 
 
 # Counts reminders too, which write nothing, so are added at once.
-_recovery_codes = meter.create_counter(
-    "inventory.admin.recovery_codes",
-    unit="{event}",
-    description="Recovery codes made, and reminders that few are left, by event",
+_recovery_codes = at_once(
+    "shared",
+    meter.create_counter(
+        "inventory.admin.recovery_codes",
+        unit="{event}",
+        description="Recovery codes made, and reminders that few are left, by event",
+    ),
 )
 recovery_codes_made = WriteMetric(log, _recovery_codes)
 
@@ -1190,10 +1200,13 @@ def use_reset_link(
 # The recovery token (docs/decisions/0012)
 
 # Counts what is refused too, so is given to refusals() as well.
-_recoveries = meter.create_counter(
-    "inventory.admin.recoveries",
-    unit="{attempt}",
-    description="Uses of the operator's recovery token, by outcome",
+_recoveries = at_once(
+    "shared",
+    meter.create_counter(
+        "inventory.admin.recoveries",
+        unit="{attempt}",
+        description="Uses of the operator's recovery token, by outcome",
+    ),
 )
 # A recovery link made is a warning: it lets in whoever holds it.
 recovery_links_made = WriteMetric(log, _recoveries, level="warning")

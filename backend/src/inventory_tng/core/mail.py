@@ -28,6 +28,7 @@ from opentelemetry import metrics
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.metrics_at_once import at_once
 from inventory_tng.core.phrases import writing_numbers
 from inventory_tng.core.settings import MailConfig
 from inventory_tng.models.admins import Admin
@@ -58,10 +59,13 @@ Kind = Literal[
 # provider that has gone quiet holds one only briefly.
 TIMEOUT_SECONDS = 10
 
-sent = meter.create_counter(
-    "inventory.mail.sent",
-    unit="{message}",
-    description="Mail to administrators, by kind and outcome",
+sent = at_once(
+    "nothing written",
+    meter.create_counter(
+        "inventory.mail.sent",
+        unit="{message}",
+        description="Mail to administrators, by kind and outcome",
+    ),
 )
 
 

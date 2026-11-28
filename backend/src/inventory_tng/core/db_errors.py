@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import exc
 from sqlalchemy.orm import Session
 
+from inventory_tng.core.metrics_at_once import at_once
 from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.core.rule_names import UNIQUE, RuleName
 
@@ -228,10 +229,13 @@ UNAVAILABLE: dict[int | str, dict[str, Any]] = {
 }
 
 
-pool_timeouts = metrics.get_meter(__name__).create_counter(
-    "db.client.connection.timeouts",
-    unit="{timeout}",
-    description="Requests that found no free connection in time, by pool",
+pool_timeouts = at_once(
+    "failure",
+    metrics.get_meter(__name__).create_counter(
+        "db.client.connection.timeouts",
+        unit="{timeout}",
+        description="Requests that found no free connection in time, by pool",
+    ),
 )
 
 

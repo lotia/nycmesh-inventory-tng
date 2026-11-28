@@ -30,6 +30,7 @@ from inventory_tng.catalogue.unit_conversion import (
 from inventory_tng.core.db_errors import RuleBroken
 from inventory_tng.core.db_lookups import values_by
 from inventory_tng.core.db_once_committed import once_committed
+from inventory_tng.core.metrics_at_once import at_once
 from inventory_tng.core.refusals import Fields, refusals
 from inventory_tng.core.rule_names import RuleName
 from inventory_tng.core.write_metrics import WriteMetric
@@ -57,10 +58,13 @@ from inventory_tng.stock.units_shown import Now
 log = structlog.get_logger(__name__)
 meter = metrics.get_meter(__name__)
 
-replayed = meter.create_counter(
-    "inventory.transactions.replayed",
-    unit="{transaction}",
-    description="Batches sent again with a key already written, by kind",
+replayed = at_once(
+    "nothing written",
+    meter.create_counter(
+        "inventory.transactions.replayed",
+        unit="{transaction}",
+        description="Batches sent again with a key already written, by kind",
+    ),
 )
 # A batch refused only for these is of a page behind the catalogue.
 SHOWN_BEHIND = frozenset({"unit_changed", "package_resized"})

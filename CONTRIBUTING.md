@@ -1520,19 +1520,20 @@ its `on_commit(session, event, ...)` logs the success line with it. A
 line with no metric goes through `once_committed`
 (`core/db_once_committed.py`). One logged by hand after a commit fails
 `tests/codebase/test_writes_logged_once_committed.py`; review looks for
-one before, and for a write's metric made bare. A refusal or failure,
-which commits nothing, is measured and logged at once, and so are
-`debug` lines. Log a refusal through a
-kind declared with `@refusals` (`core/refusals.py`), which counts it as
-it logs it, by a reason from a fixed list, a `Literal` that `ty check`
-holds calls to; a refusal logged by hand fails
-`tests/codebase/test_refusals_counted.py`. A change a rule
-refuses is logged and counted already, by `attempt()` and its kin in
-`core/db_errors.py`: pass them the ids to log, and count it again nowhere
-(`tests/codebase/test_rule_refusals.py`). A form's own problem with a box
-is a `Problem` with its kind (`web/form_problems.py`), which the page
-counts as it shows it. A test that calls a write directly commits before
-it reads the metric or log line.
+one before. Any other counter or histogram is given to `refusals()`, or
+to `at_once()` (`core/metrics_at_once.py`) with why it measures no
+write; one made bare fails `tests/codebase/test_metrics_declared.py`.
+A refusal or failure, which commits nothing, is measured and logged at
+once, and so are `debug` lines. Log a refusal through a kind declared
+with `@refusals` (`core/refusals.py`), which counts it as it logs it, by
+a reason from a fixed list, a `Literal` that `ty check` holds calls to;
+a refusal logged by hand fails `tests/codebase/test_refusals_counted.py`.
+A change a rule refuses is logged and counted already, by `attempt()`
+and its kin in `core/db_errors.py`: pass them the ids to log, and count
+it again nowhere (`tests/codebase/test_rule_refusals.py`). A form's own
+problem with a box is a `Problem` with its kind (`web/form_problems.py`),
+which the page counts as it shows it. A test that calls a write directly
+commits before it reads the metric or log line.
 
 Metric attributes take values from a fixed list in code. For a database error,
 log `describe_error(error)`: its class, code and constraint, never its message,
