@@ -11,7 +11,10 @@
  */
 import { ignoreTaps } from "../shared/settling";
 
-/** Whether this page was reached by a redirect, as a form's answer is. */
+/** Whether this page was reached by a redirect, as a form's answer is.
+ * Only one from the same origin is counted, as every one here is. A link
+ * that redirects, as to sign in, waits too, and WebKit counts the redirect
+ * again on a reload: a needless wait, never a tap lost to a double tap. */
 const redirected = () =>
   performance
     .getEntriesByType("navigation")

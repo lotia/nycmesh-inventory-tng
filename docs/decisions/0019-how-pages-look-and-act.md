@@ -100,8 +100,9 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   confirmation page (`_confirm.html`'s macro), which marks its way
   back. Focus stays where a page's starts until an ignored tap focuses
   what the page marks, else its heading. A link followed to any other
-  page takes taps at once. Only taps, and such a page, start a wait:
-  typing, picking from a list and a label read leave taps taken.
+  page takes taps at once; one that redirects, as to sign in, waits.
+  Only taps, and such a page, start a wait: typing, picking from a list
+  and a label read leave taps taken.
   `backend/tests/codebase/test_focus_and_settling.py` refuses focus
   moved, or a tap told from a key's press, anywhere else.
 - We rejected deciding each place apart, as each fix found another (Ali,

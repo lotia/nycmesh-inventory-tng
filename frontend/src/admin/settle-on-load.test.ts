@@ -105,4 +105,16 @@ describe("a page a tap brought up (Ali, 2026-11-27, inventory-tng-0c2z)", () => 
     tap(save);
     expect(tapped).toEqual(["Save"]);
   });
+
+  it("leaves a page a link was followed to alone, reloaded or not", () => {
+    for (const type of ["navigate", "reload", "back_forward"]) {
+      vi.spyOn(performance, "getEntriesByType").mockReturnValue([
+        { redirectCount: 0, type } as PerformanceNavigationTiming,
+      ]);
+      const save = page(`<form><button>Save</button></form>`);
+      settleOnLoad(document);
+      tap(save);
+      expect(tapped).toEqual(["Save"]);
+    }
+  });
 });

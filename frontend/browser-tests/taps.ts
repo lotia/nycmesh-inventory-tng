@@ -9,8 +9,11 @@ import { SETTLE_MS } from "../src/shared/settling";
 /** A point on the page, as a finger touches it. */
 export type Point = { x: number; y: number };
 
-/** Waits till the page takes taps again. */
+/** Waits till the page takes taps again. A page's wait as it loads starts
+ * when its script runs, which is before DOMContentLoaded but may be after
+ * its words show (src/admin/settle-on-load.ts). */
 export async function settled(page: Page): Promise<void> {
+  await page.waitForLoadState("domcontentloaded");
   await page.waitForTimeout(SETTLE_MS);
 }
 
