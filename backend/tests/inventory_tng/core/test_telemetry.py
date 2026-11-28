@@ -562,6 +562,28 @@ def test_counts_the_places_a_count_was_saved_at(
     assert (after[0] - before[0], after[1] - before[1]) == (1, 2)
 
 
+def test_a_count_form_saved_rolled_back_is_neither_measured_nor_logged(
+    rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Measured and logged once committed (db_once_committed): a count form
+    saved, its transaction never committed but rolled back, leaves no trace
+    in either (inventory-tng-kebu)."""
+    client, _, reader, _ = rolled_back
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    place = stocked(session)
+    path = f"{COUNTS}/{place.store.id}"
+    form = count_form_at(client, place.store.id)
+    name = "inventory.count.places"
+    before = histogram_counts(reader, name)
+    monkeypatch.setattr(session, "commit", session.flush)
+    with capture_logs() as logs:
+        assert client.post(path, data=form, follow_redirects=False).status_code == 303
+        session.rollback()
+    assert added(reader, name, before, histogram_counts) == {}
+    assert "count saved" not in [line["event"] for line in logs]
+
+
 def emptied_while_counted(
     client: TestClient, session: Session, place: Place, area: Location
 ) -> tuple[str, Answer]:

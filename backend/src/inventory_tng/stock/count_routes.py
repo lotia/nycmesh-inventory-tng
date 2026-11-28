@@ -879,7 +879,7 @@ def count(
     def put_right() -> StoreCounted:
         nonlocal retired, shown_now
         try:
-            return record_store_count(
+            saved = record_store_count(
                 session,
                 sent_key,
                 signed.admin.id,
@@ -897,6 +897,8 @@ def count(
         except ShownOtherwise as broken:
             shown_now = broken.now
             raise
+        once_committed(session, _saved, place.id, saved, fixes)
+        return saved
 
     result, broken = refusal(session, put_right, *RULE_REFUSALS, location_id=place.id)
     if broken is not None:
@@ -995,7 +997,6 @@ def count(
         )
     assert result is not None
     session.commit()
-    _saved(place.id, result, fixes)
     counted = result.places
     moved = {place_id: each.moved for place_id, each in counted.items() if each.moved}
     if not moved:
@@ -1028,7 +1029,7 @@ def count(
 
 def _saved(place_id: int, result: StoreCounted, fixes: Sequence[Fix]) -> None:
     """Measure and log a count form of the place saved, and the moves it
-    fixed."""
+    fixed: once committed (count's put_right)."""
     counted = result.places
     if any(each.written for each in counted.values()):
         places_counted.record(len(counted))
