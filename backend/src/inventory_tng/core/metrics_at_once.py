@@ -23,7 +23,8 @@ Why = Literal[
     # What writes no row, as labels laid out, a batch sent again or mail.
     "nothing written",
     # Given to a WriteMetric or refusals() too, and added by hand only for
-    # what neither measures.
+    # what neither measures, as a reminder shown or the scan page's own
+    # refusals.
     "shared",
 ]
 

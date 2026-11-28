@@ -103,34 +103,31 @@ def _per_account(limits: RateLimits) -> RateLimitItem:
 Reason = Literal["unknown_user", "bad_password", "bad_code", "rate_limited"]
 Factor = Literal["totp", "recovery", "password"]
 
-# Each counts what is refused too, so is given to refusals() as well.
-_sign_ins = at_once(
-    "shared",
+
+@refusals(
+    log,
     meter.create_counter(
         "inventory.admin.sign_ins",
         unit="{attempt}",
         description="Administrators' sign-in attempts, by outcome",
     ),
 )
-signed_in = WriteMetric(log, _sign_ins)
-_confirmations = at_once(
-    "shared",
+def sign_in_refused(
+    event: str, *, outcome: Literal["refused"], reason: Reason, **fields: Unpack[Fields]
+) -> None: ...
+
+
+signed_in = sign_in_refused.written()
+
+
+@refusals(
+    log,
     meter.create_counter(
         "inventory.admin.confirmations",
         unit="{attempt}",
         description="Codes typed to confirm a sensitive action, by outcome",
     ),
 )
-confirmed = WriteMetric(log, _confirmations)
-
-
-@refusals(log, _sign_ins)
-def sign_in_refused(
-    event: str, *, outcome: Literal["refused"], reason: Reason, **fields: Unpack[Fields]
-) -> None: ...
-
-
-@refusals(log, _confirmations)
 def confirmation_refused(
     event: str,
     *,
@@ -138,6 +135,9 @@ def confirmation_refused(
     outcome: Literal["refused", "rate_limited"],
     **fields: Unpack[Fields],
 ) -> None: ...
+
+
+confirmed = confirmation_refused.written()
 
 
 _hasher = PasswordHasher()
@@ -1199,23 +1199,22 @@ def use_reset_link(
 
 # The recovery token (docs/decisions/0012)
 
-# Counts what is refused too, so is given to refusals() as well.
-_recoveries = at_once(
-    "shared",
+
+@refusals(
+    log,
     meter.create_counter(
         "inventory.admin.recoveries",
         unit="{attempt}",
         description="Uses of the operator's recovery token, by outcome",
     ),
 )
-# A recovery link made is a warning: it lets in whoever holds it.
-recovery_links_made = WriteMetric(log, _recoveries, level="warning")
-
-
-@refusals(log, _recoveries)
 def recovery_refused(
     event: str, *, outcome: TokenRefusal, **fields: Unpack[Fields]
 ) -> None: ...
+
+
+# A recovery link made is a warning: it lets in whoever holds it.
+recovery_links_made = recovery_refused.written(level="warning")
 
 
 def recover(

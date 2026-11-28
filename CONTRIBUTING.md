@@ -1523,6 +1523,8 @@ line with no metric goes through `once_committed`
 one before. Any other counter or histogram is given to `refusals()`, or
 to `at_once()` (`core/metrics_at_once.py`) with why it measures no
 write; one made bare fails `tests/codebase/test_metrics_declared.py`.
+A counter of an outcome, such as a sign-in's, is made by `refusals()`,
+and its success is that kind's `written()`.
 A refusal or failure, which commits nothing, is measured and logged at
 once, and so are `debug` lines. Log a refusal through a kind declared
 with `@refusals` (`core/refusals.py`), which counts it as it logs it, by

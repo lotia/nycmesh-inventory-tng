@@ -4,12 +4,10 @@ problem's kind that is not on its list, before any test runs (Ali,
 core/rule_names.py's RuleName, web/form_problems.py's Kind). Run on a
 small file written for it, with one call of each right and one wrong."""
 
-import subprocess
 from pathlib import Path
 
-from ty import find_ty_bin
+from helpers.ty_checked import refused_lines
 
-BACKEND = Path(__file__).parents[2]
 CHECKED = """\
 from typing import Any, Literal, Unpack, cast
 
@@ -34,17 +32,4 @@ refused("refused")
 
 
 def test_ty_refuses_a_value_not_on_its_list(tmp_path: Path) -> None:
-    checked = tmp_path / "checked.py"
-    checked.write_text(CHECKED)
-    found = subprocess.run(
-        [find_ty_bin(), "check", "--output-format", "concise", str(checked)],
-        cwd=BACKEND,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    lines = [
-        line for line in found.stdout.splitlines() if line.startswith(str(checked))
-    ]
-    refused = sorted(int(line.split(":")[1]) for line in lines)
-    assert refused == [15, 16, 17, 18, 19], found.stdout
+    assert refused_lines(CHECKED, tmp_path) == [15, 16, 17, 18, 19]

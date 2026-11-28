@@ -81,10 +81,9 @@ write's log line with `once_committed` together, so `ty check` refuses a
 write measured by hand, before its commit or after. Before, a codebase
 test caught one after a commit, but none before: a call site cannot tell
 a write's success from a refusal or a note. Every other counter or
-histogram is declared where it is made too: given to `refusals()`, or
-to `at_once()` (`core/metrics_at_once.py`) with why it measures no
-write, from a fixed list, such as a browser's report or a failure; a
-codebase test fails on one made bare. We rejected an allow list of the
+histogram is declared where it is made too, as a refusal's or with why
+it measures no write, from a fixed list; CONTRIBUTING.md#logging says
+how each kind is declared. We rejected an allow list of the
 notes logged inside a transaction, or of the metrics added at once,
 which every new one would need.
 

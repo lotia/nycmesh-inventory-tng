@@ -16,7 +16,14 @@ inventory-tng-vj5h):
 Its keyword-only parameters are the counter's attributes, each a Literal
 whose values are its fixed list in code (AGENTS.md rule 7), or a str whose
 list is only known as the app runs, given to refusals() by name, such as
-the tables. The function's body is never run."""
+the tables. The function's body is never run.
+
+A counter of an outcome, such as a sign-in's, counts its refusals and
+its success: the success is the kind's written() WriteMetric
+(core/write_metrics.py), so the counter is never held bare
+(inventory-tng-8xs0):
+
+    signed_in = sign_in_refused.written()"""
 
 import inspect
 from collections.abc import Callable, Collection, Mapping
@@ -34,6 +41,8 @@ from typing import (
 
 from opentelemetry.metrics import Counter
 from structlog.typing import FilteringBoundLogger
+
+from inventory_tng.core.write_metrics import WriteMetric
 
 Level = Literal["debug", "info", "warning"]
 # What an attribute whose value is not on its list, or left out, is
@@ -89,8 +98,7 @@ def _attributes(
 class Refusals[**P]:
     """Refusals of one kind, called as `shape` declares: each logged on
     `log`, the refusing module's, and added to `counter` by its
-    attributes. The counter may also count what was not refused, as a
-    sign-in's outcome does. Made by refusals()."""
+    attributes. Made by refusals()."""
 
     def __init__(
         self,
@@ -134,6 +142,12 @@ class Refusals[**P]:
                 )
                 measured[name] = UNLISTED
         self._counter.add(count, measured)
+
+    def written(self, level: Literal["info", "warning"] = "info") -> WriteMetric:
+        """The write that is the counter's outcome when not refused, as a
+        sign-in's success: measured on the same counter once committed,
+        logged on the same log at `level`."""
+        return WriteMetric(self._log, self._counter, level)
 
 
 def refusals[**P](
