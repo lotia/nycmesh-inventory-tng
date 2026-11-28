@@ -1,11 +1,11 @@
 """The app's own source, read with Python's ast module by tests that check
-how it is written (test_locking.py, test_history.py, test_write_owners.py,
-test_import_directions.py), and its templates' folder. Nothing of it runs
-in the app."""
+how it is written, and its templates' folder. Nothing of it runs in the
+app."""
 
 import ast
 import re
 from collections.abc import Callable, Collection, Mapping
+from functools import cache
 from pathlib import Path
 from typing import Literal, NamedTuple
 
@@ -50,6 +50,16 @@ def outside(path: Path, check: Check, allowed: Allowed) -> list[int]:
 def modules() -> list[Path]:
     """Every module of the app."""
     return sorted(SOURCE.rglob("*.py"))
+
+
+@cache
+def parsed() -> dict[str, ast.Module]:
+    """Every module of the app, parsed once for every test, by its path
+    under SOURCE, such as "core/db_errors.py"."""
+    return {
+        str(path.relative_to(SOURCE)): ast.parse(path.read_text(), str(path))
+        for path in modules()
+    }
 
 
 def offending(check: Check, allowed: Allowed) -> dict[str, list[int]]:

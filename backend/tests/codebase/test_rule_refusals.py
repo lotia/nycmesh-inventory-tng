@@ -19,16 +19,17 @@ Deterministic, read from the source:
 
 import ast
 import importlib
-from pathlib import Path
+from collections.abc import Callable
+from functools import cache
 from types import ModuleType
 
 from inventory_tng.core.rule_names import RULE_NAMES, UNIQUE
 from inventory_tng.web.forms import RULES
 
-from helpers.source import SOURCE, modules
+from helpers.source import parsed
 
-DB_ERRORS = SOURCE / "core" / "db_errors.py"
-LEDGER = SOURCE / "stock" / "ledger.py"
+DB_ERRORS = "core/db_errors.py"
+LEDGER = "stock/ledger.py"
 RULE_ERRORS = {
     "RuleBroken",
     "Stale",
@@ -80,10 +81,6 @@ PASSED_ON = {
 }
 
 
-def _where(path: Path) -> str:
-    return str(path.relative_to(SOURCE))
-
-
 def _functions(tree: ast.Module) -> dict[ast.AST, str]:
     """Each node of `tree` by the top-level function or method it is in."""
     inside: dict[ast.AST, str] = {}
@@ -124,13 +121,21 @@ def _caught(tree: ast.Module) -> set[str]:
     }
 
 
-def _caught_elsewhere() -> set[tuple[str, str]]:
+def _outside_db_errors(
+    find: Callable[[ast.Module], set[str]],
+) -> set[tuple[str, str]]:
+    """The functions `find` finds in every module but db_errors itself, by
+    module and function."""
     return {
-        (_where(path), function)
-        for path in modules()
-        if path != DB_ERRORS
-        for function in _caught(ast.parse(path.read_text(), str(path)))
+        (where, function)
+        for where, tree in parsed().items()
+        if where != DB_ERRORS
+        for function in find(tree)
     }
+
+
+def _caught_elsewhere() -> set[tuple[str, str]]:
+    return _outside_db_errors(_caught)
 
 
 def test_rule_refusals_are_caught_only_by_attempt() -> None:
@@ -157,12 +162,7 @@ def _unnamed(tree: ast.Module) -> set[str]:
 
 
 def _unnamed_anywhere() -> set[tuple[str, str]]:
-    return {
-        (_where(path), function)
-        for path in modules()
-        if path != DB_ERRORS
-        for function in _unnamed(ast.parse(path.read_text(), str(path)))
-    }
+    return _outside_db_errors(_unnamed)
 
 
 def test_every_change_names_its_rows_for_a_refusal() -> None:
@@ -188,10 +188,10 @@ def test_finds_a_change_naming_no_row() -> None:
     assert _unnamed(ast.parse(source)) == {"bare"}
 
 
-def _module(path: Path) -> ModuleType:
-    return importlib.import_module(
-        ".".join(("inventory_tng", *path.relative_to(SOURCE).with_suffix("").parts))
-    )
+def _module(where: str) -> ModuleType:
+    """The module at `where`, a path under SOURCE, imported."""
+    dotted = where.removesuffix(".py").replace("/", ".")
+    return importlib.import_module(f"inventory_tng.{dotted}")
 
 
 def _returned(function: ast.FunctionDef) -> set[str]:
@@ -237,7 +237,7 @@ def _named(arg: ast.expr, module: ModuleType, tree: ast.Module) -> set[str] | No
     return None
 
 
-def _rule_of(node: ast.Call, path: Path, broken: set[ast.AST]) -> ast.expr | None:
+def _rule_of(node: ast.Call, where: str, broken: set[ast.AST]) -> ast.expr | None:
     """The rule a call raises a change's refusal by, if it does: `broken`,
     the nodes of RuleBroken's subclasses, whose super().__init__ names
     theirs."""
@@ -251,7 +251,7 @@ def _rule_of(node: ast.Call, path: Path, broken: set[ast.AST]) -> ast.expr | Non
         ) if node in broken and node.args:
             return node.args[0]
         case ast.Attribute(value=ast.Name(id="broken"), attr="append") if (
-            path == LEDGER
+            where == LEDGER
         ):
             return node.args[0]
     return None
@@ -268,23 +268,23 @@ def _in_rule_errors(tree: ast.Module) -> set[ast.AST]:
     }
 
 
+@cache
 def _raised() -> tuple[set[str], set[tuple[str, str]]]:
     """The rules' names the code raises, and where one is passed on."""
     names: set[str] = set()
     passed: set[tuple[str, str]] = set()
-    for path in modules():
-        tree = ast.parse(path.read_text(), str(path))
-        module = _module(path)
+    for where, tree in parsed().items():
+        module = _module(where)
         inside = _functions(tree)
         broken = _in_rule_errors(tree)
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
-            if (arg := _rule_of(node, path, broken)) is None:
+            if (arg := _rule_of(node, where, broken)) is None:
                 continue
             found = _named(arg, module, tree)
             if found is None:
-                passed.add((_where(path), inside.get(node, "<module>")))
+                passed.add((where, inside.get(node, "<module>")))
             else:
                 names |= found
     return names, passed

@@ -1524,8 +1524,8 @@ refuses is logged and counted already, by `attempt()` and its kin in
 `core/db_errors.py`: pass them the ids to log, and count it again nowhere
 (`tests/codebase/test_rule_refusals.py`). A form's own problem with a box
 is a `Problem` with its kind (`web/form_problems.py`), which the page
-counts as it shows it. A test that
-calls a write directly commits before it reads the metric or log line.
+counts as it shows it. A test that calls a write directly commits before
+it reads the metric or log line.
 
 Metric attributes take values from a fixed list in code. For a database error,
 log `describe_error(error)`: its class, code and constraint, never its message,

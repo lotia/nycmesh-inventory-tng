@@ -28,8 +28,7 @@ log = structlog.get_logger(__name__)
 # units; too long or too short; not of its form, such as an email address;
 # not matching another box or a code; no such row, as a form made by hand
 # names; another row's already; or the form's own words for something
-# else. The counter's attribute, from this list
-# only.
+# else. The counter's attribute, from this list only.
 Kind = Literal[
     "required",
     "not_chosen",
@@ -95,9 +94,8 @@ def count_shown(template: str, context: Mapping[str, Any]) -> None:
     box, of its context's `problems`, and its `problem`, one said of the
     whole form: one line for each kind, naming its boxes."""
     by_kind: dict[Kind, list[str]] = {}
-    problem = context.get("problem")
-    whole = {"problem": problem} if isinstance(problem, Problem) else {}
-    for box, words in {**context.get("problems", {}), **whole}.items():
+    said = [*context.get("problems", {}).items(), ("problem", context.get("problem"))]
+    for box, words in said:
         if isinstance(words, Problem):
             by_kind.setdefault(words.kind, []).append(box)
     for kind, boxes in sorted(by_kind.items()):

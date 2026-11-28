@@ -28,7 +28,7 @@ import pytest
 # Has every table: helpers.source imports every model.
 from inventory_tng.core.db_base import Base
 
-from helpers.source import SOURCE, TEMPLATES, modules
+from helpers.source import SOURCE, TEMPLATES, modules, parsed
 
 # The app's modules by their path under SOURCE, read.
 type App = Mapping[str, ast.Module]
@@ -206,10 +206,7 @@ CHECKS: dict[str, Check] = {
 
 
 def test_the_app_breaks_no_import_rule() -> None:
-    app = {
-        str(path.relative_to(SOURCE)): ast.parse(path.read_text(), str(path))
-        for path in modules()
-    }
+    app = parsed()
     breaks = {
         (rule, path, what)
         for rule, check in CHECKS.items()

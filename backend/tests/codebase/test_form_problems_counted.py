@@ -11,9 +11,8 @@ Problem already. A phrase that is not a problem of the form's own is
 named in NOT_A_PROBLEM, with why, and one no longer found fails too."""
 
 import ast
-from pathlib import Path
 
-from helpers.source import SOURCE, modules
+from helpers.source import parsed
 
 NOT_A_PROBLEM = {
     # Points at the line to type something else here on: the count's
@@ -23,14 +22,6 @@ NOT_A_PROBLEM = {
     # refusal, closed meanwhile (inventory.counts.refused).
     ("stock/count_forms.py", "RULES"),
 }
-
-
-def _forms_modules() -> list[Path]:
-    return [
-        path
-        for path in modules()
-        if path.name == "forms.py" or path.name.endswith("_forms.py")
-    ]
 
 
 def _phrase(node: ast.expr) -> str | None:
@@ -63,10 +54,12 @@ def _bare(tree: ast.Module) -> set[str]:
 
 
 def _found() -> set[tuple[str, str]]:
+    """The phrases each forms module puts into a problems dict bare."""
     return {
-        (str(path.relative_to(SOURCE)), phrase)
-        for path in _forms_modules()
-        for phrase in _bare(ast.parse(path.read_text(), str(path)))
+        (where, phrase)
+        for where, tree in parsed().items()
+        if where.endswith(("/forms.py", "_forms.py"))
+        for phrase in _bare(tree)
     }
 
 

@@ -8,20 +8,21 @@ Deterministic, read from the source: only a call of a log level's method
 (log.info("...")), or of a name given one (emit = log.info), with its
 event written in it, a string or an f-string, is read, and only its
 event, by whole words, so a docstring, a comment, a variable or a
-refusal's own words to a person (RULES, notices) never match. The few that are not a request refused are named in NOT_COUNTED,
-each with why, and one no longer found there fails too, so the list
-cannot outlive its code."""
+refusal's own words to a person (RULES, notices) never match. The few
+that are not a request refused are named in NOT_COUNTED, each with why,
+and one no longer found there fails too, so the list cannot outlive its
+code."""
 
 import ast
 import re
 
-from helpers.source import SOURCE, modules
+from helpers.source import parsed
 
 LEVELS = {"debug", "info", "warning", "error", "exception", "critical"}
 REFUSED = re.compile(
     r"\b(?:refused|rejected|held back|not (?:made|set|settled|brought back))\b"
 )
-HELPER = SOURCE / "core" / "refusals.py"
+HELPER = "core/refusals.py"
 # Operator commands export no metrics: telemetry starts only in the
 # server (server.py), so a counter there would always read nothing.
 COMMAND = "an operator command, which exports no metrics"
@@ -56,14 +57,11 @@ def _levels(tree: ast.Module) -> set[str]:
 def _event(node: ast.Call, levels: set[str]) -> str | None:
     """The event a log call writes in it: an f-string's text without its
     values. `levels`, the names given a level's method."""
-    match node.func:
-        case ast.Attribute(attr=attr) if attr in LEVELS:
-            pass
-        case ast.Name(id=name) if name in levels:
-            pass
-        case _:
-            return None
-    if not node.args:
+    called = node.func
+    if not node.args or not (
+        (isinstance(called, ast.Attribute) and called.attr in LEVELS)
+        or (isinstance(called, ast.Name) and called.id in levels)
+    ):
         return None
     match node.args[0]:
         case ast.Constant(value=str(text)):
@@ -91,10 +89,10 @@ def _refusals_logged(tree: ast.Module) -> list[tuple[int, str]]:
 
 def _logged_by_hand() -> list[tuple[str, int, str]]:
     return [
-        (str(path.relative_to(SOURCE)), line, event)
-        for path in modules()
-        if path != HELPER
-        for line, event in _refusals_logged(ast.parse(path.read_text(), str(path)))
+        (where, line, event)
+        for where, tree in parsed().items()
+        if where != HELPER
+        for line, event in _refusals_logged(tree)
     ]
 
 

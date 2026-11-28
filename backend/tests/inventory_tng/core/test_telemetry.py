@@ -627,13 +627,13 @@ def test_counts_the_areas_bring_it_back_refused_by_rule(
     retire(session, shelf, bin_)
     path, refused = emptied_while_counted(client, session, place, bin_)
     rules = since(reader, RULES_REFUSED)
-    brought_before = counted(reader, "inventory.count.areas_brought_back")
+    brought = since(reader, "inventory.count.areas_brought_back")
     back = client.post(
         f"{path}/bring-back", data=count_form(refused) | {"area_id": str(bin_.id)}
     )
     assert back.status_code == 409
     assert rules() == {(("rule", "location_parent_current"),): 1}
-    assert counted(reader, "inventory.count.areas_brought_back") == brought_before
+    assert brought() == {}
 
 
 def test_counts_the_moves_fixed_on_a_count_form(
@@ -700,8 +700,7 @@ def test_counts_count_forms_refused_by_reason(
     radio, cable = f"counted_{place.item.id}", f"counted_{place.cable.id}"
     path = f"{COUNTS}/{place.store.id}"
     form = count_form_at(client, place.store.id)
-    name = "inventory.counts.refused"
-    before = counted(reader, name)
+    refused = since(reader, "inventory.counts.refused")
     rules = since(reader, RULES_REFUSED)
     boxes = since(reader, FORM_PROBLEMS)
     sent = (
@@ -714,7 +713,7 @@ def test_counts_count_forms_refused_by_reason(
     for data, status in sent:
         answer = client.post(path, data=data, follow_redirects=False)
         assert answer.status_code == status
-    assert added(reader, name, before) == {(("reason", "named_twice"),): 1}
+    assert refused() == {(("reason", "named_twice"),): 1}
     assert boxes() == {(("form", "stock/count"), ("kind", "number")): 2}
     assert rules() == {
         (("rule", CHANGED),): 1,
@@ -1385,32 +1384,29 @@ def test_counts_changes_refused_by_a_rule_once_by_its_name(
     raise_check(session, moved_at)
     waiting, huge = other.cable, place.cable
     free = Place(session).cable
-    big = {"minimum": Decimal(400_000_000)}
+    # Each item, the unit its form asks for, and how its form showed the
+    # unit (None for as it is now), refused by the rule.
     refusals = (
-        (moved, item_fields(moved, unit="m"), None, "item_unit_fixed"),
-        (labelled, item_fields(labelled, unit="each"), None, "item_unit_labelled"),
-        (converted, item_fields(converted, unit="each"), None, "item_unit_converted"),
-        (waiting, item_fields(waiting, unit="ft"), None, "item_unit_checks_waiting"),
-        (huge, item_fields(huge, unit="ft", **big), None, "item_unit_out_of_range"),
+        (moved, "m", None, "item_unit_fixed"),
+        (labelled, "each", None, "item_unit_labelled"),
+        (converted, "each", None, "item_unit_converted"),
+        (waiting, "ft", None, "item_unit_checks_waiting"),
+        (huge, "ft", None, "item_unit_out_of_range"),
         # Forms drawn while their unit was free; each fixed now, by its cause.
-        (moved, item_fields(moved, unit="ft"), True, "item_unit_moved_since_shown"),
-        (
-            labelled,
-            item_fields(labelled, unit="ft"),
-            True,
-            "item_unit_labelled_since_shown",
-        ),
-        (converted, item_fields(converted, unit="ft"), True, CHANGED),
+        (moved, "ft", True, "item_unit_moved_since_shown"),
+        (labelled, "ft", True, "item_unit_labelled_since_shown"),
+        (converted, "ft", True, CHANGED),
         # Its form drawn while its unit was fixed; free now.
-        (free, item_fields(free, unit="ft"), False, "item_unit_revoked_since_shown"),
+        (free, "ft", False, "item_unit_revoked_since_shown"),
     )
     with capture_logs() as logs:
-        for item, fields, shown_free, rule in refusals:
+        for item, unit, shown_free, rule in refusals:
+            big = {"minimum": Decimal(400_000_000)} if item is huge else {}
             save = partial(
                 items.save,
                 session,
                 item,
-                fields,
+                item_fields(item, unit=unit, **big),
                 seen=None,
                 recorded_in=item.unit if shown_free is None else None,
                 shown_free=shown_free,
