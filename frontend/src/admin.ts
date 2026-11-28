@@ -4,7 +4,6 @@
  */
 import { copyButtons, printButtons } from "./admin/buttons";
 import { suggest } from "./admin/combobox";
-import { settleConfirmPage } from "./admin/confirm-pages";
 import {
   followPicks,
   followTyped,
@@ -13,12 +12,13 @@ import {
 } from "./admin/hints";
 import { guardRetire } from "./admin/retire";
 import { followTotals } from "./admin/running-totals";
+import { settleOnLoad } from "./admin/settle-on-load";
 import { sendOnce } from "./admin/single-use-forms";
 import { followWebSearch } from "./admin/web-search";
 import { takeSeparatorFrom } from "./shared/quantity";
 
 takeSeparatorFrom(document.documentElement);
-settleConfirmPage(document);
+settleOnLoad(document);
 guardRetire(document);
 sendOnce(window);
 printButtons(document);

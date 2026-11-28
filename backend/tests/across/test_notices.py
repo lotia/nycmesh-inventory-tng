@@ -155,10 +155,12 @@ def test_a_retire_is_undone_from_its_notice(
     assert retired.status_code == 303
     landed = retired.headers["location"]
     assert landed == f"{path}?undo={retiring.id}&notice=retired"
-    undo = read(admin_client.get(landed).text).one(
-        "form", action=f"{path}/{retiring.id}/restore"
-    )
+    shown = read(admin_client.get(landed).text)
+    undo = shown.one("form", action=f"{path}/{retiring.id}/restore")
     assert undo.attrs["method"] == "post"
+    # Its words marked for the page's script, which ignores taps a moment
+    # as the page loads, an ignored one focusing them (inventory-tng-0c2z).
+    shown.one("span", "Retired.", data_settle="", tabindex="-1")
     assert [(b.text, b.classes) for b in undo.all("button")] == [(words, [])]
     assert admin_client.post(f"{path}/{retiring.id}/restore").status_code == 303
     # Back already: the notice says what was done, and offers nothing more.

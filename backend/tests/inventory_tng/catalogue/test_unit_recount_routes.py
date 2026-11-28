@@ -124,7 +124,7 @@ def test_the_page_says_beforehand_all_it_will_do(
     # script (inventory-tng-0c2z).
     shown = read(page.text)
     shown.one("button", "Recount in ft", class_="danger")
-    shown.one("a", "Keep it in m", data_keep="")
+    shown.one("a", "Keep it in m", data_settle="")
 
 
 OTHER_LENGTH = {"m": "ft", "ft": "m"}

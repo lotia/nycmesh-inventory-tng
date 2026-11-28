@@ -28,6 +28,8 @@ test("a page with unsaved changes asks before retiring", async ({ page }) => {
   await page.waitForTimeout(SETTLE_MS);
   await page.getByRole("button", { name: "Retire anyway" }).click();
   await expect(page.getByRole("status")).toContainText("Retired.");
+  // The notice's taps wait a moment as it comes.
+  await page.waitForTimeout(SETTLE_MS);
   await page.getByRole("button", { name: "Bring them back" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(was);
 });
@@ -105,10 +107,36 @@ test("a double tap on Retire brings up the question, and its second tap, on Reti
   await expect(name).toHaveValue(`${was} (typed)`);
 });
 
+test("a double tap on Retire anyway leaves the retire, its second tap on the notice's Bring them back ignored (inventory-tng-0c2z)", async ({
+  page,
+}) => {
+  const was = await ownVolunteer(page);
+  await page.getByLabel(/^Name/).fill(`${was} (typed)`);
+  await page.getByRole("button", { name: "Retire", exact: true }).click();
+  await page.waitForTimeout(SETTLE_MS);
+  await page.getByRole("button", { name: "Retire anyway" }).click();
+  const notice = page.getByRole("status");
+  await expect(notice).toContainText("Retired.");
+  // The second tap, landing as the next page comes, on Bring them back.
+  const back = page.getByRole("button", { name: "Bring them back" });
+  const box = await back.boundingBox();
+  if (box === null) {
+    throw new Error("Bring them back is not shown");
+  }
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(notice.getByText("Retired.")).toBeFocused();
+  await expect(back).toBeVisible();
+  await page.waitForTimeout(SETTLE_MS);
+  await back.click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(was);
+});
+
 test("with nothing unsaved, retiring asks nothing", async ({ page }) => {
   const name = await ownVolunteer(page);
   await page.getByRole("button", { name: "Retire", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Retired.");
+  // The notice's taps wait a moment as it comes.
+  await page.waitForTimeout(SETTLE_MS);
   await page.getByRole("button", { name: "Bring them back" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
 });

@@ -3,11 +3,13 @@
     {% with section_id="retired" %}{% include "_notice.html" %}{% endwith %}
     With `none`, a notice about no section, under the page's title
     (admin_base.html). One that a change can be undone from offers it:
-    `undo`, the path to post to. -#}
+    `undo`, the path to post to, its words marked data-settle: the page
+    ignores taps a moment as it loads (frontend/src/admin/settle-on-load.ts),
+    so the double tap that brought it never lands on the undo. -#}
 {% if notice and notice_section == section_id %}
 {%- if undo %}
 <div role="status" class="flex flex-wrap items-center gap-3">
-  <span>{{ notice }}</span>
+  <span data-settle tabindex="-1">{{ notice }}</span>
   <form method="post" action="{{ undo }}"><button>{{ undo_words | default(_("Bring it back")) }}</button></form>
 </div>
 {%- else %}<p role="status">{{ notice }}</p>{% endif %}

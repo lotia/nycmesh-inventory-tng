@@ -1,13 +1,13 @@
 {#- A confirmation page's form (docs/decisions/0019): the fields it carries,
 from a call block if any; the danger button first, then a link to keep
-things as they are, marked data-keep for the page's script
-(frontend/src/admin/confirm-pages.ts). -#}
+things as they are, marked data-settle for the page's script
+(frontend/src/admin/settle-on-load.ts). -#}
 {% macro confirm(action, button, keep, keep_words) -%}
 <form method="post" action="{{ action }}">
   {% if caller %}{{ caller() }}{% endif %}
   <div class="actions">
     <button class="danger">{{ button }}</button>
-    <a href="{{ keep }}" data-keep>{{ keep_words }}</a>
+    <a href="{{ keep }}" data-settle>{{ keep_words }}</a>
   </div>
 </form>
 {%- endmacro %}
