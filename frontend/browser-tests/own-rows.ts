@@ -11,9 +11,9 @@ import {
   type Page,
   type Response,
 } from "@playwright/test";
-import { SETTLE_MS } from "../src/shared/settling";
 import { assertNone, test as base, watch } from "./csp-violations";
 import { prepared } from "./prepared";
+import { settled } from "./scan-page";
 
 /**
  * A name no other test, or run of this one, has. Its end in letters only,
@@ -164,7 +164,7 @@ export async function invite(
  * (docs/decisions/0019, Double taps).
  */
 export async function record(page: Page): Promise<Response> {
-  await page.waitForTimeout(SETTLE_MS);
+  await settled(page);
   const saving = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/transactions") &&
@@ -179,7 +179,7 @@ export async function record(page: Page): Promise<Response> {
     page.getByText(`Recorded (transaction ${saved}).`),
   ).toBeVisible();
   // The cart's lines went: taps are taken again a moment later.
-  await page.waitForTimeout(SETTLE_MS);
+  await settled(page);
   return response;
 }
 

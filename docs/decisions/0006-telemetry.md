@@ -111,7 +111,8 @@ refused (`inventory.<things>.refused`, by `reason`), rather than one
 differs in its unit (a request, a form, a report), and a total across
 kinds would mean nothing, so OpenTelemetry's naming conventions give each
 its own name. Counters that measured refusals already kept their names
-and attributes, and now count through the helper.
+and attributes, and now count through the helper, but for those of a
+rule's refusals, folded into one below.
 
 Operator commands log their refusals but count none: telemetry starts
 only in the server, so a counter in a command would always read nothing.

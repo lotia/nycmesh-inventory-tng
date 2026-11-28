@@ -78,8 +78,9 @@ the scan pages, on a phone (360 to 430 px, one hand) and a desktop alike.
   meant. So such a tap keeps that space blank, or has the page ignore
   taps, for `SETTLE_MS` (`frontend/src/shared/settling.ts`).
 - **Focus moves without scrolling**, to the heading of what moved up,
-  the list's heading, or the control the removed content was about;
-  never to a box or list whose keyboard or picker would open. A tap
+  the list's heading, or the control the removed content was about,
+  such as the Your name list after "That's me"; never to a text box,
+  whose keyboard would open. A tap
   that asks to go somewhere far from it scrolls there, as Change goes
   to Your name, and taps then wait too, as everything moved.
 - **An ignored tap** puts focus back on that target; an ignored key's

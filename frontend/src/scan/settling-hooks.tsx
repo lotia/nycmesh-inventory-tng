@@ -13,27 +13,29 @@ import { focusInPlace, ignoreTaps, SETTLE_MS } from "../shared/settling";
  * inventory-tng-lm1b, inventory-tng-m6dc). `keep` is given its height as
  * it was before the tap; `space` is the blank, or null once it has gone,
  * and calls `onTap` when tapped, as a tap on nothing may move focus.
+ * Kept again, even at the same height, the wait starts again.
  */
 export function useKeptSpace() {
-  const height = useSignal<number | null>(null);
+  // A new object each keep, so the same height kept again restarts the wait.
+  const kept = useSignal<{ tall: number } | null>(null);
   useEffect(() => {
-    if (height.value === null) {
+    if (kept.value === null) {
       return;
     }
     const wait = setTimeout(() => {
-      height.value = null;
+      kept.value = null;
     }, SETTLE_MS);
     return () => clearTimeout(wait);
-  }, [height.value]);
+  }, [kept.value]);
   return {
     keep: (tall: number) => {
-      height.value = tall;
+      kept.value = { tall };
     },
     space: (onTap: () => void) =>
-      height.value === null ? null : (
+      kept.value === null ? null : (
         <div
           aria-hidden="true"
-          style={{ height: `${height.value}px` }}
+          style={{ height: `${kept.value.tall}px` }}
           onClick={onTap}
         />
       ),
