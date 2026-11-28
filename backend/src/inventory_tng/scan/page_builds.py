@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse
 from opentelemetry import metrics
 from pydantic import BaseModel, Field
 
+from inventory_tng.core.refusals import Refusals
 from inventory_tng.web.frontend_bundle import BUILD_ID
 
 log = structlog.get_logger(__name__)
@@ -36,11 +37,14 @@ HEADER = "X-Inventory-Build"
 # every build's. Set only in a change that makes a batch accept less.
 OLDEST_BUILD: str | None = None
 
-too_old = meter.create_counter(
-    "inventory.transactions.too_old",
-    unit="{transaction}",
-    description="Batches held back as from a build of the scan page older "
-    "than the server takes: kept on the phone, to put back in the cart",
+too_old = Refusals(
+    log,
+    meter.create_counter(
+        "inventory.transactions.too_old",
+        unit="{transaction}",
+        description="Batches held back as from a build of the scan page older "
+        "than the server takes: kept on the phone, to put back in the cart",
+    ),
 )
 
 
@@ -113,8 +117,7 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(BuildTooOld)
     def build_too_old(request: Request, error: BuildTooOld) -> JSONResponse:
-        too_old.add(1)
-        log.info("batch from a build too old", oldest=OLDEST_BUILD)
+        too_old("batch held back: build too old", oldest=OLDEST_BUILD)
         body = BuildTooOldReply(
             reason="build_too_old",
             build=error.build,

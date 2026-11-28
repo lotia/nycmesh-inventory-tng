@@ -1,7 +1,8 @@
 # 0006 — Telemetry: metrics and logs over OTLP, traces on demand
 
 **Status:** accepted · 2026-10-30 · amended 2026-11-19 (measured and
-logged once committed; camera sessions)
+logged once committed; camera sessions) and 2026-11-27 (every refusal
+logged and counted together)
 
 ## Context
 

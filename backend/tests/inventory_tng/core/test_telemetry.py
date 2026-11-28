@@ -24,9 +24,17 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from inventory_tng.admins import accounts, mail_messages
+from inventory_tng.admins.paths import ACCOUNT
 from inventory_tng.app import create_app
-from inventory_tng.catalogue import forms, items, unit_changes, unit_recounts
-from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, unit_recount
+from inventory_tng.catalogue import (
+    forms,
+    items,
+    reading_rules,
+    unit_changes,
+    unit_recounts,
+    units,
+)
+from inventory_tng.catalogue.paths import CATEGORIES, ITEMS, READINGS, unit_recount
 from inventory_tng.core import db_locking, db_sessions, mail
 from inventory_tng.core.db_errors import Gone, NoSession, RuleBroken
 from inventory_tng.core.masking import MASK, Masker
@@ -34,6 +42,7 @@ from inventory_tng.core.settings import RateLimits, Settings
 from inventory_tng.core.telemetry import Telemetry, enabled
 from inventory_tng.devices import devices
 from inventory_tng.devices.guards import RegisteredDevice
+from inventory_tng.devices.paths import CODES
 from inventory_tng.labels import labels
 from inventory_tng.models.catalogue import Category, ItemPackage
 from inventory_tng.models.devices import Device
@@ -56,6 +65,7 @@ from inventory_tng.stock import (
 from inventory_tng.stock.count_forms import NO_SUCH_PACKAGE
 from inventory_tng.stock.paths import ADJUSTMENTS, COUNTS
 from inventory_tng.web import security_headers
+from inventory_tng.web.forms import CHANGED, RETIRED
 
 from helpers.apps import on_session
 from helpers.csp_reports import SHAPES
@@ -2272,4 +2282,95 @@ def test_counts_adjustments_and_answers_to_lines_recorded_more_refused(
     }
     assert added(reader, answers, answers_before) == {
         (("answer", "checked"), ("reason", "why_problem")): 1
+    }
+
+
+def test_counts_admin_and_single_use_forms_refused_by_reason(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A form carrying a secret field, and one that makes something shown
+    once sent with no key."""
+    client, _, reader, _ = rolled_back
+    admin_forms, single_use = (
+        "inventory.admin.forms.refused",
+        "inventory.single_use_forms.refused",
+    )
+    admin_before, single_before = (
+        counted(reader, admin_forms),
+        counted(reader, single_use),
+    )
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    secret = {"email": f"ada-{tag()}@example.org", "api_token": "hunter2"}
+    assert client.post(f"{ACCOUNT}/email", data=secret).status_code == 400
+    no_key = {"uses": "1", "days": "1", "label": f"Open day {tag()}", "count": "1"}
+    assert client.post(CODES, data=no_key).status_code == 400
+    assert added(reader, admin_forms, admin_before) == {
+        (("reason", "secret_field"),): 1
+    }
+    assert added(reader, single_use, single_before) == {
+        (("made", "registration_code"), ("reason", "key_missing")): 1
+    }
+
+
+def test_counts_package_tracking_refused_by_scope_and_reason(
+    rolled_back: Recorded, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Items ticked whose open package moved meanwhile, then a package of
+    an item retired."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.package_tracking.refused"
+    before = counted(reader, name)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    spools = Spools(session)
+    cable = spools.cable
+
+    def moved_meanwhile(*_: object, **__: object) -> int:
+        raise RuleBroken(CHANGED)
+
+    with monkeypatch.context() as patched:
+        patched.setattr(open_packages, "close_unfollowed", moved_meanwhile)
+        client.post(f"{ITEMS}/tracking", data={"item": [str(cable.id)], "track": "off"})
+    cable.retired_at = datetime.now(UTC)
+    session.flush()
+    package = f"{ITEMS}/{cable.id}/packages/{spools.spool.id}/tracking"
+    assert client.post(package, data={"track": "off"}).status_code == 409
+    assert added(reader, name, before) == {
+        (("reason", CHANGED), ("scope", "bulk")): 1,
+        (("reason", RETIRED), ("scope", "package")): 1,
+    }
+
+
+def test_counts_reading_rules_refused_by_reason(
+    rolled_back: Recorded, session: Session
+) -> None:
+    """A rule's reading sent from a page shown before a change since."""
+    client, _, reader, _ = rolled_back
+    name = "inventory.reading_rules.refused"
+    before = counted(reader, name)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    (rule,) = reading_rules.decide(session, {f"Q{tag()}": units.Rule(None)}, None)
+    later = str(int(shown(rule)) + 1)
+    sent = {"reading": "none", "version": later}
+    assert client.post(f"{READINGS}/{rule.id}", data=sent).status_code == 409
+    assert added(reader, name, before) == {(("reason", CHANGED),): 1}
+
+
+def test_counts_lengths_set_on_length_checks_refused_by_reason(
+    rolled_back: Recorded, session: Session
+) -> None:
+    client, _, reader, _ = rolled_back
+    name = "inventory.open_packages.length_checks.refused"
+    before = counted(reader, name)
+    _, key = new_admin(session)
+    sign_in_with(client, key=key)
+    one = Spools(session).opened()
+    lengths = "/admin/stock/length-checks"
+    client.post(f"{lengths}/{one.id}/set", data={"left": "a lot"})
+    client.post(f"{lengths}/{one.id}/set", data={"left": "250"})
+    assert added(reader, name, before) == {
+        (("reason", "not_a_length"),): 1,
+        (("reason", "not_as_shown"),): 1,
     }

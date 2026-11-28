@@ -13,6 +13,7 @@ from collections.abc import Collection
 from typing import Literal
 
 from opentelemetry.metrics import Counter
+from structlog.typing import FilteringBoundLogger
 
 Level = Literal["debug", "info", "warning"]
 
@@ -24,7 +25,7 @@ class Refusals:
     count what was not refused, as a sign-in's outcome does."""
 
     def __init__(
-        self, log: object, counter: Counter, **attributes: Collection[str]
+        self, log: FilteringBoundLogger, counter: Counter, **attributes: Collection[str]
     ) -> None:
         self._log = log
         self._counter = counter
@@ -38,13 +39,20 @@ class Refusals:
         """Log `event` with `fields`, and add `count` to the counter by
         those of them that are its attributes, every one given: more than
         one for a counter of what the refusal refused, such as units
-        changed since shown. A value not in its list is a bug, and raised,
-        before anything is logged or counted."""
+        changed since shown.
+
+        An attribute missing, or a value not in its list, is a bug. It is
+        logged as an error and not counted, rather than raised: the
+        refusal still stands and is said, where raising would answer the
+        request with a 500 instead, and a test reading the counter sees
+        it missing."""
+        getattr(self._log, level)(event, **fields)
         measured: dict[str, str] = {}
         for name, values in self._attributes.items():
-            value = fields[name]
+            value = fields.get(name)
             if not isinstance(value, str) or value not in values:
-                raise ValueError(f"{name}={value!r} is not one of its list")
+                # Only the attribute's name: the value is not from its list.
+                self._log.error("refusal not counted", refusal=event, attribute=name)
+                return
             measured[name] = value
         self._counter.add(count, measured)
-        getattr(self._log, level)(event, **fields)

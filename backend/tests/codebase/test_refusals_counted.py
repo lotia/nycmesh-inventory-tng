@@ -1,7 +1,8 @@
 """Every refusal the app logs is counted too, through core/refusals.py's
 Refusals, never logged by hand (Ali, 2026-11-27, inventory-tng-h3k0): a
-log call whose event says something was refused, rejected, or not made,
-set, settled or brought back fails here, outside that module.
+log call whose event says something was refused, rejected or held back,
+or not made, set, settled or brought back, fails here, outside that
+module.
 
 Deterministic, read from the source: only a call of a log level's method
 (log.info("...")) with its event written in it, a string or an f-string,
@@ -17,7 +18,9 @@ import re
 from helpers.source import SOURCE, modules
 
 LEVELS = {"debug", "info", "warning", "error", "exception", "critical"}
-REFUSED = re.compile(r"\b(?:refused|rejected|not (?:made|set|settled|brought back))\b")
+REFUSED = re.compile(
+    r"\b(?:refused|rejected|held back|not (?:made|set|settled|brought back))\b"
+)
 HELPER = SOURCE / "core" / "refusals.py"
 # Operator commands export no metrics: telemetry starts only in the
 # server (server.py), so a counter there would always read nothing.
@@ -97,10 +100,11 @@ def test_finds_a_refusal_logged_by_hand() -> None:
         ")\n"
         'log.debug(f"{purpose} refused")\n'
         'log.info("length not set: the form said otherwise")\n'
+        'log.info("batch held back: build too old")\n'
         'log.info("mail not sent")\n'
         'log.info("unrefused")\n'
         'refusals("thing refused", reason="x")\n'
         '"""log.info("refused")"""\n'
     )
     found = _refusals_logged(ast.parse(source))
-    assert sorted(line for line, _ in found) == [1, 2, 5, 6]
+    assert sorted(line for line, _ in found) == [1, 2, 5, 6, 7]

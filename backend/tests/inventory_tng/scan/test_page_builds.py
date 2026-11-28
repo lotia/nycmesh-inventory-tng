@@ -100,7 +100,9 @@ def test_a_batch_from_a_build_too_old_is_held_back_before_it_is_checked(
         },
     )
     assert response.headers[HEADER] == SERVERS
-    (line,) = [line for line in logs if line["event"] == "batch from a build too old"]
+    (line,) = [
+        line for line in logs if line["event"] == "batch held back: build too old"
+    ]
     assert line["oldest"] == OLDEST
 
 

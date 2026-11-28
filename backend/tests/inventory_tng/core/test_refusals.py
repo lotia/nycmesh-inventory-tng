@@ -46,17 +46,29 @@ def test_logs_and_counts_a_refusal_by_its_attributes_only() -> None:
 
 
 @pytest.mark.parametrize("reason", ["free text", None])
-def test_a_value_not_in_its_list_is_neither_logged_nor_counted(
+def test_a_value_not_in_its_list_is_logged_as_an_error_not_counted(
     reason: str | None,
 ) -> None:
+    """A bug, but the refusal stands, logged as ever: raised, the request
+    would be answered 500 instead. The value is never logged again."""
     refused, counter = refusals(reason=("rate_limited",))
-    with capture_logs() as logs, pytest.raises(ValueError, match="reason="):
+    with capture_logs() as logs:
         refused("report refused", reason=reason)
-    assert (counter.added, logs) == ([], [])
+    assert counter.added == []
+    assert logs == [
+        {"event": "report refused", "reason": reason, "log_level": "info"},
+        {
+            "event": "refusal not counted",
+            "refusal": "report refused",
+            "attribute": "reason",
+            "log_level": "error",
+        },
+    ]
 
 
-def test_every_attribute_is_given() -> None:
+def test_an_attribute_left_out_is_not_counted() -> None:
     refused, counter = refusals(reason=("rate_limited",), page=("scan",))
-    with pytest.raises(KeyError, match="page"):
+    with capture_logs() as logs:
         refused("report refused", reason="rate_limited")
     assert counter.added == []
+    assert logs[-1]["attribute"] == "page"
