@@ -42,6 +42,7 @@ import {
   SIDES,
   type Side,
   takesFromOpen,
+  unitChanged,
   withLine,
   withLineChanged,
 } from "./cart";
@@ -275,12 +276,17 @@ export function CartForm({
   }
 
   /** How many of what is said above the lines and Record are shown:
-   * Added back, Undo's offer, the problems, Sending. */
+   * Added back, Undo's offer, the problems, Sending; and on the lines, a
+   * unit changed, above the line's boxes, which a tick may clear. */
   const saidAbove = () =>
     (putBack.value === null ? 0 : 1) +
     (removed.value?.revision === cart.value.revision ? 1 : 0) +
     problems.value.length +
-    (saved.value === null ? 0 : 1);
+    (saved.value === null ? 0 : 1) +
+    cart.value.lines.filter((line) => {
+      const item = indexOf(catalogue).items.get(line.itemId);
+      return item !== undefined && unitChanged(line, item);
+    }).length;
 
   /** A tap took away what was above other controls, which moved up: taps
    * are ignored a moment, and focus goes, without scrolling, to `to` once
@@ -293,9 +299,9 @@ export function CartForm({
   /** Change the cart. What a tap's change takes away of what is said
    * above the lines and Record moves what is below up, so taps are ignored
    * a moment, an ignored one focusing what had focus (inventory-tng-r3jx).
-   * Typed in a box, or `picked` in a list's picker, no finger is on the
-   * page to land again. */
-  function change(next: Cart, picked = false) {
+   * Not `tapped`, as when picked in a list's picker or read from a label,
+   * or typed in a box, no finger is on the page to land again. */
+  function change(next: Cart, tapped = true) {
     const said = saidAbove();
     // Focus is on an HTML or SVG element, either of which takes focus().
     const focused = document.activeElement as HTMLElement | null;
@@ -305,7 +311,7 @@ export function CartForm({
     removed.value = null;
     focusNext.current = null;
     kept(store.change(next));
-    if (saidAbove() < said && !picked && !isTextBox(focused)) {
+    if (saidAbove() < said && tapped && !isTextBox(focused)) {
       ignoreTaps(document, () => focused);
     }
   }
@@ -364,18 +370,19 @@ export function CartForm({
     }
   });
 
-  /** Change the cart's `fields`, `picked` in a list's picker or not. */
-  function set(fields: Partial<Cart>, picked = false) {
+  /** Change the cart's `fields`, `tapped` or not (change). */
+  function set(fields: Partial<Cart>, tapped = true) {
     change(
       placed(cart.value, { ...cart.value, ...fields }, catalogue, sealed),
-      picked,
+      tapped,
     );
   }
 
   /** Add one, and say what: opening, an item is the package it opens
    * (openingPackage), as only whole packages are opened; with no such
    * package, its line, for the volunteer to fill. A package's own label
-   * is the volunteer's choice, kept as typed. */
+   * is the volunteer's choice, kept as typed. Read from a label, or picked
+   * in the search, whose tap Finder settles: not `tapped` (change). */
   function add(itemId: number, packageId?: number): Picked {
     const item = indexOf(catalogue).items.get(itemId);
     const opening = packageId === undefined && cart.value.kind === "open";
@@ -389,7 +396,7 @@ export function CartForm({
           aboutLine(cart.value, itemId),
         );
       }
-      change(withLine(cart.value, itemId));
+      change(withLine(cart.value, itemId), false);
       return done(say(WHICH_PACKAGE, { item: item?.name }));
     }
     if (pack === undefined && looseUnread(cart.value, itemId)) {
@@ -402,6 +409,7 @@ export function CartForm({
       packageId === undefined
         ? next
         : withLineChanged(next, itemId, (line) => ({ ...line, typed: true })),
+      false,
     );
     return done(
       pack === undefined
@@ -446,7 +454,7 @@ export function CartForm({
         const place = places.get(read.locationId);
         const [only, other] = placeSides(cart.value);
         if (only !== undefined && other === undefined) {
-          placeOn(only, read.locationId);
+          placeOn(only, read.locationId, false);
           const here =
             cart.value.kind === "open" ? PLACE_HERE : PLACE_FROM_HERE;
           return done(say(only === "from" ? here : PLACE_TO_HERE, { place }));
@@ -461,8 +469,12 @@ export function CartForm({
     });
   }
 
-  function placeOn(side: Side, locationId: number) {
-    set(side === "from" ? { fromId: locationId } : { toId: locationId });
+  /** Fill `side` with the place, `tapped` or read from its label. */
+  function placeOn(side: Side, locationId: number, tapped = true) {
+    set(
+      side === "from" ? { fromId: locationId } : { toId: locationId },
+      tapped,
+    );
     placeRead.value = null;
   }
 
@@ -884,7 +896,7 @@ export function CartForm({
             ref={nameList}
             value={String(cart.value.volunteerId ?? "")}
             onChange={(event) =>
-              set({ volunteerId: idOrNull(event.currentTarget.value) }, true)
+              set({ volunteerId: idOrNull(event.currentTarget.value) }, false)
             }
           >
             <option value="">{say(NO_NAME_PICKED)}</option>
@@ -922,7 +934,7 @@ export function CartForm({
           list={fromList}
           catalogue={catalogue}
           value={cart.value.fromId}
-          onPick={(fromId) => set({ fromId }, true)}
+          onPick={(fromId) => set({ fromId }, false)}
         />
       )}
       {sides.to && (
@@ -931,7 +943,7 @@ export function CartForm({
           list={toList}
           catalogue={catalogue}
           value={cart.value.toId}
-          onPick={(toId) => set({ toId }, true)}
+          onPick={(toId) => set({ toId }, false)}
         />
       )}
       {cart.value.kind === "install" && (

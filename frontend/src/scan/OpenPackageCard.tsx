@@ -7,11 +7,12 @@
  */
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
-import { useId } from "preact/hooks";
+import { useId, useRef } from "preact/hooks";
 import { countedWhole, isLength, isShortEnd, keyboard } from "../amount-rules";
 import { Field } from "../shared/Field";
 import { say, sayAmount } from "../shared/i18n";
 import { boxAmount } from "../shared/quantity";
+import { focusInPlace, ignoreTaps } from "../shared/settling";
 import type { Item } from "./cart";
 import {
   cutOf,
@@ -178,6 +179,7 @@ export function OpenPackageCard({
   const nowId = useId();
   const afterId = useId();
   const hintId = useId();
+  const card = useRef<HTMLFieldSetElement>(null);
   const unit = item.unit;
   const printed = isLength(unit);
   const words = wordsFor(unit);
@@ -211,6 +213,8 @@ export function OpenPackageCard({
   );
   return (
     <fieldset
+      ref={card}
+      tabIndex={-1}
       class={`flex flex-col gap-2 border-2 border-line p-3 ${empty ? "bg-band" : ""}`}
     >
       <legend class="flex flex-wrap items-center gap-2 px-1">
@@ -264,15 +268,24 @@ export function OpenPackageCard({
           <input
             type="checkbox"
             checked={taken.whole}
-            onChange={(event) =>
+            onChange={(event) => {
+              const ticked = event.currentTarget.checked;
               take({
                 // Moved whole, it is not used up.
                 ...(taken.now === undefined ? {} : { now: taken.now }),
-                ...(event.currentTarget.checked
+                ...(ticked
                   ? { amount: boxAmount(open.left), whole: true }
                   : NOTHING_TAKEN),
-              })
-            }
+              });
+              if (empty && !ticked) {
+                // Unticked, showing nothing, the box goes and what is
+                // below moves up under the finger: taps wait a moment,
+                // and focus goes to the card (docs/decisions/0019, Double
+                // taps).
+                focusInPlace(card.current);
+                ignoreTaps(document, () => card.current);
+              }
+            }}
           />
           {say(ALL_OF_IT)}
         </label>

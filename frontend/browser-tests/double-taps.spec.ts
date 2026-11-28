@@ -8,7 +8,7 @@
  */
 import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "./csp-violations";
-import { ownCable } from "./own-rows";
+import { ownCable, unique } from "./own-rows";
 import { prepared } from "./prepared";
 import { fillMove, pick, settled } from "./scan-page";
 
@@ -65,16 +65,23 @@ test("a double tap on Undo puts the line back, and nothing else", async ({
   ).toBeFocused();
 });
 
-test("a double tap on an item in the search adds it once, and the Cart heading has focus", async ({
+test("a double tap on an item in the search adds it once, and taps nothing that moved up", async ({
   page,
 }) => {
-  await twoLines(page);
-  const third = await ownCable(page);
+  // Three matches, so the cart's first line moves up under the last one.
+  const three = unique("Cable");
+  const first = await ownCable(page, `${three} a`);
+  await ownCable(page, `${three} b`);
+  await ownCable(page, `${three} c`);
   await page.goto("/scan");
+  await fillMove(page, first);
+  await page.getByLabel(/Find an item/).fill(three);
+  const matches = page.getByRole("listitem").getByRole("button", {
+    name: three,
+  });
+  await expect(matches).toHaveCount(3);
+  await doubleTap(page, matches.last());
   await expect(linesOf(page)).toHaveCount(2);
-  await page.getByLabel(/Find an item/).fill(third);
-  await doubleTap(page, page.getByRole("button", { name: third, exact: true }));
-  await expect(linesOf(page)).toHaveCount(3);
   await expect(page.getByRole("heading", { name: "Cart" })).toBeFocused();
 });
 

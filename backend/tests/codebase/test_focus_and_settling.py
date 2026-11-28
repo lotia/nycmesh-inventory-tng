@@ -25,8 +25,9 @@ SETTLING = SOURCE / "shared/settling.ts"
 HOOKS = SOURCE / "scan/settling-hooks.tsx"
 # focus(), called or optionally called, or its scroll option named.
 FOCUSES = re.compile(r"\.focus\s*(?:\?\.)?\(|\bpreventScroll\b")
-# A click's detail compared, which tells a pointer's tap from a key's press.
-TELLS_TAPS = re.compile(r"\.detail\s*(?:[<>]=?|[!=]==?)")
+# An event's detail read, which tells a pointer's tap from a key's press:
+# compared, or tested as true or false.
+TELLS_TAPS = re.compile(r"\b(?:event|ev|e)\.detail\b")
 
 
 def _sources() -> list[Path]:
@@ -74,7 +75,13 @@ def test_each_focus_is_found(text: str) -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ["if (event.detail > 0) {", "event.detail === 0", "e.detail >= 1"],
+    [
+        "if (event.detail > 0) {",
+        "event.detail === 0",
+        "e.detail >= 1",
+        "if (!event.detail) return;",
+        "ev.detail ? tap() : press()",
+    ],
 )
 def test_each_pointer_test_is_found(text: str) -> None:
     assert TELLS_TAPS.search(text)

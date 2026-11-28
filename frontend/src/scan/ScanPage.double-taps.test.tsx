@@ -11,9 +11,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import type { Outbox } from "../shared/outbox";
 import { SETTLE_MS } from "../shared/settling";
-import { CATALOGUE } from "../testing/catalogue";
-import { answering, json } from "../testing/fetch";
+import { pass } from "../testing/camera";
+import { CATALOGUE, openSpool } from "../testing/catalogue";
+import { answering, json, saved } from "../testing/fetch";
 import {
+  camera,
   fillMove,
   find,
   open,
@@ -23,10 +25,12 @@ import {
   storedCart,
   tap,
 } from "../testing/scan-page";
-import { CART, DISCARD_CART, RECORD } from "./CartForm";
-import { REMOVE } from "./CartLine";
+import { CART, DISCARD_CART, RECORD, SCAN_WITH_CAMERA } from "./CartForm";
+import { REMOVE, UNIT_CHANGED } from "./CartLine";
 import { type Cart, freshCart, KIND_WORDS, storeCart } from "./cart";
 import { DISCARD, KEEP_IT } from "./Notes";
+import { ALL_OF_IT } from "./OpenPackageCard";
+import { POINT } from "./Scanner";
 import { COULD_NOT_LOAD, SCAN, TRY_AGAIN } from "./ScanPage";
 
 // The camera, faked: it sees whatever a test puts in `inView`.
@@ -155,6 +159,36 @@ describe("a tap that takes away what is above other controls (Ali, 2026-11-27, i
     expect(lineCount()).toBe(before - 1);
   });
 
+  test("All of it, ticked on a line whose unit changed: the words saying so go, and the tick keeps focus", async () => {
+    const { api } = server(saved, {
+      ...CATALOGUE,
+      open_packages: [openSpool()],
+    });
+    storeCart({
+      ...FILLED,
+      lines: [{ itemId: 101, packages: {}, loose: "", unit: "ft" }],
+    });
+    open(api);
+    await ready();
+    const words = () =>
+      screen.queryByText(say(UNIT_CHANGED, { was: "ft", unit: "m" }));
+    expect(words()).not.toBeNull();
+    const whole = screen.getByLabelText(say(ALL_OF_IT));
+    whole.focus();
+    tap(whole);
+    expect(words()).toBeNull();
+    // Focus stays on the tick, as the page did not move it; an ignored
+    // tap on what moved up puts it back there.
+    const remove = removeButtons()[0] as HTMLElement;
+    remove.focus();
+    fireEvent.click(remove, { detail: 1 });
+    expect(lineCount()).toBe(1);
+    expect(document.activeElement).toBe(whole);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    fireEvent.click(remove, { detail: 1 });
+    expect(lineCount()).toBe(0);
+  });
+
   test("typed in a box, a change that takes Undo's offer away leaves taps taken: no finger is on the page", async () => {
     await opened();
     tap(removeButtons()[0] as HTMLElement);
@@ -165,6 +199,22 @@ describe("a tap that takes away what is above other controls (Ali, 2026-11-27, i
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
     fireEvent.click(removeButtons()[0] as HTMLElement, { detail: 1 });
     expect(lineCount()).toBe(0);
+  });
+
+  test("read by the camera, a label whose line takes Undo's offer away leaves taps taken: no finger is on the page", async () => {
+    await opened();
+    tap(removeButtons()[0] as HTMLElement);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    camera.state.inView = [];
+    tap(button(say(SCAN_WITH_CAMERA)));
+    await screen.findByText(say(POINT));
+    camera.state.inView = ["B3ZT9W"];
+    await pass();
+    await screen.findByText("Added one: LiteBeam 5AC.");
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    const before = lineCount();
+    fireEvent.click(removeButtons()[0] as HTMLElement, { detail: 1 });
+    expect(lineCount()).toBe(before - 1);
   });
 
   test("Discard cart, confirmed: the lines go, and the Cart heading has focus", async () => {

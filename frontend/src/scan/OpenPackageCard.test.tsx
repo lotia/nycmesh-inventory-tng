@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, test, vi } from "vitest";
 import { say } from "../shared/i18n";
 import { takeSeparatorFrom } from "../shared/quantity";
+import { SETTLE_MS } from "../shared/settling";
 import { cart } from "../testing/cart";
 import { CATALOGUE, cable, openAt, radio } from "../testing/catalogue";
 import { saidAsText } from "../testing/said";
@@ -60,11 +61,14 @@ describe("an open package's card", () => {
   });
 });
 
-/** An open package of an item, shown as a card with `taken`. */
-function card(
+type Shown = { amount: string; whole: boolean; now?: string };
+type Options = { left?: number; moving?: boolean; onTake?: () => void };
+
+/** An open package of an item, as a card with `taken`. */
+function cardOf(
   item: typeof cable,
-  taken: { amount: string; whole: boolean; now?: string },
-  { left = 4000, moving = false, onTake = () => {} } = {},
+  taken: Shown,
+  { left = 4000, moving = false, onTake = () => {} }: Options = {},
 ) {
   const open = openAt(1, left, {
     key: "11111111-1111-4111-8111-111111111111",
@@ -72,15 +76,20 @@ function card(
     package_id: item.packages[0]?.id ?? 0,
     package_name: item.packages[0]?.name ?? "",
   });
-  return render(
+  return (
     <OpenPackageCard
       open={open}
       item={item}
       taken={taken}
       moving={moving}
       onTake={onTake}
-    />,
+    />
   );
+}
+
+/** An open package of an item, shown as a card with `taken`. */
+function card(item: typeof cable, taken: Shown, options: Options = {}) {
+  return render(cardOf(item, taken, options));
 }
 
 test("things counted each get no hint to read a printed length", () => {
@@ -106,6 +115,35 @@ test("moved whole, then shown at nothing, its box stays to untick", () => {
   const whole = { amount: "20", whole: true };
   card(cable, whole, { left: -4000, moving: true });
   expect(screen.getByLabelText(say(ALL_OF_IT))).toBeDefined();
+});
+
+test("moved whole and shown at nothing, unticked, its box goes and taps wait a moment (inventory-tng-r3jx)", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const onTake = vi.fn();
+  const whole = { amount: "20", whole: true };
+  const { rerender } = card(cable, whole, {
+    left: -4000,
+    moving: true,
+    onTake,
+  });
+  fireEvent.click(screen.getByLabelText(say(ALL_OF_IT)));
+  const unticked = onTake.mock.lastCall?.[0];
+  expect(unticked).toMatchObject({ whole: false });
+  rerender(cardOf(cable, unticked, { left: -4000, moving: true, onTake }));
+  expect(screen.queryByLabelText(say(ALL_OF_IT))).toBeNull();
+  const fieldset = screen.getByRole("group");
+  expect(document.activeElement).toBe(fieldset);
+  // The double tap's second, on what moved up: nothing is asked.
+  onTake.mockClear();
+  fireEvent.click(screen.getByRole("button", { name: say(WRONG_LENGTH) }), {
+    detail: 1,
+  });
+  expect(onTake).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(fieldset);
+  await vi.advanceTimersByTimeAsync(SETTLE_MS);
+  fireEvent.click(screen.getByRole("button", { name: say(WRONG_LENGTH) }));
+  expect(onTake).toHaveBeenCalled();
+  vi.useRealTimers();
 });
 
 test("showing nothing, nothing is offered to move whole", () => {
